@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "FoxyVPN"
-include(":app")
+include(":android")

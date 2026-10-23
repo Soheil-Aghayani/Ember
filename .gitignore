@@ -7,10 +7,10 @@
 .externalNativeBuild
 .cxx
 local.properties
-app/build/
+android/build/
 *.apk
 *.aab
 *.keystore
 *.jks
 keystore.properties
-app/src/main/jni/
+android/src/main/jni/
