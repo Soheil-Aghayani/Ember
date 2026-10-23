@@ -2,16 +2,31 @@ package com.soheil.ember.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+// Inter is not bundled yet; swap this for the Inter FontFamily (design/tokens.json "font").
+val EmberFontFamily: FontFamily = FontFamily.Default
+
+private fun style(weight: FontWeight, size: Int, lineHeight: Int) =
+    TextStyle(fontFamily = EmberFontFamily, fontWeight = weight, fontSize = size.sp, lineHeight = lineHeight.sp)
+
+// Apple HIG text styles (design/tokens.json "type") mapped onto Material slots.
 val EmberTypography = Typography(
-    displayLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 57.sp, lineHeight = 64.sp),
-    headlineLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
-    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
-    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
-    bodyLarge = TextStyle(fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
-    labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    displayLarge = style(FontWeight.Bold, 34, 41),       // largeTitle
+    displayMedium = style(FontWeight.Bold, 34, 41),
+    displaySmall = style(FontWeight.Bold, 28, 34),
+    headlineLarge = style(FontWeight.Bold, 28, 34),      // title1
+    headlineMedium = style(FontWeight.SemiBold, 22, 28), // title2
+    headlineSmall = style(FontWeight.SemiBold, 20, 25),  // title3
+    titleLarge = style(FontWeight.SemiBold, 22, 28),
+    titleMedium = style(FontWeight.SemiBold, 17, 22),    // headline
+    titleSmall = style(FontWeight.Medium, 16, 21),       // callout
+    bodyLarge = style(FontWeight.Normal, 17, 22),        // body
+    bodyMedium = style(FontWeight.Normal, 15, 20),       // subheadline
+    bodySmall = style(FontWeight.Normal, 13, 18),        // footnote
+    labelLarge = style(FontWeight.Medium, 16, 21),
+    labelMedium = style(FontWeight.Medium, 13, 18),
+    labelSmall = style(FontWeight.Medium, 12, 16),       // caption
 )

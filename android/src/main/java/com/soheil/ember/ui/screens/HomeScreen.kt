@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -101,7 +102,7 @@ fun HomeScreen(
     val targetRingColor = when (state) {
         ConnectionState.CONNECTED -> statusColors.connected
         ConnectionState.CONNECTING -> statusColors.connecting
-        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
+        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
     }
 
     val ringColor by animateColorAsState(targetValue = targetRingColor, label = "connect-ring-color")
@@ -321,6 +322,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(
@@ -351,6 +353,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         val isConnected = state == ConnectionState.CONNECTED
@@ -409,6 +412,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         val isConnected = state == ConnectionState.CONNECTED
