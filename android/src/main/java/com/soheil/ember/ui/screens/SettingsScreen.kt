@@ -60,7 +60,7 @@ import com.soheil.ember.data.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val GITHUB_URL = "https://github.com/soheil/ember"
+private const val GITHUB_URL = "https://github.com/Soheil-Aghayani/Ember"
 
 @Composable
 fun SettingsScreen(
