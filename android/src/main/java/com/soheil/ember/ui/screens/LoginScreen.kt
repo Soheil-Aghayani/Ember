@@ -1,6 +1,7 @@
 package com.soheil.ember.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.soheil.ember.R
 import com.soheil.ember.data.FxaAuthRepository
 import kotlinx.coroutines.launch
 
@@ -108,6 +111,12 @@ fun LoginScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
+            Image(
+                painter = painterResource(R.drawable.ember_logo),
+                contentDescription = null,
+                modifier = Modifier.size(72.dp),
+            )
+            Spacer(Modifier.padding(top = 12.dp))
             Text("Sign in", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.padding(top = 8.dp))
             Text(

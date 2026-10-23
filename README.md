@@ -3,7 +3,7 @@
 # Ember
 
 <p align="center">
-  <img src="https://i.ibb.co/8D9KdmNk/6a07263d16c0.png" alt="Ember Logo" width="150"/>
+  <img src="design/brand/ember-logo.png" alt="Ember Logo" width="150"/>
 </p>
 
 ![Android](https://img.shields.io/badge/Android-212121?style=for-the-badge&logo=android&logoColor=white)
