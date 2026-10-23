@@ -1,6 +1,13 @@
 package com.soheil.ember.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.soheil.ember.ui.components.EmberDivider
+import com.soheil.ember.ui.components.EmberTopBar
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -103,16 +110,7 @@ fun ServerListScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Choose location") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+        topBar = { EmberTopBar("Choose location", onBack) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -126,7 +124,7 @@ fun ServerListScreen(
                         .fillMaxWidth()
                         .padding(24.dp),
                 )
-                else -> LazyColumn {
+                else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
                     items(
                         rows,
                         key = { row ->
@@ -143,17 +141,18 @@ fun ServerListScreen(
                         when (row) {
                             is LocationRow.RecommendedRow -> ListItem(
                                 leadingContent = {
-                                    Icon(Icons.Filled.Public, contentDescription = null)
+                                    Icon(Icons.Filled.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 },
                                 headlineContent = { Text("Recommended", fontWeight = FontWeight.SemiBold) },
                                 supportingContent = { Text("Automatically chosen for the best performance") },
                                 trailingContent = {
                                     if (row.country.code == selected?.countryCode) {
-                                        Icon(Icons.Filled.CheckCircle, contentDescription = "Selected")
+                                        Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 },
                                 modifier = Modifier
-                                    .padding(horizontal = 8.dp)
+                                    .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                                    .clip(RoundedCornerShape(16.dp))
                                     .clickable {
                                         val candidates = ServerListClient.candidatesForCountry(countries, row.country.code)
                                         val chosen = candidates.randomOrNull()
@@ -173,7 +172,8 @@ fun ServerListScreen(
                                     )
                                 },
                                 headlineContent = { Text(row.country.name, fontWeight = FontWeight.SemiBold) },
-                                modifier = Modifier.padding(horizontal = 8.dp),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                             )
                             is LocationRow.CityRow -> {
                                 val city = row.country.cities[row.cityIndex]
@@ -200,8 +200,20 @@ fun ServerListScreen(
                                     }
                                 }
 
+                                val isFirst = row.cityIndex == 0
+                                val isLast = row.cityIndex == row.country.cities.lastIndex
+                                val cityShape = RoundedCornerShape(
+                                    topStart = if (isFirst) 16.dp else 0.dp,
+                                    topEnd = if (isFirst) 16.dp else 0.dp,
+                                    bottomStart = if (isLast) 16.dp else 0.dp,
+                                    bottomEnd = if (isLast) 16.dp else 0.dp,
+                                )
+                                if (!isFirst) {
+                                    Box(Modifier.padding(horizontal = 16.dp)) {
+                                        EmberDivider()
+                                    }
+                                }
                                 ListItem(
-
                                     headlineContent = { Text(city.code) },
                                     supportingContent = {
                                         val primaryHostname = city.servers.firstOrNull()?.hostname
@@ -221,11 +233,12 @@ fun ServerListScreen(
                                         if (row.country.code == selected?.countryCode &&
                                             city.code == selected?.cityCode
                                         ) {
-                                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected")
+                                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                         }
                                     },
                                     modifier = Modifier
-                                        .padding(start = 24.dp, end = 8.dp)
+                                        .padding(horizontal = 16.dp)
+                                        .clip(cityShape)
                                         .clickable {
                                             val candidates = ServerListClient.candidatesForCity(countries, row.country.code, city.code)
                                             val chosen = candidates.randomOrNull()

@@ -1,5 +1,8 @@
 package com.soheil.ember.ui.screens
 
+import com.soheil.ember.ui.components.EmberDivider
+import com.soheil.ember.ui.components.EmberGroup
+import com.soheil.ember.ui.components.EmberTopBar
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -30,7 +33,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -41,7 +43,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -249,16 +250,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+        topBar = { EmberTopBar("Settings", onBack) },
     ) { padding ->
         Column(
             Modifier
@@ -266,202 +258,209 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            SectionLabel("Connection")
-            ListItem(
-                headlineContent = { Text("Verify exit location") },
-                supportingContent = { Text("Check that the tunnel exits in the selected country") },
-                trailingContent = {
-                    Switch(
-                        checked = exitCheckEnabled,
-                        onCheckedChange = {
-                            exitCheckEnabled = it
-                            settingsStore.exitCheckEnabled = it
-                        },
-                    )
-                },
-            )
-            ListItem(
-                headlineContent = { Text("Tunnel MTU") },
-                supportingContent = { Text(mtu.toString()) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showMtuDialog = true },
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionLabel("DNS")
-            ListItem(
-                headlineContent = { Text("Tunnel DNS") },
-                supportingContent = {
-                    val subtitle = when (dnsProvider) {
-                        SettingsStore.DnsProvider.SYSTEM_DEFAULT -> "Default"
-                        SettingsStore.DnsProvider.CUSTOM -> customDohUrl.ifBlank { "Custom DoH (Not configured)" }
-                        else -> dnsProvider.label
-                    }
-                    Text(subtitle)
-                },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showDnsProviderDialog = true },
-            )
-            ListItem(
-                headlineContent = { Text("Resolver DNS") },
-                supportingContent = {
-                    val subtitle = when (bootstrapDnsProvider) {
-                        SettingsStore.BootstrapDnsProvider.CUSTOM -> customBootstrapIp.ifBlank { "Custom IP (Not configured)" }
-                        SettingsStore.BootstrapDnsProvider.SYSTEM -> "System DNS"
-                        else -> bootstrapDnsProvider.label
-                    }
-                    Text(subtitle)
-                },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showBootstrapDnsDialog = true },
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionLabel("Local proxy")
-            ListItem(
-                headlineContent = { Text("Proxy-only mode") },
-                supportingContent = { Text("Run local proxy servers (SOCKS5 & HTTP), without a VPN interface") },
-                trailingContent = {
-                    Switch(
-                        checked = proxyOnlyMode,
-                        onCheckedChange = {
-                            proxyOnlyMode = it
-                            settingsStore.proxyOnlyMode = it
-                        },
-                    )
-                },
-            )
-            ListItem(
-                headlineContent = { Text("Local address") },
-                supportingContent = { Text(socksBindAddress) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showSocksBindDialog = true },
-            )
-            ListItem(
-                headlineContent = { Text("SOCKS5 port") },
-                supportingContent = { Text(socksPort.toString()) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showSocksPortDialog = true },
-            )
-            ListItem(
-                headlineContent = { Text("Enable HTTP proxy") },
-                supportingContent = { Text("Run local HTTP proxy alongside SOCKS5") },
-                trailingContent = {
-                    Switch(
-                        checked = httpProxyEnabled,
-                        onCheckedChange = {
-                            httpProxyEnabled = it
-                            settingsStore.httpProxyEnabled = it
-                        },
-                    )
-                },
-            )
-            if (httpProxyEnabled) {
+            EmberGroup("Connection") {
                 ListItem(
-                    headlineContent = { Text("HTTP port") },
-                    supportingContent = { Text(httpProxyPort.toString()) },
+                    headlineContent = { Text("Verify exit location") },
+                    supportingContent = { Text("Check that the tunnel exits in the selected country") },
+                    trailingContent = {
+                        Switch(
+                            checked = exitCheckEnabled,
+                            onCheckedChange = {
+                                exitCheckEnabled = it
+                                settingsStore.exitCheckEnabled = it
+                            },
+                        )
+                    },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Tunnel MTU") },
+                    supportingContent = { Text(mtu.toString()) },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable { showHttpPortDialog = true },
+                    modifier = Modifier.clickable { showMtuDialog = true },
                 )
             }
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionLabel("Split tunneling")
-            ListItem(
-                headlineContent = { Text("Excluded apps") },
-                supportingContent = {
-                    Text(
-                        if (excludedApps.isEmpty()) {
-                            "None"
-                        } else {
-                            "${excludedApps.size} app(s) bypass the VPN"
-                        },
-                    )
-                },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showSplitTunnelDialog = true },
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionLabel("Advanced")
-            ListItem(
-                headlineContent = { Text("Custom edge address") },
-                supportingContent = { Text(customEdgeAddress.ifBlank { "Not set" }) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showEdgeAddressDialog = true },
-            )
-            ListItem(
-                headlineContent = { Text("TLS fragmentation") },
-                supportingContent = { Text(tlsSplitMode.label) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { showTlsSplitDialog = true },
-            )
-            ListItem(
-                headlineContent = { Text("Chain through upstream proxy") },
-                supportingContent = { Text("Connect to the VPN server through another proxy first") },
-                trailingContent = {
-                    Switch(
-                        checked = upstreamProxyEnabled,
-                        onCheckedChange = {
-                            upstreamProxyEnabled = it
-                            settingsStore.upstreamProxyEnabled = it
-                        },
-                    )
-                },
-            )
-            if (upstreamProxyEnabled) {
+            EmberGroup("DNS") {
                 ListItem(
-                    headlineContent = { Text("Proxy type") },
-                    supportingContent = { Text(upstreamProxyType.name) },
+                    headlineContent = { Text("Tunnel DNS") },
+                    supportingContent = {
+                        val subtitle = when (dnsProvider) {
+                            SettingsStore.DnsProvider.SYSTEM_DEFAULT -> "Default"
+                            SettingsStore.DnsProvider.CUSTOM -> customDohUrl.ifBlank { "Custom DoH (Not configured)" }
+                            else -> dnsProvider.label
+                        }
+                        Text(subtitle)
+                    },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable { showUpstreamProxyTypeDialog = true },
+                    modifier = Modifier.clickable { showDnsProviderDialog = true },
                 )
+                EmberDivider()
                 ListItem(
-                    headlineContent = { Text("Proxy address") },
+                    headlineContent = { Text("Resolver DNS") },
+                    supportingContent = {
+                        val subtitle = when (bootstrapDnsProvider) {
+                            SettingsStore.BootstrapDnsProvider.CUSTOM -> customBootstrapIp.ifBlank { "Custom IP (Not configured)" }
+                            SettingsStore.BootstrapDnsProvider.SYSTEM -> "System DNS"
+                            else -> bootstrapDnsProvider.label
+                        }
+                        Text(subtitle)
+                    },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { showBootstrapDnsDialog = true },
+                )
+            }
+            EmberGroup("Local proxy") {
+                ListItem(
+                    headlineContent = { Text("Proxy-only mode") },
+                    supportingContent = { Text("Run local proxy servers (SOCKS5 & HTTP), without a VPN interface") },
+                    trailingContent = {
+                        Switch(
+                            checked = proxyOnlyMode,
+                            onCheckedChange = {
+                                proxyOnlyMode = it
+                                settingsStore.proxyOnlyMode = it
+                            },
+                        )
+                    },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Local address") },
+                    supportingContent = { Text(socksBindAddress) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { showSocksBindDialog = true },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("SOCKS5 port") },
+                    supportingContent = { Text(socksPort.toString()) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { showSocksPortDialog = true },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Enable HTTP proxy") },
+                    supportingContent = { Text("Run local HTTP proxy alongside SOCKS5") },
+                    trailingContent = {
+                        Switch(
+                            checked = httpProxyEnabled,
+                            onCheckedChange = {
+                                httpProxyEnabled = it
+                                settingsStore.httpProxyEnabled = it
+                            },
+                        )
+                    },
+                )
+                if (httpProxyEnabled) {
+                    EmberDivider()
+                    ListItem(
+                        headlineContent = { Text("HTTP port") },
+                        supportingContent = { Text(httpProxyPort.toString()) },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { showHttpPortDialog = true },
+                    )
+            }
+            }
+            EmberGroup("Split tunneling") {
+                ListItem(
+                    headlineContent = { Text("Excluded apps") },
                     supportingContent = {
                         Text(
-                            if (upstreamProxyHost.isBlank()) {
-                                "Not set"
+                            if (excludedApps.isEmpty()) {
+                                "None"
                             } else {
-                                "$upstreamProxyHost:$upstreamProxyPort"
+                                "${excludedApps.size} app(s) bypass the VPN"
                             },
                         )
                     },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable { showUpstreamProxyAddressDialog = true },
-                )
-                ListItem(
-                    headlineContent = { Text("Proxy credentials") },
-                    supportingContent = {
-                        Text(if (upstreamProxyUsername.isBlank()) "None" else upstreamProxyUsername)
-                    },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable { showUpstreamProxyCredentialsDialog = true },
+                    modifier = Modifier.clickable { showSplitTunnelDialog = true },
                 )
             }
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionLabel("About")
-            ListItem(
-                headlineContent = { Text("View logs") },
-                supportingContent = { Text("Recent connection activity") },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable(onClick = onOpenLogs),
-            )
-            ListItem(
-                headlineContent = { Text("Version") },
-                supportingContent = { Text(BuildConfig.VERSION_NAME) },
-            )
-            ListItem(
-                headlineContent = { Text("Source code") },
-                supportingContent = { Text(GITHUB_URL) },
-                leadingContent = { Icon(Icons.Filled.Code, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
-                },
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            EmberGroup("Advanced") {
+                ListItem(
+                    headlineContent = { Text("Custom edge address") },
+                    supportingContent = { Text(customEdgeAddress.ifBlank { "Not set" }) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { showEdgeAddressDialog = true },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("TLS fragmentation") },
+                    supportingContent = { Text(tlsSplitMode.label) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { showTlsSplitDialog = true },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Chain through upstream proxy") },
+                    supportingContent = { Text("Connect to the VPN server through another proxy first") },
+                    trailingContent = {
+                        Switch(
+                            checked = upstreamProxyEnabled,
+                            onCheckedChange = {
+                                upstreamProxyEnabled = it
+                                settingsStore.upstreamProxyEnabled = it
+                            },
+                        )
+                    },
+                )
+                if (upstreamProxyEnabled) {
+                    EmberDivider()
+                    ListItem(
+                        headlineContent = { Text("Proxy type") },
+                        supportingContent = { Text(upstreamProxyType.name) },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { showUpstreamProxyTypeDialog = true },
+                    )
+                    EmberDivider()
+                    ListItem(
+                        headlineContent = { Text("Proxy address") },
+                        supportingContent = {
+                            Text(
+                                if (upstreamProxyHost.isBlank()) {
+                                    "Not set"
+                                } else {
+                                    "$upstreamProxyHost:$upstreamProxyPort"
+                                },
+                            )
+                        },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { showUpstreamProxyAddressDialog = true },
+                    )
+                    EmberDivider()
+                    ListItem(
+                        headlineContent = { Text("Proxy credentials") },
+                        supportingContent = {
+                            Text(if (upstreamProxyUsername.isBlank()) "None" else upstreamProxyUsername)
+                        },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { showUpstreamProxyCredentialsDialog = true },
+                    )
+            }
+            }
+            EmberGroup("About") {
+                ListItem(
+                    headlineContent = { Text("View logs") },
+                    supportingContent = { Text("Recent connection activity") },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable(onClick = onOpenLogs),
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Version") },
+                    supportingContent = { Text(BuildConfig.VERSION_NAME) },
+                )
+                EmberDivider()
+                ListItem(
+                    headlineContent = { Text("Source code") },
+                    supportingContent = { Text(GITHUB_URL) },
+                    leadingContent = { Icon(Icons.Filled.Code, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
+                    },
+                )
+            }
             Button(
                 onClick = onSignOut,
                 colors = ButtonDefaults.buttonColors(
@@ -470,7 +469,7 @@ fun SettingsScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 32.dp),
             ) {
                 Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -1050,16 +1049,6 @@ private fun SplitTunnelDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-    )
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
