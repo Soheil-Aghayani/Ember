@@ -38,13 +38,13 @@ val hasReleaseSigning = releaseKeystoreFile.exists() &&
     !releaseStorePassword.isNullOrBlank()
 
 android {
-    namespace = "com.soheil.foxyvpn"
+    namespace = "com.soheil.ember"
     compileSdk = 35
 
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
-        applicationId = "com.soheil.foxyvpn"
+        applicationId = "com.soheil.ember"
         minSdk = 26
         targetSdk = 35
         versionCode = 44
@@ -57,7 +57,7 @@ android {
 
                     "APP_PLATFORM=android-26",
 
-                    "APP_CFLAGS=-DPKGNAME=com/soheil/foxyvpn/vpn/tun -DCLSNAME=HevSocks5Tunnel",
+                    "APP_CFLAGS=-DPKGNAME=com/soheil/ember/vpn/tun -DCLSNAME=HevSocks5Tunnel",
                 )
             }
         }

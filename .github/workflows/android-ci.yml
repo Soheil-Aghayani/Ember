@@ -41,7 +41,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: foxyvpn-debug-apk
+          name: ember-debug-apk
           path: android/build/outputs/apk/debug/*.apk
 
   release:

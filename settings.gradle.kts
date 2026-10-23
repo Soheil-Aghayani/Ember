@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FoxyVPN"
+rootProject.name = "Ember"
 include(":android")

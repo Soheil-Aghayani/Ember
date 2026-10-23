@@ -1,9 +1,9 @@
 <div align="center">
 
-# FoxyVPN - Unofficial Firefox VPN client
+# Ember
 
 <p align="center">
-  <img src="https://i.ibb.co/8D9KdmNk/6a07263d16c0.png" alt="FoxyVPN Logo" width="150"/>
+  <img src="https://i.ibb.co/8D9KdmNk/6a07263d16c0.png" alt="Ember Logo" width="150"/>
 </p>
 
 ![Android](https://img.shields.io/badge/Android-212121?style=for-the-badge&logo=android&logoColor=white)
@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/License_MIT-212121?style=for-the-badge)
 
 
-*FoxyVPN signs in with a Firefox account, obtains a proxy pass from Mozilla's
+*Ember signs in with a Firefox account, obtains a proxy pass from Mozilla's
 Guardian service, and carries the whole device's traffic through Firefox VPN's
 Fastly edge over an HTTP/2 tunnel. It is a native Kotlin app with a
 Jetpack Compose (Material 3) UI.*
@@ -52,13 +52,13 @@ Jetpack Compose (Material 3) UI.*
 
 1. **Get a Firefox account.** If you do not have one, create it for free at
    [accounts.firefox.com](https://accounts.firefox.com/signup).
-2. **Install the APK** from the [Releases](https://github.com/soheil/foxyvpn/releases)
+2. **Install the APK** from the [Releases](https://github.com/Soheil-Aghayani/FoxyVPN/releases)
    page.
 3. **Sign in** with that account's email and password.
 4. **Pick a location** and tap the power button.
 
 > [!NOTE]
-> **No subscription is required.** FoxyVPN runs on the free **50 GB of monthly
+> **No subscription is required.** Ember runs on the free **50 GB of monthly
 VPN traffic Mozilla includes with a Firefox account** for browser users, which
 is the same allowance the Firefox browser's built-in VPN uses. Once the
 allowance is used up for the month, connections stop working until it resets.
@@ -77,8 +77,8 @@ allowance is used up for the month, connections stop working until it resets.
 ## ⚙️ Build
 * #### Clone Repository:
 ```bash
-git clone https://github.com/soheil/foxyvpn.git
-cd foxyvpn
+git clone https://github.com/Soheil-Aghayani/FoxyVPN.git
+cd FoxyVPN
    ```
 * #### Build and Install:
 ```bash
