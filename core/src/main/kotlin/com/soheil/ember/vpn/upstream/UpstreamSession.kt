@@ -35,3 +35,8 @@ class UpstreamConnectTimeoutException(
     message: String,
     cause: Throwable? = null,
 ) : IOException(message, cause)
+
+object UpstreamDebug {
+    /** Log every HTTP/2 frame. Android turns this on for debug builds. */
+    @Volatile var frameLogging: Boolean = false
+}

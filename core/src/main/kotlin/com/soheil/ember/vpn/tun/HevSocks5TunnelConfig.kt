@@ -1,6 +1,5 @@
 package com.soheil.ember.vpn.tun
 
-import android.content.Context
 import java.io.File
 
 object HevSocks5TunnelConfig {
@@ -54,7 +53,7 @@ object HevSocks5TunnelConfig {
         return (packed and MAPDNS_NETMASK_BITS) == MAPDNS_NETWORK_BITS
     }
 
-    fun write(context: Context, socksPort: Int, useMapDns: Boolean = true, mtu: Int = TUN_MTU): String {
+    fun write(dir: File, socksPort: Int, useMapDns: Boolean = true, mtu: Int = TUN_MTU): String {
 
         val mapdnsBlock = if (useMapDns) {
             """
@@ -93,7 +92,7 @@ object HevSocks5TunnelConfig {
               log-level: 'warn'
             """.trimIndent() + "\n"
 
-        val file = File(context.filesDir, FILE_NAME)
+        val file = File(dir, FILE_NAME)
         file.writeText(yaml)
         return file.absolutePath
     }

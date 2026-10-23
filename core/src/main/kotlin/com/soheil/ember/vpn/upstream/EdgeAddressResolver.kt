@@ -51,7 +51,7 @@ private const val CACHE_TTL_MS = 5 * 60_000L
 
 private const val FAILURE_BACKOFF_MS = 30 * 60_000L
 
-internal object EdgeAddressResolver {
+object EdgeAddressResolver {
 
     private class CacheEntry(val addresses: List<String>, val resolvedAtMs: Long)
 

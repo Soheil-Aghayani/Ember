@@ -1,6 +1,6 @@
 package com.soheil.ember.data
 
-import android.util.Base64
+import java.util.Base64
 import com.soheil.ember.data.model.RuntimeAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +49,7 @@ private const val DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60
 private val jsonMediaType = "application/json".toMediaType()
 
 class FxaAuthRepository(
-    private val tokenStore: TokenStore,
+    private val tokenStore: AuthTokenStore,
     private val challengeSolver: FastlyChallengeSolver = FastlyChallengeSolver(ControlPlaneHttp.cookieJar),
 ) {
     var pendingSessionToken: String?
@@ -310,7 +310,7 @@ class FxaAuthRepository(
     private fun hawkHeader(method: String, url: HttpUrl, tokenId: String, hmacKey: ByteArray, body: ByteArray): String {
         val ts = (System.currentTimeMillis() / 1000).toString()
         val nonceBytes = ByteArray(6).also { SecureRandom().nextBytes(it) }
-        val nonce = Base64.encodeToString(nonceBytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        val nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(nonceBytes)
         val path = url.encodedPath + if (url.encodedQuery != null) "?${url.encodedQuery}" else ""
 
         var payloadHash = ""
@@ -319,13 +319,13 @@ class FxaAuthRepository(
             digest.update("hawk.1.payload\napplication/json\n".toByteArray(Charsets.UTF_8))
             digest.update(body)
             digest.update("\n".toByteArray(Charsets.UTF_8))
-            payloadHash = Base64.encodeToString(digest.digest(), Base64.NO_WRAP)
+            payloadHash = Base64.getEncoder().encodeToString(digest.digest())
         }
 
         val normalized = "hawk.1.header\n$ts\n$nonce\n${method.uppercase()}\n$path\n${url.host}\n${url.port}\n$payloadHash\n\n"
 
         val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(hmacKey, "HmacSHA256")) }
-        val macB64 = Base64.encodeToString(mac.doFinal(normalized.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+        val macB64 = Base64.getEncoder().encodeToString(mac.doFinal(normalized.toByteArray(Charsets.UTF_8)))
 
         var header = "Hawk id=\"$tokenId\", ts=\"$ts\", nonce=\"$nonce\", mac=\"$macB64\""
         if (payloadHash.isNotEmpty()) header += ", hash=\"$payloadHash\""

@@ -20,3 +20,5 @@
 -dontwarn com.google.errorprone.annotations.**
 
 -dontwarn reactor.blockhound.**
+
+-keep class com.soheil.ember.vpn.upstream.EmberNioSocketChannel { *; }

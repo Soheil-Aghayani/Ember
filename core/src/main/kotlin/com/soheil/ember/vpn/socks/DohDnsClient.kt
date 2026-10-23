@@ -30,7 +30,7 @@ private const val KEEP_ALIVE_MINUTES = 5L
 private const val FAILURE_SUPPRESSION_THRESHOLD = 3
 private const val FAILURE_SUPPRESSION_MS = 5 * 60_000L
 
-internal object DohEndpoints {
+object DohEndpoints {
     private class Operator(val addresses: List<String>)
 
     private val OPERATORS = listOf(
@@ -119,7 +119,7 @@ internal object DohEndpoints {
     }
 }
 
-internal object DohDnsClient {
+object DohDnsClient {
     private class Transport(val proxyAddress: InetSocketAddress, val client: OkHttpClient)
 
     private class EndpointHealth {

@@ -644,7 +644,7 @@ class EmberVpnService : VpnService() {
                 }
 
                 val tunnelConfigPath = HevSocks5TunnelConfig.write(
-                    applicationContext,
+                    applicationContext.filesDir,
                     socksPort,
                     useMapDns = mapdnsActive,
                     mtu = settingsStore.mtu,
@@ -971,7 +971,7 @@ class EmberVpnService : VpnService() {
     private suspend fun resolveConnectCandidate(proxyStateStore: ProxyStateStore): ProxyCandidate {
         proxyStateStore.load()?.let { return it }
         AppLogger.i(TAG, "connect: no server previously selected; auto-selecting recommended location")
-        val client = (applicationContext as? EmberVpnApp)?.serverListClient ?: ServerListClient(applicationContext)
+        val client = (applicationContext as? EmberVpnApp)?.serverListClient ?: ServerListClient(applicationContext.filesDir)
         val countries = runCatching {
             withTimeout(SERVER_LIST_FETCH_TIMEOUT_MS) { client.fetchCountries() }
         }.getOrElse {
@@ -988,7 +988,7 @@ class EmberVpnService : VpnService() {
 
     private suspend fun discoverAlternateCandidates(primary: ProxyCandidate): List<ProxyCandidate> {
         val attempt = runCatching {
-            val client = (applicationContext as? EmberVpnApp)?.serverListClient ?: ServerListClient(applicationContext)
+            val client = (applicationContext as? EmberVpnApp)?.serverListClient ?: ServerListClient(applicationContext.filesDir)
             val countries = runCatching {
                 withTimeout(SERVER_LIST_FETCH_TIMEOUT_MS) { client.fetchCountries() }
             }.getOrElse {

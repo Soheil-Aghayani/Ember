@@ -71,7 +71,7 @@ class SimpleCookieJar : CookieJar {
 }
 
 private class SplitClientHelloSocket(
-    private val modeProvider: () -> SettingsStore.TlsSplitMode,
+    private val modeProvider: () -> TlsSplitMode,
 ) : Socket() {
     private var splitDone = false
 
@@ -80,7 +80,7 @@ private class SplitClientHelloSocket(
         return object : FilterOutputStream(realOut) {
             override fun write(b: ByteArray, off: Int, len: Int) {
                 val mode = modeProvider()
-                if (splitDone || mode == SettingsStore.TlsSplitMode.OFF) {
+                if (splitDone || mode == TlsSplitMode.OFF) {
                     realOut.write(b, off, len)
                     return
                 }
@@ -119,7 +119,7 @@ private class SplitClientHelloSocket(
 private class ProtectingSocketFactory : SocketFactory() {
 
     private fun createRawSocket(): Socket =
-        SplitClientHelloSocket { ControlPlaneHttp.tlsSplitModeProvider?.invoke() ?: SettingsStore.TlsSplitMode.OFF }
+        SplitClientHelloSocket { ControlPlaneHttp.tlsSplitModeProvider?.invoke() ?: TlsSplitMode.OFF }
 
     private fun protect(socket: Socket, localAddress: InetSocketAddress?): Socket {
         runCatching {
@@ -165,7 +165,7 @@ object ControlPlaneHttp {
     var socketProtector: ((Socket) -> Boolean)? = null
 
     @Volatile
-    var tlsSplitModeProvider: (() -> SettingsStore.TlsSplitMode)? = null
+    var tlsSplitModeProvider: (() -> TlsSplitMode)? = null
 
     val client: OkHttpClient by lazy {
         OkHttpClient.Builder()

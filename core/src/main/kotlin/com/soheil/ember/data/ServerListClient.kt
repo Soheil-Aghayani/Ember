@@ -1,6 +1,5 @@
 package com.soheil.ember.data
 
-import android.content.Context
 import com.soheil.ember.data.model.ProxyCandidate
 import com.soheil.ember.data.model.VpnCity
 import com.soheil.ember.data.model.VpnCountry
@@ -25,12 +24,12 @@ const val RECOMMENDED_COUNTRY_CODE = "REC"
 private val EXCLUDED_COUNTRY_NAMES = setOf("CatchAll Anycast")
 
 class ServerListClient(
-    private val context: Context? = null,
+    private val cacheDir: File? = null,
     private val client: OkHttpClient = ControlPlaneHttp.client,
 ) {
 
     private val cacheFile: File?
-        get() = context?.let { File(it.filesDir, "vpn_serverlist_cache.json") }
+        get() = cacheDir?.let { File(it, "vpn_serverlist_cache.json") }
 
     suspend fun fetchCountries(): List<VpnCountry> = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(REMOTE_SETTINGS_URL).applyMozillaVpnHeaders().build()

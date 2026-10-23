@@ -1,6 +1,6 @@
 package com.soheil.ember.data
 
-import android.util.Base64
+import java.util.Base64
 import com.soheil.ember.data.model.Entitlement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -114,14 +114,14 @@ class GuardianClient(
     }
 }
 
-internal fun jwtExpiryEpochSeconds(token: String): Long? {
+fun jwtExpiryEpochSeconds(token: String): Long? {
     val parts = token.split('.')
     if (parts.size < 2) return null
     val payload = runCatching {
         var b64 = parts[1]
         while (b64.length % 4 != 0) b64 += "="
         String(
-            android.util.Base64.decode(b64, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP),
+            Base64.getUrlDecoder().decode(b64),
             Charsets.UTF_8,
         )
     }.getOrNull() ?: return null

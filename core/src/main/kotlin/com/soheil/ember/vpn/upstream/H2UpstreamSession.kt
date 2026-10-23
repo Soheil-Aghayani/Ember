@@ -1,9 +1,7 @@
 package com.soheil.ember.vpn.upstream
 
-import android.os.Build
-import com.soheil.ember.BuildConfig
 import com.soheil.ember.data.AppLogger
-import com.soheil.ember.data.SettingsStore
+import com.soheil.ember.data.TlsSplitMode
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
 import io.netty.channel.Channel
@@ -95,11 +93,15 @@ private const val CONSCRYPT_PROVIDER_NAME = "Conscrypt"
 private val TLS_PROVIDER: Provider? = runCatching { Security.getProvider(CONSCRYPT_PROVIDER_NAME) }.getOrNull()
 
 private val TLS_PROTOCOLS: Array<String> =
-    if (TLS_PROVIDER != null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    if (TLS_PROVIDER != null || platformSupportsTls13()) {
         arrayOf("TLSv1.3", "TLSv1.2")
     } else {
         arrayOf("TLSv1.2")
     }
+
+private fun platformSupportsTls13(): Boolean = runCatching {
+    javax.net.ssl.SSLContext.getDefault().supportedSSLParameters.protocols.contains("TLSv1.3")
+}.getOrDefault(false)
 
 private const val HTTP2_FLOW_CONTROL_WINDOW_BYTES = 16 * 1024 * 1024
 
@@ -135,7 +137,7 @@ class H2UpstreamSession(
     bearerToken: String,
     private val upstreamProxy: UpstreamProxyConfig? = null,
     private val edgeAddress: String? = null,
-    private val tlsSplitMode: SettingsStore.TlsSplitMode = SettingsStore.TlsSplitMode.OFF,
+    private val tlsSplitMode: TlsSplitMode = TlsSplitMode.OFF,
 ) : UpstreamSession {
 
     private val group = NioEventLoopGroup(1)
@@ -279,7 +281,7 @@ class H2UpstreamSession(
 
                     upstreamProxy?.let { proxy -> ch.pipeline().addLast(buildProxyHandler(proxy)) }
 
-                    if (tlsSplitMode != SettingsStore.TlsSplitMode.OFF) {
+                    if (tlsSplitMode != TlsSplitMode.OFF) {
                         ch.pipeline().addLast("tlsSplit", TlsSplitHandler(tlsSplitMode))
                     }
 
@@ -300,7 +302,7 @@ class H2UpstreamSession(
                         )
 
                         .autoAckPingFrame(false)
-                    if (BuildConfig.DEBUG) {
+                    if (UpstreamDebug.frameLogging) {
 
                         frameCodecBuilder.frameLogger(Http2FrameLogger(LogLevel.DEBUG))
                     }
@@ -818,13 +820,12 @@ private suspend fun ChannelFuture.awaitChannel(): Channel =
         }
     }
 
-@androidx.annotation.Keep
-internal class EmberNioSocketChannel : io.netty.channel.socket.nio.NioSocketChannel() {
+class EmberNioSocketChannel : io.netty.channel.socket.nio.NioSocketChannel() {
     fun publicJavaChannel(): java.nio.channels.SocketChannel = super.javaChannel() as java.nio.channels.SocketChannel
 }
 
 private class TlsSplitHandler(
-    private val mode: SettingsStore.TlsSplitMode,
+    private val mode: TlsSplitMode,
 ) : ChannelOutboundHandlerAdapter() {
     private var splitDone = false
 

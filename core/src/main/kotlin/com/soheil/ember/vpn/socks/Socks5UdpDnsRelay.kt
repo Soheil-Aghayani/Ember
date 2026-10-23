@@ -19,15 +19,15 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "Socks5UdpDnsRelay"
 
-internal const val DNS_PORT = 53
+const val DNS_PORT = 53
 
-internal const val MAX_DNS_MESSAGE_BYTES = 4096
+const val MAX_DNS_MESSAGE_BYTES = 4096
 
 private const val SOCKS5_UDP_HEADER_MIN_BYTES = 10
 
 private const val MAX_INFLIGHT_QUERIES = 32
 
-internal class Socks5UdpDnsRelay(
+class Socks5UdpDnsRelay(
     private val bindAddress: InetAddress,
     private val clientAddress: InetAddress,
     private val socksProxy: InetSocketAddress?,

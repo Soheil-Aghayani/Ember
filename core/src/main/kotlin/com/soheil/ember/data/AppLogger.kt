@@ -1,6 +1,5 @@
 package com.soheil.ember.data
 
-import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
@@ -27,6 +26,9 @@ object AppLogger {
     private const val MAX_ENTRIES = 2_000
     private const val MIN_PUBLISH_INTERVAL_MS = 200L
 
+    /** Platform logging backend. Android installs one that forwards to logcat. */
+    @Volatile var sink: LogSink = StderrLogSink
+
     private val buffer = ConcurrentLinkedDeque<LogEntry>()
     private val _entries = MutableStateFlow<List<LogEntry>>(emptyList())
     val entries: StateFlow<List<LogEntry>> = _entries
@@ -41,21 +43,21 @@ object AppLogger {
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     fun d(tag: String, message: String) {
-        Log.d(tag, message)
+        sink.d(tag, message)
     }
 
     fun i(tag: String, message: String) {
-        Log.i(tag, message)
+        sink.i(tag, message)
         log(LogLevel.INFO, tag, message)
     }
 
     fun w(tag: String, message: String, error: Throwable? = null) {
-        if (error != null) Log.w(tag, message, error) else Log.w(tag, message)
+        sink.w(tag, message, error)
         log(LogLevel.WARN, tag, if (error != null) "$message: ${error.message}" else message)
     }
 
     fun e(tag: String, message: String, error: Throwable? = null) {
-        if (error != null) Log.e(tag, message, error) else Log.e(tag, message)
+        sink.e(tag, message, error)
         log(LogLevel.ERROR, tag, if (error != null) "$message: ${error.message}" else message)
     }
 
@@ -109,5 +111,25 @@ object AppLogger {
     fun exportAsText(): String = buffer.toList().joinToString("\n") { entry ->
         val ts = timeFormat.format(Date(entry.timestampMillis))
         "$ts ${entry.level.name.padEnd(5)} [${entry.tag}] ${entry.message}"
+    }
+}
+
+interface LogSink {
+    fun d(tag: String, message: String)
+    fun i(tag: String, message: String)
+    fun w(tag: String, message: String, error: Throwable?)
+    fun e(tag: String, message: String, error: Throwable?)
+}
+
+object StderrLogSink : LogSink {
+    override fun d(tag: String, message: String) = System.err.println("D/$tag: $message")
+    override fun i(tag: String, message: String) = System.err.println("I/$tag: $message")
+    override fun w(tag: String, message: String, error: Throwable?) {
+        System.err.println("W/$tag: $message")
+        error?.printStackTrace()
+    }
+    override fun e(tag: String, message: String, error: Throwable?) {
+        System.err.println("E/$tag: $message")
+        error?.printStackTrace()
     }
 }

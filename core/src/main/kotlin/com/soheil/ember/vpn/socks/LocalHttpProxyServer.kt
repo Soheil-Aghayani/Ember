@@ -1,7 +1,5 @@
 package com.soheil.ember.vpn.socks
 
-import android.net.InetAddresses
-import android.os.Build
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.vpn.RelayDispatchers
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
@@ -158,9 +156,6 @@ class LocalHttpProxyServer(
     }
 
     private fun isIpLiteral(host: String): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return InetAddresses.isNumericAddress(host)
-        }
         if (host.contains(':')) {
             return host.all { it == ':' || it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
         }

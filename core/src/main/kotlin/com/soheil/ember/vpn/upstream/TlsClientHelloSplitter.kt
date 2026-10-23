@@ -1,6 +1,6 @@
 package com.soheil.ember.vpn.upstream
 
-import com.soheil.ember.data.SettingsStore
+import com.soheil.ember.data.TlsSplitMode
 import io.netty.buffer.ByteBuf
 
 object TlsClientHelloSplitter {
@@ -75,20 +75,20 @@ object TlsClientHelloSplitter {
         return null
     }
 
-    fun split(buf: ByteBuf, mode: SettingsStore.TlsSplitMode): List<ByteBuf>? {
+    fun split(buf: ByteBuf, mode: TlsSplitMode): List<ByteBuf>? {
         val totalLen = buf.readableBytes()
         val rIdx = buf.readerIndex()
 
         return when (mode) {
-            SettingsStore.TlsSplitMode.OFF -> null
-            SettingsStore.TlsSplitMode.FIRST_BYTE -> {
+            TlsSplitMode.OFF -> null
+            TlsSplitMode.FIRST_BYTE -> {
                 if (totalLen < 2) return null
                 listOf(
                     buf.retainedSlice(rIdx, 1),
                     buf.retainedSlice(rIdx + 1, totalLen - 1),
                 )
             }
-            SettingsStore.TlsSplitMode.SNI -> {
+            TlsSplitMode.SNI -> {
                 val bytes = ByteArray(totalLen)
                 buf.getBytes(rIdx, bytes)
                 val offset = findSniOffset(bytes) ?: return null
@@ -103,17 +103,17 @@ object TlsClientHelloSplitter {
         }
     }
 
-    fun splitBytes(b: ByteArray, off: Int = 0, len: Int = b.size, mode: SettingsStore.TlsSplitMode): List<ByteArray>? {
+    fun splitBytes(b: ByteArray, off: Int = 0, len: Int = b.size, mode: TlsSplitMode): List<ByteArray>? {
         if (len < 2 || off + len > b.size) return null
         return when (mode) {
-            SettingsStore.TlsSplitMode.OFF -> null
-            SettingsStore.TlsSplitMode.FIRST_BYTE -> {
+            TlsSplitMode.OFF -> null
+            TlsSplitMode.FIRST_BYTE -> {
                 listOf(
                     b.copyOfRange(off, off + 1),
                     b.copyOfRange(off + 1, off + len),
                 )
             }
-            SettingsStore.TlsSplitMode.SNI -> {
+            TlsSplitMode.SNI -> {
                 val slice = if (off == 0 && len == b.size) b else b.copyOfRange(off, off + len)
                 val offset = findSniOffset(slice) ?: return null
                 val start = offset.first

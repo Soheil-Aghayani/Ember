@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.BuildConfig
 import com.soheil.ember.data.SettingsStore
+import com.soheil.ember.data.TlsSplitMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -819,9 +820,9 @@ private fun UpstreamProxyTypePickerDialog(
 
 @Composable
 private fun TlsSplitModePickerDialog(
-    current: SettingsStore.TlsSplitMode,
+    current: TlsSplitMode,
     onDismiss: () -> Unit,
-    onConfirm: (SettingsStore.TlsSplitMode) -> Unit,
+    onConfirm: (TlsSplitMode) -> Unit,
 ) {
     var selected by remember { mutableStateOf(current) }
     AlertDialog(
@@ -835,7 +836,7 @@ private fun TlsSplitModePickerDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
-                SettingsStore.TlsSplitMode.entries.forEach { mode ->
+                TlsSplitMode.entries.forEach { mode ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
