@@ -26,7 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,9 +35,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.soheil.ember.data.AppLogger
+import com.soheil.ember.ui.components.EmberDivider
+import com.soheil.ember.ui.components.EmberTopBar
 import com.soheil.ember.data.LogEntry
 import com.soheil.ember.data.LogLevel
 import kotlinx.coroutines.Dispatchers
@@ -80,18 +82,9 @@ fun LogsScreen(onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        if (visible.size == entries.size) "Logs (${entries.size})"
-                        else "Logs (${visible.size}/${entries.size})",
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            EmberTopBar(
+                title = if (visible.size == entries.size) "Logs (${entries.size})" else "Logs (${visible.size}/${entries.size})",
+                onBack = onBack,
                 actions = {
                     IconButton(onClick = {
                         if (entries.isEmpty()) {
@@ -181,8 +174,9 @@ fun LogsScreen(onBack: () -> Unit) {
                                 style = MaterialTheme.typography.labelSmall,
                                 color = color,
                             )
-                            Text(entry.message, style = MaterialTheme.typography.bodyMedium)
+                            Text(entry.message, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                         }
+                        EmberDivider()
                     }
                 }
             }

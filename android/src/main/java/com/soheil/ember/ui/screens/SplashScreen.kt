@@ -18,7 +18,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.soheil.ember.data.FxaAuthRepository
 import com.soheil.ember.data.SessionStatus
 import kotlinx.coroutines.delay
@@ -54,7 +53,7 @@ fun SplashScreen(
                 tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(16.dp))
-            Text("Ember", fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text("Ember", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
             CircularProgressIndicator(
                 modifier = Modifier
                     .padding(top = 24.dp)

@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -106,10 +108,10 @@ fun LoginScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("Sign in with Firefox", style = MaterialTheme.typography.headlineMedium)
+            Text("Sign in", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.padding(top = 8.dp))
             Text(
-                "Ember runs on the free 50 GB of monthly VPN traffic Mozilla includes with a Firefox account. No subscription is required.",
+                "Use your Firefox account. Ember runs on the free 50 GB of monthly VPN traffic Mozilla includes with it. No subscription is required.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -131,6 +133,7 @@ fun LoginScreen(
                     keyboardActions = KeyboardActions(
                         onNext = { focusManager.moveFocus(FocusDirection.Down) }
                     ),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.padding(top = 12.dp))
@@ -152,6 +155,7 @@ fun LoginScreen(
                             doSubmitLogin()
                         }
                     ),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.padding(top = 20.dp))
@@ -161,7 +165,9 @@ fun LoginScreen(
                         doSubmitLogin()
                     },
                     enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
@@ -193,6 +199,7 @@ fun LoginScreen(
                             doSubmitTwoFactor()
                         }
                     ),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.padding(top = 20.dp))
@@ -202,7 +209,9 @@ fun LoginScreen(
                         doSubmitTwoFactor()
                     },
                     enabled = !isLoading && code.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
