@@ -165,7 +165,6 @@ fun LoginScreen(
                         doSubmitLogin()
                     },
                     enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
@@ -209,7 +208,6 @@ fun LoginScreen(
                         doSubmitTwoFactor()
                     },
                     enabled = !isLoading && code.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
