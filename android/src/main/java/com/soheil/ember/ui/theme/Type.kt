@@ -2,12 +2,19 @@ package com.soheil.ember.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.soheil.ember.R
 
-// Inter is not bundled yet; swap this for the Inter FontFamily (design/tokens.json "font").
-val EmberFontFamily: FontFamily = FontFamily.Default
+// Inter (SIL OFL, see design/Inter-LICENSE.txt).
+val EmberFontFamily = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+)
 
 private fun style(weight: FontWeight, size: Int, lineHeight: Int) =
     TextStyle(fontFamily = EmberFontFamily, fontWeight = weight, fontSize = size.sp, lineHeight = lineHeight.sp)
