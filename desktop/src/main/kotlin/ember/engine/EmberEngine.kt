@@ -157,8 +157,12 @@ class EmberEngine(dataDir: File) {
                 val waitMs = expiry?.let { (it - RENEW_MARGIN_SECONDS) * 1000L - System.currentTimeMillis() }
                     ?: FALLBACK_PASS_RENEW_MS
                 delay(waitMs.coerceAtLeast(30_000L))
-                val pass = runCatching { mintPass() }.getOrElse {
-                    AppLogger.w(TAG, "could not renew the proxy pass", it)
+                val pass = try {
+                    mintPass()
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (failure: Throwable) {
+                    AppLogger.w(TAG, "could not renew the proxy pass", failure)
                     delay(30_000L)
                     continue
                 }
