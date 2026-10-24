@@ -12,6 +12,26 @@ class DesktopSettings(private val file: File) {
         runCatching { if (file.isFile) file.inputStream().use { load(it) } }
     }
 
+    var keepInTray: Boolean
+        get() = props.getProperty("keepInTray", "true").toBoolean()
+        set(value) = put("keepInTray", value.toString())
+
+    var autoConnect: Boolean
+        get() = props.getProperty("autoConnect", "false").toBoolean()
+        set(value) = put("autoConnect", value.toString())
+
+    var theme: String
+        get() = props.getProperty("theme", "System")
+        set(value) = put("theme", value)
+
+    var lastCountry: String
+        get() = props.getProperty("lastCountry", "")
+        set(value) = put("lastCountry", value)
+
+    var lastCity: String
+        get() = props.getProperty("lastCity", "")
+        set(value) = put("lastCity", value)
+
     var wholeDevice: Boolean
         get() = props.getProperty("wholeDevice", "false").toBoolean()
         set(value) = put("wholeDevice", value.toString())
