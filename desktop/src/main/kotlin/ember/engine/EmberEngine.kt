@@ -11,6 +11,8 @@ import com.soheil.ember.data.ServerListClient
 import com.soheil.ember.data.TokenInvalidError
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.data.model.ProxyCandidate
+import com.soheil.ember.vpn.ExitCheck
+import com.soheil.ember.vpn.IpLocationInfo
 import com.soheil.ember.vpn.socks.LocalHttpProxyServer
 import com.soheil.ember.vpn.socks.LocalSocks5Server
 import com.soheil.ember.vpn.upstream.EdgeAddressResolver
@@ -69,6 +71,18 @@ class EmberEngine(private val dataDir: File) {
     private val _blockedNotice = MutableStateFlow<String?>(null)
     val blockedNotice: StateFlow<String?> = _blockedNotice
 
+    private val _connectedTarget = MutableStateFlow<ProxyCandidate?>(null)
+    val connectedTarget: StateFlow<ProxyCandidate?> = _connectedTarget
+
+    private val _quota = MutableStateFlow(settings.quota)
+    val quota: StateFlow<QuotaInfo?> = _quota
+
+    /** Result of asking a public service which IP and country the tunnel exits from. */
+    data class ExitStatus(val info: IpLocationInfo? = null, val error: String? = null, val checking: Boolean = false)
+
+    private val _exit = MutableStateFlow(ExitStatus())
+    val exit: StateFlow<ExitStatus> = _exit
+
     /** Whether the connection that is up (or coming up) routes the whole device. */
     private val _wholeDevice = MutableStateFlow(false)
     val wholeDevice: StateFlow<Boolean> = _wholeDevice
@@ -120,7 +134,9 @@ class EmberEngine(private val dataDir: File) {
                     startLocalProxies()
                 }
                 _connectedAtMs.value = System.currentTimeMillis()
+                _connectedTarget.value = chosen
                 _state.value = ConnectionState.CONNECTED
+                checkExit()
                 AppLogger.i(TAG, "connected via ${chosen.authority} (wholeDevice=$wholeDevice)")
                 scheduleRenewal(pass)
             } catch (cancel: CancellationException) {
@@ -178,7 +194,32 @@ class EmberEngine(private val dataDir: File) {
             guardian.fetchProxyPass(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
         }
         lastPass = pass
+        recordQuota(pass)
         return pass
+    }
+
+    private fun recordQuota(pass: ProxyPass) {
+        if (pass.quotaRemaining == null && pass.quotaMax == null && pass.quotaReset == null) return
+        val info = QuotaInfo(pass.quotaRemaining, pass.quotaMax, pass.quotaReset)
+        settings.quota = info
+        _quota.value = settings.quota
+    }
+
+    /** Fetches fresh quota numbers from the service (also used when the app is disconnected). */
+    fun refreshQuota() {
+        scope.launch { runCatching { mintPass() }.onFailure { AppLogger.w(TAG, "quota refresh failed", it) } }
+    }
+
+    private fun checkExit() {
+        _exit.value = ExitStatus(checking = true)
+        scope.launch {
+            delay(1_500)
+            val result = ExitCheck().fetchProxiedIpInfo(SOCKS_PORT)
+            _exit.value = ExitStatus(
+                info = result.getOrNull(),
+                error = result.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName },
+            )
+        }
     }
 
     /** The last pass if it is still comfortably valid, so a redial does not need the (tunnelled) network. */
@@ -291,6 +332,8 @@ class EmberEngine(private val dataDir: File) {
         session = null
         edgeIp = null
         _connectedAtMs.value = null
+        _connectedTarget.value = null
+        _exit.value = ExitStatus()
         _wholeDevice.value = false
         _state.value = ConnectionState.DISCONNECTED
     }

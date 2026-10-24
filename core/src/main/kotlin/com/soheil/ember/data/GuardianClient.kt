@@ -48,7 +48,7 @@ class GuardianClient(
                     ?: jwtExpiryEpochSeconds(token),
                 quotaMax = resp.header("X-Quota-Limit")?.toLongOrNull(),
                 quotaRemaining = resp.header("X-Quota-Remaining")?.toLongOrNull(),
-                quotaReset = resp.header("X-Quota-Reset")?.toLongOrNull(),
+                quotaReset = parseQuotaReset(resp.header("X-Quota-Reset")),
             )
         }
     }
@@ -126,4 +126,11 @@ fun jwtExpiryEpochSeconds(token: String): Long? {
         )
     }.getOrNull() ?: return null
     return runCatching { JSONObject(payload).optLong("exp", 0L) }.getOrNull()?.takeIf { it > 0 }
+}
+
+/** Guardian sends the quota reset as epoch seconds, epoch milliseconds or an ISO-8601 instant. Returns epoch seconds. */
+internal fun parseQuotaReset(raw: String?): Long? {
+    val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    value.toLongOrNull()?.let { return if (it > 100_000_000_000L) it / 1000 else it }
+    return runCatching { java.time.Instant.parse(value).epochSecond }.getOrNull()
 }

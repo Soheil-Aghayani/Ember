@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.FxaAuthRepository
 import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
 import com.soheil.ember.data.ServerListClient
+import com.soheil.ember.data.formatBytes
 import com.soheil.ember.data.SessionStatus
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.data.model.ProxyCandidate
@@ -268,6 +270,10 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
     val blocked by engine.blockedNotice.collectAsState()
     val whole by engine.wholeDevice.collectAsState()
     val wholeSetting = engine.settings.wholeDevice
+    val target by engine.connectedTarget.collectAsState()
+    val exit by engine.exit.collectAsState()
+    val quota by engine.quota.collectAsState()
+    LaunchedEffect(Unit) { engine.refreshQuota() }
     val status = statusColors()
     var elapsed by remember { mutableStateOf(0L) }
 
@@ -341,14 +347,93 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
             }
         }
         Spacer(Modifier.height(24.dp))
-        Card(Modifier.clickable(onClick = onOpenLocations)) {
+        val connectedTarget = target
+        if (state == ConnectionState.CONNECTED && connectedTarget != null) {
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Connected to", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FlagIcon(connectedTarget.countryCode, 32.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                connectedTarget.countryName.ifBlank { connectedTarget.countryCode },
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            if (connectedTarget.cityCode.isNotBlank()) {
+                                Text(connectedTarget.cityCode, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    val info = exit.info
+                    when {
+                        exit.checking -> Text("Checking your connection...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        info != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (info.countryCode.isNotBlank()) {
+                                FlagIcon(info.countryCode, 16.dp)
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text("Exit IP ${info.ip}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        exit.error != null -> Text(
+                            "Could not verify the connection: ${exit.error}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+        } else {
+            Card(Modifier.clickable(onClick = onOpenLocations)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Location", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (selected != null) {
+                            FlagIcon(selected.countryCode, 24.dp)
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Text(
+                            selected?.let { it.countryName.ifBlank { it.countryCode } } ?: "Recommended",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card {
             Column(Modifier.padding(16.dp)) {
-                Text("Location", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Monthly data", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    selected?.let { "${it.emojiFlag} ${it.countryName.ifBlank { it.countryCode }}" } ?: "Recommended",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                val q = quota
+                val remaining = q?.remaining
+                val max = q?.max
+                if (q == null || (remaining == null && max == null)) {
+                    Text("Not reported yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text(
+                        buildString {
+                            if (remaining != null) append("${formatBytes(remaining)} left")
+                            if (max != null) append(if (remaining != null) " of ${formatBytes(max)}" else "Limit ${formatBytes(max)}")
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (remaining != null && max != null && max > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            progress = { (remaining.toFloat() / max.toFloat()).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
+                }
+                q?.resetEpochSeconds?.let { reset ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(resetLabel(reset), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -360,7 +445,7 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
                 Text("HTTP  $LOCAL_BIND:$HTTP_PORT", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Point an app or browser at this proxy to use it. Whole-device mode (all apps, with a kill switch) is not available yet, so this does not protect other traffic.",
+                    "Point an app or browser at this proxy to use it. Other apps are not protected in proxy mode. Turn on whole-device mode in Settings to route everything.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -409,9 +494,10 @@ private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, 
                 HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val open = country.code in expanded
                 LocationRow(
-                    "${country.emojiFlag} ${country.name}",
+                    country.name,
                     "${country.cities.size} cities",
                     selected?.countryCode == country.code && selected.cityCode.isBlank(),
+                    flagCode = country.code,
                     onToggle = { expanded = if (open) expanded - country.code else expanded + country.code },
                 ) {
                     onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull())
@@ -440,6 +526,7 @@ private fun LocationRow(
     subtitle: String,
     isSelected: Boolean,
     indent: Int = 0,
+    flagCode: String? = null,
     onToggle: (() -> Unit)? = null,
     onPick: () -> Unit,
 ) {
@@ -447,6 +534,10 @@ private fun LocationRow(
         Modifier.fillMaxWidth().clickable(onClick = onPick).padding(start = (16 + indent).dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (flagCode != null) {
+            FlagIcon(flagCode, 28.dp)
+            Spacer(Modifier.width(12.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -518,6 +609,16 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
         }
         Spacer(Modifier.width(12.dp))
         Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
+}
+
+private fun resetLabel(resetEpochSeconds: Long): String {
+    val secondsLeft = resetEpochSeconds - System.currentTimeMillis() / 1000
+    val days = Math.ceil(secondsLeft / 86_400.0).toLong()
+    return when {
+        secondsLeft <= 0 -> "Data allowance resets today"
+        days == 1L -> "Resets in 1 day"
+        else -> "Resets in $days days"
     }
 }
 

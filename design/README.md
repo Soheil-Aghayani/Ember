@@ -12,3 +12,6 @@ Claude's warmth (cream paper, ink text, generous whitespace) with Firefox's oran
 - **Icons:** do not use SF Symbols or SF Pro in the Android or Windows apps (Apple licence limits them to Apple platforms). Use original icons in the style noted in `tokens.json`; they will be generated with GPT and reviewed for licence-safety.
 - **Brand:** no Firefox logo, no look-alike fox mark. Ember's mark is an original ember/flame.
 - **Reference only:** the Sketch symbol libraries and HIG are references, not assets we copy.
+
+## Third-party assets
+- Country flags in `desktop/src/main/resources/flags/` are from the circle-flags set (MIT licence, github.com/HatScripts/circle-flags).
