@@ -392,16 +392,27 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
                 Column(Modifier.padding(16.dp)) {
                     Text("Connected to", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
+                    // "Recommended" is not a country: show where the connection really exits once that is known.
+                    val isRecommended = connectedTarget.countryCode.equals("REC", ignoreCase = true) || connectedTarget.countryCode.isBlank()
+                    val exitCode = exit.info?.countryCode.orEmpty()
+                    val shownCode = if (isRecommended) exitCode else connectedTarget.countryCode
+                    val shownName = when {
+                        !isRecommended -> connectedTarget.countryName.ifBlank { connectedTarget.countryCode }
+                        exitCode.length == 2 -> java.util.Locale("", exitCode).getDisplayCountry(java.util.Locale.ENGLISH)
+                        else -> "Recommended location"
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        FlagIcon(connectedTarget.countryCode, 32.dp)
+                        FlagIcon(shownCode, 32.dp)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text(
-                                connectedTarget.countryName.ifBlank { connectedTarget.countryCode },
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            if (connectedTarget.cityCode.isNotBlank()) {
-                                Text(connectedTarget.cityCode, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(shownName, style = MaterialTheme.typography.titleMedium)
+                            val detail = when {
+                                isRecommended -> "Recommended server"
+                                connectedTarget.cityCode.isNotBlank() -> connectedTarget.cityCode
+                                else -> null
+                            }
+                            if (detail != null) {
+                                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
