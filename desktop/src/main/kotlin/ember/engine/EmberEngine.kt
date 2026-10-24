@@ -103,6 +103,7 @@ class EmberEngine(private val dataDir: File) {
     private val redialing = AtomicBoolean(false)
 
     init {
+        AppLogger.sink = FileLogSink(File(dataDir, "ember.log"))
         NettyLoggingBridge.install()
         UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
         if (tunnel.isBlocked()) {

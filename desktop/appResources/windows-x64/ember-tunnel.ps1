@@ -68,6 +68,9 @@ function Remove-AddedRoutes {
 
 function Invoke-Cleanup {
     Remove-AddedRoutes
+    foreach ($net in @('0.0.0.0', '128.0.0.0')) {
+        & route.exe delete $net mask 128.0.0.0 127.0.0.1 2>&1 | Out-Null
+    }
     Remove-NetFirewallRule -Group $RuleGroup -PolicyStore ActiveStore -ErrorAction SilentlyContinue
     Get-Process -Name 'hev-socks5-tunnel' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
@@ -125,10 +128,13 @@ try {
 
     # Kill switch first: if anything after this fails or the tunnel dies, traffic is dropped, not leaked.
     if ($killSwitch) {
-        $lo = Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like 'Loopback*' } | Select-Object -First 1
-        if (-not $lo) { throw 'loopback interface not found; cannot enable the kill switch' }
-        Add-Route '0.0.0.0/1' $lo.ifIndex '127.0.0.1' 5000
-        Add-Route '128.0.0.0/1' $lo.ifIndex '127.0.0.1' 5000
+        # Two high-metric routes that point at this computer itself drop traffic. While the tunnel is up its
+        # own /1 routes (metric 1) win; if the tunnel disappears, these remain and nothing leaves.
+        foreach ($net in @('0.0.0.0', '128.0.0.0')) {
+            $out = & route.exe add $net mask 128.0.0.0 127.0.0.1 metric 5000 2>&1
+            Write-Log ("route add $net/1 -> " + (($out | Out-String).Trim()) + " (exit $LASTEXITCODE)")
+            if ($LASTEXITCODE -ne 0) { throw "could not add the kill-switch route for $net/1: " + (($out | Out-String).Trim()) }
+        }
     }
 
     # The route to Mozilla's edge must stay on the physical network or the tunnel would loop into itself.

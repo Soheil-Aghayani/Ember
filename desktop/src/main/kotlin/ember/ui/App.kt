@@ -636,6 +636,19 @@ private fun SettingsPage(engine: EmberEngine, onSignOut: () -> Unit) {
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {
+            Text("About", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Text("Ember ${System.getProperty("jpackage.app-version") ?: "development build"}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Log file: ${ember.engine.appDataDir().resolve("ember.log")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+    Card {
+        Column(Modifier.padding(16.dp)) {
             Text("Account", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(12.dp)) { Text("Sign out") }

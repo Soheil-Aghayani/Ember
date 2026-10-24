@@ -85,7 +85,7 @@ compose.desktop {
             appResourcesRootDir.set(layout.projectDirectory.dir("appResources"))
             targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Ember"
-            packageVersion = "1.0.0"
+            packageVersion = System.getenv("EMBER_VERSION") ?: "1.0.0"
             windows {
                 menuGroup = "Ember"
                 shortcut = true
