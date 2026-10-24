@@ -95,7 +95,7 @@ def convert(source, flag=False):
         viewportHeight=number(height),
     ))
     if not flag:
-        vector.set(f"{{{ANDROID}}}tint", "?attr/colorControlNormal")
+        vector.set(f"{{{ANDROID}}}tint", "?android:attr/colorControlNormal")
         if source.stem in ("alt-arrow-left-linear", "alt-arrow-right-linear", "logout-linear"):
             vector.set(f"{{{ANDROID}}}autoMirrored", "true")
     ids = {e.attrib["id"]: e for e in svg.iter() if "id" in e.attrib}

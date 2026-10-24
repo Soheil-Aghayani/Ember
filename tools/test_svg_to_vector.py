@@ -28,7 +28,7 @@ class SvgToVectorTest(unittest.TestCase):
 
     def test_inherited_strokes_and_tint(self):
         vector = self.render('<g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></g>')
-        self.assertEqual(attr(vector, "tint"), "?attr/colorControlNormal")
+        self.assertEqual(attr(vector, "tint"), "?android:attr/colorControlNormal")
         path = vector[0]
         for key, value in dict(fillColor="#00000000", strokeColor="#FF000000", strokeWidth="1.5", strokeLineCap="round", strokeLineJoin="round").items():
             self.assertEqual(attr(path, key), value)
