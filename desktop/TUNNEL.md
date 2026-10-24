@@ -65,3 +65,23 @@ Split tunnelling (per-app is hard on desktop; per-route is feasible), DoH settin
 - Is Phase 1 (proxy only) acceptable as the first desktop release? It is much safer to build and needs no admin rights.
 - Windows first, or all three desktop OSes together?
 - Is a kill switch wanted in the first whole-device release?
+
+## Decisions (owner)
+- Proxy-only is **not** acceptable as the first desktop release: whole-device capture is required.
+- Windows first. macOS and Linux later.
+- A kill switch is required in the first whole-device release.
+
+## Implemented so far (Windows)
+- `core/` is shared with Android. Desktop sign-in, server list and the HTTP/2 tunnel run on it.
+- Proxy mode (local SOCKS5/HTTP on 127.0.0.1:10808/10809) works without administrator rights and is the default.
+- Whole-device mode (**experimental, off by default, untested on real hardware**): `ember-tunnel.ps1` runs elevated, starts
+  hev-socks5-tunnel on a Wintun adapter, adds `/1` routes into it, keeps the Mozilla edge on the physical route, blocks DNS and
+  public IPv6 leaks with firewall rules (ActiveStore, so they do not survive a reboot) and, with the kill switch on, adds
+  fallback `/1` routes to loopback so traffic is dropped if the tunnel dies.
+- One administrator prompt per connect; none on disconnect (a stop file ends the helper).
+- After a crash with the kill switch on, the app shows a "Restore internet" button on next start.
+
+## Known limits
+- IPv4 only; public IPv6 is blocked rather than tunnelled.
+- Control-plane calls (pass renewal) travel through the tunnel while it is up; a redial reuses the last pass.
+- Binaries are fetched at build time: hev-socks5-tunnel 2.19.1 and Wintun 0.14.1, both verified against pinned SHA-256.
