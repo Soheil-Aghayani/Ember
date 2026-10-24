@@ -24,6 +24,11 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("autoConnect", "false").toBoolean()
         set(value) = put("autoConnect", value.toString())
 
+    var language: String
+        get() = props.getProperty("language")?.takeIf { it == "en" || it == "fa" }
+            ?: if (java.util.Locale.getDefault().language == "fa") "fa" else "en"
+        set(value) = put("language", if (value == "fa") "fa" else "en")
+
     var theme: String
         get() = props.getProperty("theme", "System")
         set(value) = put("theme", value)

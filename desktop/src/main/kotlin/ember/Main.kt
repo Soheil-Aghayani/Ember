@@ -1,13 +1,16 @@
 package ember
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
@@ -20,11 +23,16 @@ import ember.engine.UpdateCheck
 import ember.engine.appDataDir
 import ember.ui.EmberApp
 import ember.ui.EmberTheme
+import ember.ui.EnglishStrings
+import ember.ui.LocalStrings
+import ember.ui.PersianStrings
 
 fun main(args: Array<String>) = application {
     val engine = remember { EmberEngine(appDataDir()) }
     var visible by remember { mutableStateOf(!args.contains("--minimized") || !isTraySupported) }
     var theme by remember { mutableStateOf(engine.settings.theme) }
+    var language by remember { mutableStateOf(engine.settings.language) }
+    val strings = if (language == "fa") PersianStrings else EnglishStrings
     var update by remember { mutableStateOf<String?>(null) }
     val state by engine.state.collectAsState()
     val windowState = rememberWindowState(width = 960.dp, height = 680.dp)
@@ -38,12 +46,12 @@ fun main(args: Array<String>) = application {
             windowState.isMinimized = false
             visible = true
         }) {
-            Item("Open Ember", onClick = { windowState.isMinimized = false; visible = true })
-            Item(if (state == ConnectionState.DISCONNECTED) "Connect" else "Disconnect", onClick = {
+            Item(strings.openEmber, onClick = { windowState.isMinimized = false; visible = true })
+            Item(if (state == ConnectionState.DISCONNECTED) strings.connect else strings.disconnect, onClick = {
                 if (state == ConnectionState.DISCONNECTED) engine.connect(null) else engine.disconnect()
             })
             Separator()
-            Item("Quit", onClick = quit)
+            Item(strings.quit, onClick = quit)
         }
     }
     Window(
@@ -60,7 +68,13 @@ fun main(args: Array<String>) = application {
             "Dark" -> true
             else -> isSystemInDarkTheme()
         }) {
-            EmberApp(engine, theme, { theme = it; engine.settings.theme = it }, update, { update = null })
+            CompositionLocalProvider(
+                LocalStrings provides strings,
+                LocalLayoutDirection provides if (language == "fa") LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                EmberApp(engine, theme, { theme = it; engine.settings.theme = it },
+                    language, { language = it; engine.settings.language = it }, update, { update = null })
+            }
         }
     }
 }

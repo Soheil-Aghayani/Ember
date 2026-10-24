@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,10 +35,12 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,11 +54,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.FxaAuthRepository
@@ -62,16 +69,18 @@ import com.soheil.ember.data.LogLevel
 import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
 import com.soheil.ember.data.ServerListClient
 import com.soheil.ember.data.SessionStatus
+import com.soheil.ember.data.TlsSplitMode
 import com.soheil.ember.data.formatBytes
 import com.soheil.ember.data.formatBytesPerSecond
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.data.model.ProxyCandidate
 import com.soheil.ember.data.model.VpnCountry
-import com.soheil.ember.data.model.emojiFlag
+import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
 import ember.engine.Autostart
 import ember.engine.EmberEngine
 import ember.engine.HTTP_PORT
 import ember.engine.LOCAL_BIND
+import ember.engine.MTU_RANGE
 import ember.engine.SOCKS_PORT
 import ember.engine.TrafficStats
 import ember.engine.UpdateCheck
@@ -87,11 +96,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-private enum class Page(val label: String, val icon: String) {
-    Home("Home", "home"),
-    Locations("Locations", "locations"),
-    Settings("Settings", "settings"),
-    Logs("Logs", "logs"),
+private enum class Page(val icon: String) {
+    Home("home"),
+    Locations("locations"),
+    Settings("settings"),
+    Logs("logs"),
 }
 
 private enum class Session { Checking, SignedOut, SignedIn }
@@ -103,6 +112,8 @@ fun EmberApp(
     engine: EmberEngine,
     theme: String,
     onThemeChange: (String) -> Unit,
+    language: String,
+    onLanguageChange: (String) -> Unit,
     update: String?,
     onDismissUpdate: () -> Unit,
 ) {
@@ -153,7 +164,7 @@ fun EmberApp(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
                 }
-            } else MainShell(engine, restoredLocation, theme, onThemeChange, update, onDismissUpdate) {
+            } else MainShell(engine, restoredLocation, theme, onThemeChange, language, onLanguageChange, update, onDismissUpdate) {
                 engine.disconnect()
                 engine.tokenStore.clear()
                 session = Session.SignedOut
@@ -175,6 +186,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 
 @Composable
 private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
+    val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -187,10 +199,10 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
         Column(Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(32.dp)) {
             Image(painterResource("ember_logo.png"), contentDescription = null, modifier = Modifier.size(72.dp))
             Spacer(Modifier.height(12.dp))
-            Text("Sign in", style = MaterialTheme.typography.headlineLarge)
+            Text(strings.signIn, style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Use your Firefox account. Ember runs on the free 50 GB of monthly VPN traffic Mozilla includes with it.",
+                strings.loginIntro,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -200,7 +212,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Firefox account email") },
+                    label = { Text(strings.email) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -210,7 +222,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = { Text(strings.password) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     visualTransformation = PasswordVisualTransformation(),
@@ -225,20 +237,20 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                             val result = auth.startLogin(FxaAuthRepository.normalizeEmail(email), password)
                             busy = false
                             result.onSuccess { verify -> if (verify) needsCode = true else onSignedIn() }
-                                .onFailure { error = it.message ?: "Sign-in failed" }
+                                .onFailure { error = it.message ?: strings.signInFailed }
                         }
                     },
                     enabled = !busy && email.isNotBlank() && password.isNotBlank(),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text(if (busy) "Signing in..." else "Continue") }
+                ) { Text(if (busy) strings.signingIn else strings.continueLabel) }
             } else {
-                Text("Enter the confirmation code sent to your email", style = MaterialTheme.typography.bodyMedium)
+                Text(strings.codePrompt, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text("Confirmation code") },
+                    label = { Text(strings.confirmationCode) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -252,7 +264,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                             val result = auth.submitTwoFactorCode(code)
                             busy = false
                             result.onSuccess { onSignedIn() }.onFailure {
-                                error = it.message ?: "Verification failed"
+                                error = it.message ?: strings.verificationFailed
                                 if (auth.pendingSessionToken == null) needsCode = false
                             }
                         }
@@ -260,7 +272,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                     enabled = !busy && code.isNotBlank(),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text(if (busy) "Verifying..." else "Verify") }
+                ) { Text(if (busy) strings.verifying else strings.verify) }
             }
 
             error?.let {
@@ -277,6 +289,8 @@ private fun MainShell(
     restoredLocation: ProxyCandidate?,
     theme: String,
     onThemeChange: (String) -> Unit,
+    language: String,
+    onLanguageChange: (String) -> Unit,
     update: String?,
     onDismissUpdate: () -> Unit,
     onSignOut: () -> Unit,
@@ -299,7 +313,7 @@ private fun MainShell(
                         selected = candidate
                         page = Page.Home
                     }
-                    Page.Settings -> SettingsPage(engine, theme, onThemeChange, onSignOut)
+                    Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange, onSignOut)
                     Page.Logs -> LogsPage()
                 }
             }
@@ -309,6 +323,7 @@ private fun MainShell(
 
 @Composable
 private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
+    val strings = LocalStrings.current
     Column(
         Modifier.width(220.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -332,7 +347,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EmberIcon(p.icon, 20.dp, contentColor)
                     Spacer(Modifier.width(12.dp))
-                    Text(p.label, style = MaterialTheme.typography.titleSmall, color = contentColor)
+                    Text(when (p) { Page.Home -> strings.home; Page.Locations -> strings.locations; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
                 }
             }
         }
@@ -344,6 +359,7 @@ private fun HomePage(
     engine: EmberEngine, selected: ProxyCandidate?, update: String?, onDismissUpdate: () -> Unit,
     onOpenLocations: () -> Unit,
 ) {
+    val strings = LocalStrings.current
     val state by engine.state.collectAsState()
     val error by engine.lastError.collectAsState()
     val connectedAt by engine.connectedAtMs.collectAsState()
@@ -384,12 +400,10 @@ private fun HomePage(
     if (showAdminNotice) {
         AlertDialog(
             onDismissRequest = { showAdminNotice = false },
-            title = { Text("Allow administrator access") },
+            title = { Text(strings.adminTitle) },
             text = {
                 Text(
-                    "To protect your whole device, Ember sets up a secure network adapter and routing rules, " +
-                        "which needs administrator access. Windows will ask next, naming \"Windows PowerShell\" " +
-                        "(that runs Ember's network helper). Choose Yes to continue.",
+                    strings.adminHelp,
                 )
             },
             confirmButton = {
@@ -397,9 +411,9 @@ private fun HomePage(
                     engine.settings.adminNoticeSeen = true
                     showAdminNotice = false
                     engine.connect(selected)
-                }) { Text("Continue") }
+                }) { Text(strings.continueLabel) }
             },
-            dismissButton = { TextButton(onClick = { showAdminNotice = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showAdminNotice = false }) { Text(strings.cancel) } },
         )
     }
 
@@ -423,9 +437,9 @@ private fun HomePage(
             Box(Modifier.size(140.dp).clip(CircleShape).background(ring.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
                 Text(
                     when (state) {
-                        ConnectionState.DISCONNECTED -> "Connect"
-                        ConnectionState.CONNECTING -> "Cancel"
-                        ConnectionState.CONNECTED -> "Disconnect"
+                        ConnectionState.DISCONNECTED -> strings.connect
+                        ConnectionState.CONNECTING -> strings.cancel
+                        ConnectionState.CONNECTED -> strings.disconnect
                     },
                     style = MaterialTheme.typography.titleMedium,
                     color = ring,
@@ -435,9 +449,9 @@ private fun HomePage(
         Spacer(Modifier.height(16.dp))
         Text(
             when (state) {
-                ConnectionState.CONNECTED -> if (whole) "Connected" else "Proxy active"
-                ConnectionState.CONNECTING -> "Connecting…"
-                ConnectionState.DISCONNECTED -> "Disconnected"
+                ConnectionState.CONNECTED -> if (whole) strings.connected else strings.proxyActive
+                ConnectionState.CONNECTING -> strings.connecting
+                ConnectionState.DISCONNECTED -> strings.disconnected
             },
             style = MaterialTheme.typography.headlineMedium,
         )
@@ -445,7 +459,7 @@ private fun HomePage(
         Text(
             when (state) {
                 ConnectionState.CONNECTED -> formatDuration(elapsed)
-                ConnectionState.CONNECTING -> progress ?: "Connecting..."
+                ConnectionState.CONNECTING -> progress ?: strings.connecting
                 ConnectionState.DISCONNECTED -> "00:00:00"
             },
             style = MaterialTheme.typography.bodyMedium,
@@ -459,11 +473,11 @@ private fun HomePage(
             Spacer(Modifier.height(12.dp))
             Card {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Internet is blocked by the kill switch", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Text(strings.internetBlocked, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(4.dp))
                     Text(notice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text("Restore internet") }
+                    Button(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text(strings.restoreInternet) }
                 }
             }
         }
@@ -472,16 +486,16 @@ private fun HomePage(
         if (state == ConnectionState.CONNECTED && connectedTarget != null) {
             Card {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Connected to", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.connectedTo, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
-                    // "Recommended" is not a country: show where the connection really exits once that is known.
+                    // Recommended is not a country: show where the connection really exits once that is known.
                     val isRecommended = connectedTarget.countryCode.equals("REC", ignoreCase = true) || connectedTarget.countryCode.isBlank()
                     val exitCode = exit.info?.countryCode.orEmpty()
                     val shownCode = if (isRecommended) exitCode else connectedTarget.countryCode
                     val shownName = when {
-                        !isRecommended -> connectedTarget.countryName.ifBlank { connectedTarget.countryCode }
-                        exitCode.length == 2 -> java.util.Locale("", exitCode).getDisplayCountry(java.util.Locale.ENGLISH)
-                        else -> "Recommended location"
+                        !isRecommended -> localizedCountry(connectedTarget.countryCode, connectedTarget.countryName, strings)
+                        exitCode.length == 2 -> java.util.Locale("", exitCode).getDisplayCountry(Locale(strings.languageCode))
+                        else -> strings.recommendedLocation
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         FlagIcon(shownCode, 32.dp)
@@ -489,7 +503,7 @@ private fun HomePage(
                         Column {
                             Text(shownName, style = MaterialTheme.typography.titleMedium)
                             val detail = when {
-                                isRecommended -> "Recommended server"
+                                isRecommended -> strings.recommendedServer
                                 connectedTarget.cityCode.isNotBlank() -> connectedTarget.cityCode
                                 else -> null
                             }
@@ -501,16 +515,16 @@ private fun HomePage(
                     Spacer(Modifier.height(12.dp))
                     val info = exit.info
                     when {
-                        exit.checking -> Text("Checking your connection...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        exit.checking -> Text(strings.checkingConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         info != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                             if (info.countryCode.isNotBlank()) {
                                 FlagIcon(info.countryCode, 16.dp)
                                 Spacer(Modifier.width(6.dp))
                             }
-                            Text("Exit IP ${info.ip}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(strings.exitIp(info.ip), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         exit.error != null -> Text(
-                            "Could not verify the connection: ${exit.error}",
+                            strings.connectionCheckFailed(exit.error.orEmpty()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -520,7 +534,7 @@ private fun HomePage(
         } else {
             Card(Modifier.clickable(onClick = onOpenLocations)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Location", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.location, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (selected != null) {
@@ -528,7 +542,7 @@ private fun HomePage(
                             Spacer(Modifier.width(10.dp))
                         }
                         Text(
-                            selected?.let { it.countryName.ifBlank { it.countryCode } } ?: "Recommended",
+                            selected?.let { localizedCountry(it.countryCode, it.countryName, strings) } ?: strings.recommended,
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     }
@@ -538,18 +552,18 @@ private fun HomePage(
         Spacer(Modifier.height(12.dp))
         Card {
             Column(Modifier.padding(16.dp)) {
-                Text("Monthly data", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.monthlyData, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 val q = quota
                 val remaining = q?.remaining
                 val max = q?.max
                 if (q == null || (remaining == null && max == null)) {
-                    Text("Not reported yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.notReported, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Text(
                         buildString {
-                            if (remaining != null) append("${formatBytes(remaining)} left")
-                            if (max != null) append(if (remaining != null) " of ${formatBytes(max)}" else "Limit ${formatBytes(max)}")
+                            if (remaining != null) append(strings.dataLeft(formatBytes(remaining)))
+                            if (max != null) append(if (remaining != null) strings.dataOf(formatBytes(max)) else strings.dataLimit(formatBytes(max)))
                         },
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -564,20 +578,20 @@ private fun HomePage(
                 }
                 q?.resetEpochSeconds?.let { reset ->
                     Spacer(Modifier.height(8.dp))
-                    Text(resetLabel(reset), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(resetLabel(reset, strings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         Spacer(Modifier.height(12.dp))
         if (!(whole || (state == ConnectionState.DISCONNECTED && wholeSetting))) Card {
             Column(Modifier.padding(16.dp)) {
-                Text("Local proxy", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.localProxy, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text("SOCKS5  $LOCAL_BIND:$SOCKS_PORT", style = MaterialTheme.typography.bodyMedium)
                 Text("HTTP  $LOCAL_BIND:$HTTP_PORT", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Point an app or browser at this proxy to use it. Other apps are not protected in proxy mode. Turn on whole-device mode in Settings to route everything.",
+                    strings.proxyHelp,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -593,6 +607,7 @@ private fun LocationsPage(
     selectedCity: String,
     onPick: (ProxyCandidate?, String, String) -> Unit,
 ) {
+    val strings = LocalStrings.current
     var countries by remember { mutableStateOf<List<VpnCountry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var failure by remember { mutableStateOf<String?>(null) }
@@ -606,11 +621,11 @@ private fun LocationsPage(
         }
         runCatching { servers.fetchCountries() }
             .onSuccess { countries = it }
-            .onFailure { if (countries.isEmpty()) failure = it.message ?: "Could not load the server list" }
+            .onFailure { if (countries.isEmpty()) failure = it.message ?: strings.serverListFailed }
         loading = false
     }
 
-    Text("Choose location", style = MaterialTheme.typography.headlineLarge)
+    Text(strings.chooseLocation, style = MaterialTheme.typography.headlineLarge)
     Spacer(Modifier.height(16.dp))
 
     if (loading) {
@@ -626,13 +641,13 @@ private fun LocationsPage(
 
     Card {
         Column {
-            LocationRow("Recommended", "Automatically chosen for the best performance", selected == null) { onPick(null, "", "") }
+            LocationRow(strings.recommended, strings.automaticLocation, selected == null) { onPick(null, "", "") }
             for (country in ordered) {
                 HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val open = country.code in expanded
                 LocationRow(
-                    country.name,
-                    plural(country.cities.size, "city", "cities"),
+                    localizedCountry(country.code, country.name, strings),
+                    strings.cities(country.cities.size),
                     selected?.countryCode == country.code && selectedCity.isBlank(),
                     flagCode = country.code,
                     expanded = open,
@@ -645,7 +660,7 @@ private fun LocationsPage(
                         HorizontalDivider(Modifier.padding(start = 32.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         LocationRow(
                             city.name.ifBlank { city.code },
-                            plural(city.servers.size, "server", "servers"),
+                            strings.servers(city.servers.size),
                             selected?.countryCode == country.code && selectedCity == city.code,
                             indent = 16,
                         ) {
@@ -669,6 +684,7 @@ private fun LocationRow(
     onToggle: (() -> Unit)? = null,
     onPick: () -> Unit,
 ) {
+    val strings = LocalStrings.current
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onPick).padding(start = (16 + indent).dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -681,7 +697,7 @@ private fun LocationRow(
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (isSelected) Text("Selected", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        if (isSelected) Text(strings.selected, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (onToggle != null) {
             Spacer(Modifier.width(8.dp))
             Box(
@@ -692,7 +708,7 @@ private fun LocationRow(
                     if (expanded) "chevron-up" else "chevron-down",
                     20.dp,
                     MaterialTheme.colorScheme.onSurfaceVariant,
-                    if (expanded) "Hide cities" else "Show cities",
+                    if (expanded) strings.hideCities else strings.showCities,
                 )
             }
         }
@@ -700,7 +716,8 @@ private fun LocationRow(
 }
 
 @Composable
-private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, onSignOut: () -> Unit) {
+private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit, onSignOut: () -> Unit) {
+    val strings = LocalStrings.current
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
     val available = engine.tunnel.isAvailable
@@ -713,16 +730,18 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
         noPromptBusy = false
     }
 
-    Text("Settings", style = MaterialTheme.typography.headlineLarge)
+    Text(strings.settings, style = MaterialTheme.typography.headlineLarge)
     Spacer(Modifier.height(16.dp))
-    GeneralSettings(engine, theme, onThemeChange)
+    GeneralSettings(engine, theme, onThemeChange, language, onLanguageChange)
+    Spacer(Modifier.height(16.dp))
+    AdvancedSettings(engine)
     Spacer(Modifier.height(16.dp))
     Card {
         Column {
             SwitchRow(
-                "Whole-device mode (experimental)",
-                if (available) "Route all apps through Ember. Windows asks for administrator permission when you connect, unless you use the one-time setup below."
-                else "Not available in this build. It needs the Windows tunnel components.",
+                strings.wholeDevice,
+                if (available) strings.wholeDeviceHelp
+                else strings.wholeDeviceUnavailable,
                 whole && available,
                 enabled = available,
             ) {
@@ -731,8 +750,8 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             }
             HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
             SwitchRow(
-                "Kill switch",
-                "If the tunnel drops, block internet access instead of leaking your real traffic. Applies to whole-device mode.",
+                strings.killSwitch,
+                strings.killSwitchHelp,
                 killSwitch,
                 enabled = available,
             ) {
@@ -741,9 +760,8 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             }
             HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
             SwitchRow(
-                "Connect without Windows prompts",
-                "One-time setup with a single Windows prompt. After that, connecting needs no prompt. " +
-                    "Programs already running as you could then start Ember's network helper.",
+                strings.noPrompts,
+                strings.noPromptsHelp,
                 noPrompt,
                 enabled = available && !noPromptBusy,
             ) { wanted ->
@@ -756,7 +774,7 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
                         }
                         noPrompt = wanted
                     } catch (failure: Throwable) {
-                        noPromptError = failure.message ?: "The setup did not finish."
+                        noPromptError = failure.message ?: strings.setupFailed
                     } finally {
                         noPromptBusy = false
                     }
@@ -775,11 +793,11 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {
-            Text("About", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.about, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
-            Text("Ember ${System.getProperty("jpackage.app-version") ?: "development build"}", style = MaterialTheme.typography.bodyMedium)
+            Text(strings.appVersion(System.getProperty("jpackage.app-version") ?: strings.developmentBuild), style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Log file: ${ember.engine.appDataDir().resolve("ember.log")}",
+                strings.logFile(ember.engine.appDataDir().resolve("ember.log").toString()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -788,9 +806,9 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {
-            Text("Account", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.account, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(12.dp)) { Text("Sign out") }
+            OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(12.dp)) { Text(strings.signOut) }
         }
     }
 }
@@ -810,15 +828,13 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
     }
 }
 
-private fun plural(n: Int, one: String, many: String) = if (n == 1) "1 $one" else "$n $many"
-
-private fun resetLabel(resetEpochSeconds: Long): String {
+private fun resetLabel(resetEpochSeconds: Long, strings: Strings): String {
     val secondsLeft = resetEpochSeconds - System.currentTimeMillis() / 1000
     val days = Math.ceil(secondsLeft / 86_400.0).toLong()
     return when {
-        secondsLeft <= 0 -> "Data allowance resets today"
-        days == 1L -> "Resets in 1 day"
-        else -> "Resets in $days days"
+        secondsLeft <= 0 -> strings.resetToday
+        days == 1L -> strings.resetsInDays(1)
+        else -> strings.resetsInDays(days.toInt())
     }
 }
 
@@ -830,7 +846,8 @@ private fun formatDuration(seconds: Long): String {
 }
 
 @Composable
-private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit) {
+private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit) {
+    val strings = LocalStrings.current
     var keepInTray by remember { mutableStateOf(engine.settings.keepInTray) }
     var autoConnect by remember { mutableStateOf(engine.settings.autoConnect) }
     var autostart by remember { mutableStateOf(false) }
@@ -843,39 +860,48 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
     }
     Card {
         Column {
-            Text("General", Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
+            Text(strings.general, Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SwitchRow("Keep running in the tray when the window is closed",
-                "Open Ember again from the icon near the Windows clock.", keepInTray,
+            SwitchRow(strings.keepInTray,
+                strings.trayHelp, keepInTray,
                 enabled = androidx.compose.ui.window.isTraySupported) {
                 keepInTray = it
                 engine.settings.keepInTray = it
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow("Start Ember when I sign in to Windows", "Start quietly in the tray.", autostart,
+            SwitchRow(strings.startWithWindows, strings.startQuietly, autostart,
                 enabled = Autostart.supported && !busy) { enabled ->
                 busy = true
                 failure = null
                 scope.launch {
                     val saved = withContext(Dispatchers.IO) { Autostart.setEnabled(enabled) }
                     if (saved) autostart = enabled
-                    else failure = "Could not change Windows startup. Try again from the installed Ember app."
+                    else failure = strings.startupFailed
                     busy = false
                 }
             }
             failure?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow("Connect automatically when Ember starts", "Use your last chosen location after signing in.", autoConnect) {
+            SwitchRow(strings.autoConnect, strings.autoConnectHelp, autoConnect) {
                 autoConnect = it
                 engine.settings.autoConnect = it
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(Modifier.padding(16.dp)) {
-                Text("Appearance", style = MaterialTheme.typography.bodyLarge)
+                Text(strings.language, style = MaterialTheme.typography.bodyLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((code, label) in listOf("en" to strings.englishLanguage, "fa" to strings.persianLanguage)) {
+                        FilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
+                    }
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(Modifier.padding(16.dp)) {
+                Text(strings.appearance, style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (choice in listOf("Light", "Dark", "System")) {
-                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(choice) })
+                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) })
                     }
                 }
             }
@@ -885,24 +911,25 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
 
 @Composable
 private fun TrafficCard(traffic: TrafficStats) {
+    val strings = LocalStrings.current
     val reading by traffic.readings.collectAsState()
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Live traffic", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.liveTraffic, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (reading.available) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("Download", style = MaterialTheme.typography.bodySmall)
+                        Text(strings.download, style = MaterialTheme.typography.bodySmall)
                         Text(formatBytesPerSecond(reading.downloadSpeed), style = MaterialTheme.typography.titleMedium)
                     }
                     Column {
-                        Text("Upload", style = MaterialTheme.typography.bodySmall)
+                        Text(strings.upload, style = MaterialTheme.typography.bodySmall)
                         Text(formatBytesPerSecond(reading.uploadSpeed), style = MaterialTheme.typography.titleMedium)
                     }
                 }
-                Text("This session: ${formatBytes(reading.downloaded)} downloaded, ${formatBytes(reading.uploaded)} uploaded",
+                Text(strings.sessionTraffic(formatBytes(reading.downloaded), formatBytes(reading.uploaded)),
                     style = MaterialTheme.typography.bodySmall)
-            } else Text("Waiting for traffic readings...", style = MaterialTheme.typography.bodySmall,
+            } else Text(strings.waitingTraffic, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -910,10 +937,11 @@ private fun TrafficCard(traffic: TrafficStats) {
 
 @Composable
 private fun UpdateBanner(version: String, onDismiss: () -> Unit) {
+    val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     Card {
         Column(Modifier.padding(16.dp)) {
-            Text("Ember $version is available", style = MaterialTheme.typography.titleSmall)
+            Text(strings.updateAvailable(version), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = {
                     scope.launch(Dispatchers.IO) {
@@ -921,8 +949,8 @@ private fun UpdateBanner(version: String, onDismiss: () -> Unit) {
                             if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(UpdateCheck.RELEASES_URL))
                         }
                     }
-                }) { Text("View update") }
-                TextButton(onClick = onDismiss) { Text("Dismiss") }
+                }) { Text(strings.viewUpdate) }
+                TextButton(onClick = onDismiss) { Text(strings.dismiss) }
             }
         }
     }
@@ -932,6 +960,7 @@ private enum class LogFilter { All, Info, Problems }
 
 @Composable
 private fun LogsPage() {
+    val strings = LocalStrings.current
     val entries by AppLogger.entries.collectAsState()
     var filter by remember { mutableStateOf(LogFilter.All) }
     val clipboard = LocalClipboardManager.current
@@ -945,24 +974,90 @@ private fun LogsPage() {
             }
         }.map { "${dateFormat.format(Date(it.timestampMillis))} ${it.level} [${it.tag}] ${it.message}" }
     }
-    Text("Logs", style = MaterialTheme.typography.headlineLarge)
+    Text(strings.logs, style = MaterialTheme.typography.headlineLarge)
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         for (choice in LogFilter.entries) {
-            FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text(choice.name) })
+            FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text(when (choice) { LogFilter.All -> strings.allLogs; LogFilter.Info -> strings.infoLogs; LogFilter.Problems -> strings.problemLogs }) })
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty()) { Text("Copy") }
-        OutlinedButton(onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty()) { Text("Clear") }
+        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty()) { Text(strings.copy) }
+        OutlinedButton(onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty()) { Text(strings.clear) }
     }
     Spacer(Modifier.height(12.dp))
     Card {
         SelectionContainer {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (lines.isEmpty()) Text("No log entries to show.", style = MaterialTheme.typography.bodySmall)
-                for (line in lines) Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                if (lines.isEmpty()) Text(strings.emptyLogs, style = MaterialTheme.typography.bodySmall)
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (line in lines) Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    }
+                }
             }
         }
     }
 }
+
+private fun localizedCountry(code: String, fallback: String, strings: Strings): String =
+    if (code.length == 2) Locale("", code).getDisplayCountry(Locale(strings.languageCode)).ifBlank { fallback }
+    else fallback.ifBlank { code }
+
+@Composable
+private fun AdvancedSettings(engine: EmberEngine) {
+    val strings = LocalStrings.current
+    var mode by remember { mutableStateOf(engine.settings.tlsSplitMode) }
+    var mtuText by remember { mutableStateOf(engine.settings.mtu.toString()) }
+    val validMtu = parseMtu(mtuText) != null
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(strings.advanced, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.tlsFragmentation, style = MaterialTheme.typography.bodyLarge)
+            Text(strings.tlsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.selectableGroup()) {
+                for (choice in TlsSplitMode.entries) {
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = mode == choice, role = Role.RadioButton, onClick = {
+                            mode = choice
+                            engine.settings.tlsSplitMode = choice
+                        }).padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = mode == choice, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(strings.tlsLabel(choice), style = MaterialTheme.typography.bodyLarge)
+                            Text(strings.tlsDescription(choice), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(strings.mtuHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(
+                value = mtuText,
+                onValueChange = { value ->
+                    mtuText = value
+                    parseMtu(value)?.let { engine.settings.mtu = it }
+                },
+                label = { Text("MTU") },
+                isError = !validMtu,
+                supportingText = { if (!validMtu) Text(strings.mtuValidation(MTU_RANGE.first, MTU_RANGE.last)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(onClick = {
+                engine.settings.mtu = HevSocks5TunnelConfig.TUN_MTU
+                mtuText = engine.settings.mtu.toString()
+            }) { Text(strings.resetDefault) }
+            Text(strings.nextConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun parseMtu(value: String): Int? =
+    value.takeIf { it.isNotEmpty() && it.all { char -> char in '0'..'9' } }
+        ?.toIntOrNull()?.takeIf { it in MTU_RANGE }
