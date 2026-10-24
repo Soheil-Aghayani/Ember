@@ -37,6 +37,35 @@ function Test-Ipv4([string]$value) {
     return $true
 }
 
+function ConvertTo-Long([string]$ip) {
+    $b = [System.Net.IPAddress]::Parse($ip).GetAddressBytes()
+    return [long]$b[0] * 16777216 + [long]$b[1] * 65536 + [long]$b[2] * 256 + [long]$b[3]
+}
+
+function ConvertTo-Ip([long]$n) {
+    return ('{0}.{1}.{2}.{3}' -f (($n -shr 24) -band 255), (($n -shr 16) -band 255), (($n -shr 8) -band 255), ($n -band 255))
+}
+
+function Get-CidrRange([string]$cidr) {
+    $parts = $cidr.Split('/')
+    $start = ConvertTo-Long $parts[0]
+    $size = [long][math]::Pow(2, 32 - [int]$parts[1])
+    return @($start, ($start + $size - 1))
+}
+
+# The IPv4 space minus the given [start,end] intervals, as 'a.b.c.d-e.f.g.h' ranges for the firewall.
+function Get-ComplementRanges($intervals) {
+    $sorted = @($intervals | Sort-Object { $_[0] })
+    $result = New-Object System.Collections.ArrayList
+    $next = [long]0
+    foreach ($iv in $sorted) {
+        if ($iv[0] -gt $next) { [void]$result.Add((ConvertTo-Ip $next) + '-' + (ConvertTo-Ip ($iv[0] - 1))) }
+        if ($iv[1] + 1 -gt $next) { $next = $iv[1] + 1 }
+    }
+    if ($next -le 4294967295) { [void]$result.Add((ConvertTo-Ip $next) + '-255.255.255.255') }
+    return , @($result)
+}
+
 $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
 
 $stateDir = [string]$cfg.stateDir
@@ -67,12 +96,10 @@ function Remove-AddedRoutes {
 }
 
 function Invoke-Cleanup {
-    Remove-AddedRoutes
-    foreach ($net in @('0.0.0.0', '128.0.0.0')) {
-        & route.exe delete $net mask 128.0.0.0 127.0.0.1 2>&1 | Out-Null
-    }
-    Remove-NetFirewallRule -Group $RuleGroup -PolicyStore ActiveStore -ErrorAction SilentlyContinue
-    Get-Process -Name 'hev-socks5-tunnel' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = 'Continue'
+    try { Remove-AddedRoutes } catch { Write-Log ('cleanup (routes): ' + $_.Exception.Message) }
+    try { Remove-NetFirewallRule -Group $RuleGroup -PolicyStore ActiveStore -ErrorAction SilentlyContinue } catch { Write-Log ('cleanup (firewall): ' + $_.Exception.Message) }
+    try { Get-Process -Name 'hev-socks5-tunnel' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
 }
 
 if ($Mode -eq 'Restore') {
@@ -128,13 +155,21 @@ try {
 
     # Kill switch first: if anything after this fails or the tunnel dies, traffic is dropped, not leaked.
     if ($killSwitch) {
-        # Two high-metric routes that point at this computer itself drop traffic. While the tunnel is up its
-        # own /1 routes (metric 1) win; if the tunnel disappears, these remain and nothing leaves.
-        foreach ($net in @('0.0.0.0', '128.0.0.0')) {
-            $out = & route.exe add $net mask 128.0.0.0 127.0.0.1 metric 5000 2>&1
-            Write-Log ("route add $net/1 -> " + (($out | Out-String).Trim()) + " (exit $LASTEXITCODE)")
-            if ($LASTEXITCODE -ne 0) { throw "could not add the kill-switch route for $net/1: " + (($out | Out-String).Trim()) }
+        # Block public IPv4 on every active adapter except the tunnel. While the tunnel is up, the default
+        # routes send public traffic into it, so only Mozilla's edge and local-network traffic use these
+        # adapters. If the tunnel disappears, traffic falls back to them and is dropped instead of leaking.
+        $aliases = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $adapterName } | ForEach-Object { $_.Name })
+        if ($aliases.Count -eq 0) { throw 'no active network adapter was found for the kill switch' }
+        $allowed = New-Object System.Collections.ArrayList
+        foreach ($cidr in @('0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16')) {
+            [void]$allowed.Add((Get-CidrRange $cidr))
         }
+        [void]$allowed.Add(@([long]3758096384, [long]4294967295))
+        foreach ($ip in $edgeIps) { $n = ConvertTo-Long ([string]$ip); [void]$allowed.Add(@($n, $n)) }
+        $blockRanges = Get-ComplementRanges $allowed
+        New-NetFirewallRule -DisplayName 'Ember kill switch' -Group $RuleGroup -Direction Outbound -Action Block `
+            -InterfaceAlias $aliases -RemoteAddress $blockRanges -PolicyStore ActiveStore | Out-Null
+        Write-Log ('kill switch rule added on: ' + ($aliases -join ', ') + ' (' + $blockRanges.Count + ' blocked ranges)')
     }
 
     # The route to Mozilla's edge must stay on the physical network or the tunnel would loop into itself.
@@ -213,8 +248,9 @@ try {
         }
     }
 } catch {
-    Write-Log ("error: " + $_.Exception.Message)
+    $failure = $_.Exception.Message
+    Write-Log ('error: ' + $failure)
     Invoke-Cleanup
-    Write-State ('ERROR: ' + $_.Exception.Message)
+    Write-State ('ERROR: ' + $failure)
     exit 1
 }
