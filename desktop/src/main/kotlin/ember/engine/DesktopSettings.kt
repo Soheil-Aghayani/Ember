@@ -1,7 +1,11 @@
 package ember.engine
 
+import com.soheil.ember.data.TlsSplitMode
+import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
 import java.io.File
 import java.util.Properties
+
+val MTU_RANGE = 1200..1500
 
 data class QuotaInfo(val remaining: Long?, val max: Long?, val resetEpochSeconds: Long?)
 
@@ -35,6 +39,16 @@ class DesktopSettings(private val file: File) {
     var wholeDevice: Boolean
         get() = props.getProperty("wholeDevice", "false").toBoolean()
         set(value) = put("wholeDevice", value.toString())
+
+    /** Splits the TLS handshake to Mozilla's server into pieces, which can get past networks that block the VPN. */
+    var tlsSplitMode: TlsSplitMode
+        get() = runCatching { TlsSplitMode.valueOf(props.getProperty("tlsSplitMode", "OFF")) }.getOrDefault(TlsSplitMode.OFF)
+        set(value) = put("tlsSplitMode", value.name)
+
+    /** Largest packet the whole-device tunnel sends. Lower it if some sites hang or load partially. */
+    var mtu: Int
+        get() = props.getProperty("mtu")?.toIntOrNull()?.coerceIn(MTU_RANGE) ?: HevSocks5TunnelConfig.TUN_MTU
+        set(value) = put("mtu", value.coerceIn(MTU_RANGE).toString())
 
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()

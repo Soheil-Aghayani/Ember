@@ -138,7 +138,7 @@ class EmberEngine(private val dataDir: File) {
                     val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
                     s.start()
                     socks = s
-                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, onProgress = { _progress.value = it })
+                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, onProgress = { _progress.value = it })
                     startWatchingTunnel()
                 } else {
                     startLocalProxies()
@@ -243,7 +243,7 @@ class EmberEngine(private val dataDir: File) {
     }
 
     private suspend fun dial(candidate: ProxyCandidate, pass: ProxyPass): H2UpstreamSession {
-        val upstream = H2UpstreamSession(candidate.host, candidate.port, pass.token, null, edgeIp)
+        val upstream = H2UpstreamSession(candidate.host, candidate.port, pass.token, null, edgeIp, settings.tlsSplitMode)
         try {
             withTimeout(DIAL_TIMEOUT_MS) { upstream.connect() }
         } catch (failure: Throwable) {
