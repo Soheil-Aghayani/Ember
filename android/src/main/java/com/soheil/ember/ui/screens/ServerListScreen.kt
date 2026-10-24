@@ -1,5 +1,8 @@
 package com.soheil.ember.ui.screens
 
+import com.soheil.ember.ui.components.FlagIcon
+import com.soheil.ember.R
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,10 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +43,6 @@ import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
 import com.soheil.ember.data.ServerListClient
 import com.soheil.ember.data.model.ProxyCandidate
 import com.soheil.ember.data.model.VpnCountry
-import com.soheil.ember.data.model.emojiFlag
 import com.soheil.ember.vpn.PingUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -141,13 +139,13 @@ fun ServerListScreen(
                         when (row) {
                             is LocationRow.RecommendedRow -> ListItem(
                                 leadingContent = {
-                                    Icon(Icons.Filled.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Icon(painterResource(R.drawable.ic_solar_global), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 },
                                 headlineContent = { Text("Recommended", fontWeight = FontWeight.SemiBold) },
                                 supportingContent = { Text("Automatically chosen for the best performance") },
                                 trailingContent = {
                                     if (row.country.code == selected?.countryCode) {
-                                        Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                                        Icon(painterResource(R.drawable.ic_solar_check_circle), contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 },
                                 modifier = Modifier
@@ -166,10 +164,7 @@ fun ServerListScreen(
                             )
                             is LocationRow.CountryHeader -> ListItem(
                                 leadingContent = {
-                                    Text(
-                                        text = row.country.emojiFlag,
-                                        style = MaterialTheme.typography.titleLarge,
-                                    )
+                                    FlagIcon(row.country.code, 24.dp)
                                 },
                                 headlineContent = { Text(row.country.name, fontWeight = FontWeight.SemiBold) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -233,7 +228,7 @@ fun ServerListScreen(
                                         if (row.country.code == selected?.countryCode &&
                                             city.code == selected?.cityCode
                                         ) {
-                                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                                            Icon(painterResource(R.drawable.ic_solar_check_circle), contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                         }
                                     },
                                     modifier = Modifier
