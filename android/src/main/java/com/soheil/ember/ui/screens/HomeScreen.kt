@@ -1,5 +1,8 @@
 package com.soheil.ember.ui.screens
 
+import com.soheil.ember.ui.components.FlagIcon
+import com.soheil.ember.R
+import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,13 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -67,7 +63,6 @@ import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
 import com.soheil.ember.data.ServerListClient
 import com.soheil.ember.data.formatBytes
 import com.soheil.ember.data.model.ConnectionState
-import com.soheil.ember.data.model.emojiFlag
 import com.soheil.ember.ui.theme.LocalEmberStatusColors
 import com.soheil.ember.ui.theme.ThemeController
 import com.soheil.ember.ui.theme.ThemeMode
@@ -203,11 +198,11 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = when (mode) {
-                                ThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
-                                ThemeMode.LIGHT -> Icons.Filled.LightMode
-                                ThemeMode.DARK -> Icons.Filled.DarkMode
-                            },
+                            painter = painterResource(when (mode) {
+                                ThemeMode.SYSTEM -> R.drawable.ic_solar_sun_2
+                                ThemeMode.LIGHT -> R.drawable.ic_solar_sun
+                                ThemeMode.DARK -> R.drawable.ic_solar_moon
+                            }),
                             contentDescription = when (mode) {
                                 ThemeMode.SYSTEM ->
                                     "Theme: follow system. Tap to switch to ${if (showingDark) "light" else "dark"} mode"
@@ -219,7 +214,7 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
-                            imageVector = Icons.Filled.Settings,
+                            painter = painterResource(R.drawable.ic_solar_settings),
                             contentDescription = "Settings",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -268,7 +263,7 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Power,
+                            painter = painterResource(R.drawable.ic_solar_power),
                             contentDescription = if (state == ConnectionState.DISCONNECTED) "Connect" else "Disconnect",
                             tint = ringColor,
                             modifier = Modifier.size(56.dp),
@@ -334,12 +329,7 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.padding(top = 4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val flag = selectedProxy?.emojiFlag
-                            if (!flag.isNullOrBlank()) {
-                                Text(flag, style = MaterialTheme.typography.titleMedium)
-                            } else {
-                                Icon(imageVector = Icons.Filled.Public, contentDescription = null)
-                            }
+                            FlagIcon(selectedProxy?.countryCode.orEmpty(), 24.dp)
                             Spacer(Modifier.padding(start = 8.dp))
                             Text(
                                 selectedProxy?.let { it.countryName.ifBlank { it.countryCode } } ?: "Recommended",

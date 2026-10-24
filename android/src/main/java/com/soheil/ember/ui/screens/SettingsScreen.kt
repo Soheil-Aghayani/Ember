@@ -1,5 +1,7 @@
 package com.soheil.ember.ui.screens
 
+import com.soheil.ember.R
+import androidx.compose.ui.res.painterResource
 import com.soheil.ember.ui.components.EmberDivider
 import com.soheil.ember.ui.components.EmberGroup
 import com.soheil.ember.ui.components.EmberTopBar
@@ -22,12 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -277,7 +273,7 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("Tunnel MTU") },
                     supportingContent = { Text(mtu.toString()) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showMtuDialog = true },
                 )
             }
@@ -292,7 +288,7 @@ fun SettingsScreen(
                         }
                         Text(subtitle)
                     },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showDnsProviderDialog = true },
                 )
                 EmberDivider()
@@ -306,7 +302,7 @@ fun SettingsScreen(
                         }
                         Text(subtitle)
                     },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showBootstrapDnsDialog = true },
                 )
             }
@@ -328,14 +324,14 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("Local address") },
                     supportingContent = { Text(socksBindAddress) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showSocksBindDialog = true },
                 )
                 EmberDivider()
                 ListItem(
                     headlineContent = { Text("SOCKS5 port") },
                     supportingContent = { Text(socksPort.toString()) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showSocksPortDialog = true },
                 )
                 EmberDivider()
@@ -357,7 +353,7 @@ fun SettingsScreen(
                     ListItem(
                         headlineContent = { Text("HTTP port") },
                         supportingContent = { Text(httpProxyPort.toString()) },
-                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                         modifier = Modifier.clickable { showHttpPortDialog = true },
                     )
             }
@@ -374,7 +370,7 @@ fun SettingsScreen(
                             },
                         )
                     },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showSplitTunnelDialog = true },
                 )
             }
@@ -382,14 +378,14 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("Custom edge address") },
                     supportingContent = { Text(customEdgeAddress.ifBlank { "Not set" }) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showEdgeAddressDialog = true },
                 )
                 EmberDivider()
                 ListItem(
                     headlineContent = { Text("TLS fragmentation") },
                     supportingContent = { Text(tlsSplitMode.label) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable { showTlsSplitDialog = true },
                 )
                 EmberDivider()
@@ -411,7 +407,7 @@ fun SettingsScreen(
                     ListItem(
                         headlineContent = { Text("Proxy type") },
                         supportingContent = { Text(upstreamProxyType.name) },
-                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                         modifier = Modifier.clickable { showUpstreamProxyTypeDialog = true },
                     )
                     EmberDivider()
@@ -426,7 +422,7 @@ fun SettingsScreen(
                                 },
                             )
                         },
-                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                         modifier = Modifier.clickable { showUpstreamProxyAddressDialog = true },
                     )
                     EmberDivider()
@@ -435,7 +431,7 @@ fun SettingsScreen(
                         supportingContent = {
                             Text(if (upstreamProxyUsername.isBlank()) "None" else upstreamProxyUsername)
                         },
-                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                         modifier = Modifier.clickable { showUpstreamProxyCredentialsDialog = true },
                     )
             }
@@ -444,7 +440,7 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("View logs") },
                     supportingContent = { Text("Recent connection activity") },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
                     modifier = Modifier.clickable(onClick = onOpenLogs),
                 )
                 EmberDivider()
@@ -456,7 +452,7 @@ fun SettingsScreen(
                 ListItem(
                     headlineContent = { Text("Source code") },
                     supportingContent = { Text(GITHUB_URL) },
-                    leadingContent = { Icon(Icons.Filled.Code, contentDescription = null) },
+                    leadingContent = { Icon(painterResource(R.drawable.ic_solar_code), contentDescription = null) },
                     modifier = Modifier.clickable {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
                     },
@@ -472,7 +468,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 32.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_solar_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Sign out")
             }
@@ -997,7 +993,7 @@ private fun SplitTunnelDialog(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     label = { Text("Search apps") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_solar_magnifier), contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()

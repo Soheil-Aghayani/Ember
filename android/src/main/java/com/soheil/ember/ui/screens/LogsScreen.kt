@@ -1,5 +1,7 @@
 package com.soheil.ember.ui.screens
 
+import com.soheil.ember.R
+import androidx.compose.ui.res.painterResource
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -15,11 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,16 +108,16 @@ fun LogsScreen(onBack: () -> Unit) {
                             )
                         }
                     }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Save/share logs as a file")
+                        Icon(painterResource(R.drawable.ic_solar_share), contentDescription = "Save/share logs as a file")
                     }
                     IconButton(onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("Ember logs", AppLogger.exportAsText()))
                     }) {
-                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy logs")
+                        Icon(painterResource(R.drawable.ic_solar_copy), contentDescription = "Copy logs")
                     }
                     IconButton(onClick = { AppLogger.clear() }) {
-                        Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear logs")
+                        Icon(painterResource(R.drawable.ic_solar_trash_bin_trash), contentDescription = "Clear logs")
                     }
                 },
             )
