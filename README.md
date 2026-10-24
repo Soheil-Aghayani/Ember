@@ -109,3 +109,7 @@ Contributions are welcome! Feel free to submit a pull request or report an issue
 
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+- [Solar icon set](https://www.figma.com/community/file/1166831539721848736) by 480 Design (CC BY 4.0) - icons
+- [circle-flags](https://github.com/HatScripts/circle-flags) (MIT) - country flags
+- [Inter](https://rsms.me/inter/) (SIL OFL 1.1) - typeface
