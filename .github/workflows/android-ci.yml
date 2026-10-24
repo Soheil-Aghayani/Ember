@@ -102,6 +102,7 @@ jobs:
           gh release view desktop-test --json assets --jq '.assets[].name' 2>/dev/null | while read -r asset; do
             gh release delete-asset desktop-test "$asset" -y || true
           done
+          gh release edit desktop-test --title "Ember desktop test build 1.0.${{ github.run_number }}" || true
 
       - name: Attach installer to a draft release (manual runs)
         if: github.event_name == 'workflow_dispatch'
