@@ -133,11 +133,56 @@ $hev = Get-ChildItem -LiteralPath (Join-Path $here 'tunnel') -Recurse -Filter 'h
 if (-not $hev) { throw 'hev-socks5-tunnel.exe was not found next to this script' }
 
 $added = New-Object System.Collections.ArrayList
-function Add-Route([string]$prefix, [int]$ifIndex, [string]$nextHop, [int]$metric) {
+function Add-Route([string]$prefix, [int]$ifIndex, [string]$nextHop, [int]$metric, [string]$kind = 'tun') {
     New-NetRoute -DestinationPrefix $prefix -InterfaceIndex $ifIndex -NextHop $nextHop -RouteMetric $metric `
         -PolicyStore ActiveStore -ErrorAction Stop | Out-Null
-    [void]$added.Add(@{ prefix = $prefix; ifIndex = $ifIndex })
+    [void]$added.Add(@{ prefix = $prefix; ifIndex = $ifIndex; kind = $kind })
     ConvertTo-Json -InputObject @($added) | Set-Content -LiteralPath $routesFile -Encoding ascii
+}
+
+# The physical (non-tunnel) default route.
+function Get-PhysicalDefault {
+    return Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+        Where-Object { $_.NextHop -ne '0.0.0.0' -and $_.InterfaceAlias -ne $adapterName } |
+        Sort-Object RouteMetric |
+        Select-Object -First 1
+}
+
+# Something that changes whenever the physical network changes (default route or the set of active adapters).
+function Get-NetworkSignature {
+    $def = Get-PhysicalDefault
+    if (-not $def) { return $null }
+    $names = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $adapterName } | ForEach-Object { $_.Name }) | Sort-Object
+    return ('{0}|{1}|{2}' -f $def.InterfaceIndex, $def.NextHop, ($names -join ','))
+}
+
+# The route to Mozilla's edge must stay on the physical network or the tunnel would loop into itself.
+function Set-Bypass($def) {
+    foreach ($e in @($added | Where-Object { $_.kind -eq 'bypass' })) {
+        Remove-NetRoute -DestinationPrefix $e.prefix -InterfaceIndex $e.ifIndex -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+        $added.Remove($e)
+    }
+    foreach ($ip in $edgeIps) { Add-Route "$ip/32" $def.InterfaceIndex $def.NextHop 1 'bypass' }
+}
+
+# Block public IPv4 on every active adapter except the tunnel. While the tunnel is up, the default routes send
+# public traffic into it, so only Mozilla's edge and local-network traffic use these adapters. If the tunnel
+# disappears, traffic falls back to them and is dropped instead of leaking. Safe to call again after the
+# network changes: it replaces the previous rule.
+function Set-KillSwitch {
+    Remove-NetFirewallRule -DisplayName 'Ember kill switch' -PolicyStore ActiveStore -ErrorAction SilentlyContinue
+    $aliases = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $adapterName } | ForEach-Object { $_.Name })
+    if ($aliases.Count -eq 0) { throw 'no active network adapter was found for the kill switch' }
+    $allowed = New-Object System.Collections.ArrayList
+    foreach ($cidr in @('0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16')) {
+        [void]$allowed.Add((Get-CidrRange $cidr))
+    }
+    [void]$allowed.Add(@([long]3758096384, [long]4294967295))
+    foreach ($ip in $edgeIps) { $n = ConvertTo-Long ([string]$ip); [void]$allowed.Add(@($n, $n)) }
+    $blockRanges = Get-ComplementRanges $allowed
+    New-NetFirewallRule -DisplayName 'Ember kill switch' -Group $RuleGroup -Direction Outbound -Action Block `
+        -InterfaceAlias $aliases -RemoteAddress $blockRanges -PolicyStore ActiveStore | Out-Null
+    Write-Log ('kill switch rule set on: ' + ($aliases -join ', ') + ' (' + $blockRanges.Count + ' blocked ranges)')
 }
 
 Remove-Item -LiteralPath $stopFile -ErrorAction SilentlyContinue
@@ -154,26 +199,9 @@ try {
     if (-not $def) { throw 'no default IPv4 route found' }
 
     # Kill switch first: if anything after this fails or the tunnel dies, traffic is dropped, not leaked.
-    if ($killSwitch) {
-        # Block public IPv4 on every active adapter except the tunnel. While the tunnel is up, the default
-        # routes send public traffic into it, so only Mozilla's edge and local-network traffic use these
-        # adapters. If the tunnel disappears, traffic falls back to them and is dropped instead of leaking.
-        $aliases = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $adapterName } | ForEach-Object { $_.Name })
-        if ($aliases.Count -eq 0) { throw 'no active network adapter was found for the kill switch' }
-        $allowed = New-Object System.Collections.ArrayList
-        foreach ($cidr in @('0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16')) {
-            [void]$allowed.Add((Get-CidrRange $cidr))
-        }
-        [void]$allowed.Add(@([long]3758096384, [long]4294967295))
-        foreach ($ip in $edgeIps) { $n = ConvertTo-Long ([string]$ip); [void]$allowed.Add(@($n, $n)) }
-        $blockRanges = Get-ComplementRanges $allowed
-        New-NetFirewallRule -DisplayName 'Ember kill switch' -Group $RuleGroup -Direction Outbound -Action Block `
-            -InterfaceAlias $aliases -RemoteAddress $blockRanges -PolicyStore ActiveStore | Out-Null
-        Write-Log ('kill switch rule added on: ' + ($aliases -join ', ') + ' (' + $blockRanges.Count + ' blocked ranges)')
-    }
+    if ($killSwitch) { Set-KillSwitch }
 
-    # The route to Mozilla's edge must stay on the physical network or the tunnel would loop into itself.
-    foreach ($ip in $edgeIps) { Add-Route "$ip/32" $def.InterfaceIndex $def.NextHop 1 }
+    Set-Bypass $def
 
     $proc = Start-Process -FilePath $hev.FullName -ArgumentList ('"' + $hevConfig + '"') `
         -WorkingDirectory $hev.DirectoryName -WindowStyle Hidden -PassThru
@@ -214,8 +242,28 @@ try {
     Write-State 'UP'
     Write-Log 'tunnel is up'
 
+    $lastSig = Get-NetworkSignature
+    $tick = 0
     while ($true) {
         Start-Sleep -Milliseconds 1000
+        $tick++
+        if ($tick % 3 -eq 0) {
+            # Wi-Fi changes, cable plugged in, wake from sleep: re-point the edge route and the kill switch.
+            try {
+                $sig = Get-NetworkSignature
+                if ($sig -and $sig -ne $lastSig) {
+                    Write-Log ('network changed: ' + $sig)
+                    $now = Get-PhysicalDefault
+                    if ($now) {
+                        Set-Bypass $now
+                        if ($killSwitch) { Set-KillSwitch }
+                        $lastSig = $sig
+                    }
+                }
+            } catch {
+                Write-Log ('network refresh failed: ' + $_.Exception.Message)
+            }
+        }
         if (Test-Path -LiteralPath $stopFile) {
             Invoke-Cleanup
             Write-State 'DOWN'

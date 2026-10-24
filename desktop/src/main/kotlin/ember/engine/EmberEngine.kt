@@ -33,6 +33,7 @@ import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "EmberEngine"
@@ -100,6 +101,7 @@ class EmberEngine(private val dataDir: File) {
     private var connectJob: Job? = null
     private var renewJob: Job? = null
     private var watchJob: Job? = null
+    private var netWatchJob: Job? = null
     private val redialing = AtomicBoolean(false)
 
     init {
@@ -148,6 +150,7 @@ class EmberEngine(private val dataDir: File) {
                 checkExit()
                 AppLogger.i(TAG, "connected via ${chosen.authority} (wholeDevice=$wholeDevice)")
                 scheduleRenewal(pass)
+                startNetworkWatch()
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (failure: Throwable) {
@@ -276,6 +279,43 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
+    /**
+     * Reconnects the tunnel to Mozilla after the computer wakes from sleep or the physical network changes
+     * (Wi-Fi switched, cable plugged in). In whole-device mode the helper re-points its own routes.
+     */
+    private fun startNetworkWatch() {
+        netWatchJob?.cancel()
+        netWatchJob = scope.launch {
+            var lastTick = System.currentTimeMillis()
+            var lastSignature = networkSignature()
+            while (true) {
+                delay(2_000)
+                val now = System.currentTimeMillis()
+                val resumed = now - lastTick > 20_000
+                lastTick = now
+                val signature = networkSignature()
+                val changed = signature.isNotEmpty() && signature != lastSignature
+                if (signature.isNotEmpty()) lastSignature = signature
+                if (resumed || changed) {
+                    AppLogger.i(TAG, if (resumed) "resumed from sleep; re-establishing the tunnel" else "network changed; re-establishing the tunnel")
+                    delay(3_000) // let Windows and the helper settle
+                    onUnhealthy()
+                }
+            }
+        }
+    }
+
+    /** A fingerprint of the physical network: active adapters and their IPv4 addresses (tunnel and virtual switches ignored). */
+    private fun networkSignature(): String = runCatching {
+        NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+            .filter { ni -> listOf("vethernet", "hyper-v", "vmware", "virtualbox", "wintun", "loopback").none { ni.displayName.contains(it, ignoreCase = true) } }
+            .map { ni -> ni.name to ni.inetAddresses.toList().filterIsInstance<Inet4Address>().mapNotNull { it.hostAddress } }
+            .filter { (_, addresses) -> addresses.none { it.startsWith("10.8.0.") } }
+            .sortedBy { it.first }
+            .joinToString(";") { (name, addresses) -> name + "=" + addresses.sorted().joinToString(",") }
+    }.getOrDefault("")
+
     private fun scheduleRenewal(initial: ProxyPass) {
         renewJob?.cancel()
         renewJob = scope.launch {
@@ -330,6 +370,8 @@ class EmberEngine(private val dataDir: File) {
         renewJob = null
         watchJob?.cancel()
         watchJob = null
+        netWatchJob?.cancel()
+        netWatchJob = null
         if (_wholeDevice.value && !helperAlreadyBlocked) {
             runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
         }
