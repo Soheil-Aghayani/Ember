@@ -29,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -221,7 +222,7 @@ private fun MainShell(engine: EmberEngine, onSignOut: () -> Unit) {
                         selected = it
                         page = Page.Home
                     }
-                    Page.Settings -> SettingsPage(onSignOut)
+                    Page.Settings -> SettingsPage(engine, onSignOut)
                 }
             }
         }
@@ -264,6 +265,9 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
     val state by engine.state.collectAsState()
     val error by engine.lastError.collectAsState()
     val connectedAt by engine.connectedAtMs.collectAsState()
+    val blocked by engine.blockedNotice.collectAsState()
+    val whole by engine.wholeDevice.collectAsState()
+    val wholeSetting = engine.settings.wholeDevice
     val status = statusColors()
     var elapsed by remember { mutableStateOf(0L) }
 
@@ -308,7 +312,7 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
         Spacer(Modifier.height(16.dp))
         Text(
             when (state) {
-                ConnectionState.CONNECTED -> "Proxy active"
+                ConnectionState.CONNECTED -> if (whole) "Connected" else "Proxy active"
                 ConnectionState.CONNECTING -> "Connecting…"
                 ConnectionState.DISCONNECTED -> "Disconnected"
             },
@@ -324,6 +328,18 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
             Spacer(Modifier.height(8.dp))
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
+        blocked?.let { notice ->
+            Spacer(Modifier.height(12.dp))
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Internet is blocked by the kill switch", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(4.dp))
+                    Text(notice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text("Restore internet") }
+                }
+            }
+        }
         Spacer(Modifier.height(24.dp))
         Card(Modifier.clickable(onClick = onOpenLocations)) {
             Column(Modifier.padding(16.dp)) {
@@ -336,7 +352,7 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
             }
         }
         Spacer(Modifier.height(12.dp))
-        Card {
+        if (!(whole || (state == ConnectionState.DISCONNECTED && wholeSetting))) Card {
             Column(Modifier.padding(16.dp)) {
                 Text("Local proxy", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
@@ -449,8 +465,37 @@ private fun LocationRow(
 }
 
 @Composable
-private fun SettingsPage(onSignOut: () -> Unit) {
+private fun SettingsPage(engine: EmberEngine, onSignOut: () -> Unit) {
+    var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
+    var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
+    val available = engine.tunnel.isAvailable
+
     Text("Settings", style = MaterialTheme.typography.headlineLarge)
+    Spacer(Modifier.height(16.dp))
+    Card {
+        Column {
+            SwitchRow(
+                "Whole-device mode (experimental)",
+                if (available) "Route all apps through Ember. Asks for administrator permission each time you connect."
+                else "Not available in this build. It needs the Windows tunnel components.",
+                whole && available,
+                enabled = available,
+            ) {
+                whole = it
+                engine.settings.wholeDevice = it
+            }
+            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow(
+                "Kill switch",
+                "If the tunnel drops, block internet access instead of leaking your real traffic. Applies to whole-device mode.",
+                killSwitch,
+                enabled = available,
+            ) {
+                killSwitch = it
+                engine.settings.killSwitch = it
+            }
+        }
+    }
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {
@@ -458,6 +503,21 @@ private fun SettingsPage(onSignOut: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(12.dp)) { Text("Sign out") }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 

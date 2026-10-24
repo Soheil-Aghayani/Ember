@@ -26,8 +26,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "EmberEngine"
@@ -42,13 +45,15 @@ const val HTTP_PORT = 10809
 const val LOCAL_BIND = "127.0.0.1"
 
 /** Owns the account session, the server list and the tunnel to Mozilla's edge for the desktop app. */
-class EmberEngine(dataDir: File) {
+class EmberEngine(private val dataDir: File) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val tokenStore: AuthTokenStore = DesktopTokenStore(File(dataDir, "session.bin"))
     val auth = FxaAuthRepository(tokenStore)
     val servers = ServerListClient(dataDir)
+    val settings = DesktopSettings(File(dataDir, "settings.properties"))
+    val tunnel = WindowsTunnel(dataDir)
     private val guardian = GuardianClient()
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -60,22 +65,42 @@ class EmberEngine(dataDir: File) {
     private val _connectedAtMs = MutableStateFlow<Long?>(null)
     val connectedAtMs: StateFlow<Long?> = _connectedAtMs
 
+    /** Non-null while the kill switch is holding traffic after a crash or a dead tunnel. */
+    private val _blockedNotice = MutableStateFlow<String?>(null)
+    val blockedNotice: StateFlow<String?> = _blockedNotice
+
+    /** Whether the connection that is up (or coming up) routes the whole device. */
+    private val _wholeDevice = MutableStateFlow(false)
+    val wholeDevice: StateFlow<Boolean> = _wholeDevice
+
     @Volatile private var session: H2UpstreamSession? = null
     @Volatile private var target: ProxyCandidate? = null
+    @Volatile private var edgeIp: String? = null
+    @Volatile private var lastPass: ProxyPass? = null
     private var socks: LocalSocks5Server? = null
     private var http: LocalHttpProxyServer? = null
     private var connectJob: Job? = null
     private var renewJob: Job? = null
+    private var watchJob: Job? = null
     private val redialing = AtomicBoolean(false)
 
     init {
         NettyLoggingBridge.install()
         UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
+        if (tunnel.isBlocked()) {
+            _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
+        }
     }
 
     fun connect(candidate: ProxyCandidate?) {
         if (_state.value != ConnectionState.DISCONNECTED) return
+        val wholeDevice = settings.wholeDevice
+        if (wholeDevice && !tunnel.isAvailable) {
+            _lastError.value = "Whole-device mode is not available in this build. Turn it off in Settings to use proxy mode."
+            return
+        }
         _state.value = ConnectionState.CONNECTING
+        _wholeDevice.value = wholeDevice
         _lastError.value = null
         connectJob = scope.launch {
             try {
@@ -83,11 +108,20 @@ class EmberEngine(dataDir: File) {
                 target = chosen
                 EdgeAddressResolver.invalidate()
                 val pass = mintPass()
+                edgeIp = if (wholeDevice) resolveIpv4(chosen.host) else null
                 session = dial(chosen, pass)
-                startLocalProxies()
+                if (wholeDevice) {
+                    val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
+                    s.start()
+                    socks = s
+                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch)
+                    startWatchingTunnel()
+                } else {
+                    startLocalProxies()
+                }
                 _connectedAtMs.value = System.currentTimeMillis()
                 _state.value = ConnectionState.CONNECTED
-                AppLogger.i(TAG, "connected via ${chosen.authority}")
+                AppLogger.i(TAG, "connected via ${chosen.authority} (wholeDevice=$wholeDevice)")
                 scheduleRenewal(pass)
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -104,9 +138,21 @@ class EmberEngine(dataDir: File) {
         scope.launch { teardown() }
     }
 
+    /** Lifts the kill switch after a crash or a dead tunnel. Shows a Windows administrator prompt. */
+    fun restoreInternet() {
+        scope.launch {
+            try {
+                tunnel.restore()
+                _blockedNotice.value = null
+            } catch (failure: Throwable) {
+                _lastError.value = failure.message ?: "Could not restore the network."
+            }
+        }
+    }
+
     fun shutdown() {
         connectJob?.cancel()
-        teardownBlocking()
+        runBlocking { teardown() }
     }
 
     private suspend fun recommendedCandidate(): ProxyCandidate {
@@ -118,19 +164,33 @@ class EmberEngine(dataDir: File) {
             ?: error("No servers are available. Check your connection and try again.")
     }
 
+    private fun resolveIpv4(host: String): String =
+        InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
+            ?: error("$host has no IPv4 address, which whole-device mode needs.")
+
     private suspend fun mintPass(): ProxyPass {
         val account = auth.ensureFreshAccessToken()
-        return try {
+        val pass = try {
             guardian.fetchProxyPass(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
         } catch (invalid: TokenInvalidError) {
             AppLogger.w(TAG, "proxy pass rejected; activating the VPN entitlement and retrying", invalid)
             guardian.activateGuardian(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
             guardian.fetchProxyPass(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
         }
+        lastPass = pass
+        return pass
+    }
+
+    /** The last pass if it is still comfortably valid, so a redial does not need the (tunnelled) network. */
+    private suspend fun passForRedial(): ProxyPass {
+        val cached = lastPass
+        val expiry = cached?.expiresAtEpochSeconds
+        if (cached != null && expiry != null && expiry - System.currentTimeMillis() / 1000 > 30) return cached
+        return mintPass()
     }
 
     private suspend fun dial(candidate: ProxyCandidate, pass: ProxyPass): H2UpstreamSession {
-        val upstream = H2UpstreamSession(candidate.host, candidate.port, pass.token)
+        val upstream = H2UpstreamSession(candidate.host, candidate.port, pass.token, null, edgeIp)
         try {
             withTimeout(DIAL_TIMEOUT_MS) { upstream.connect() }
         } catch (failure: Throwable) {
@@ -147,6 +207,23 @@ class EmberEngine(dataDir: File) {
         val h = LocalHttpProxyServer(LOCAL_BIND, HTTP_PORT, { session }) { onUnhealthy() }
         h.start()
         http = h
+    }
+
+    private fun startWatchingTunnel() {
+        watchJob?.cancel()
+        watchJob = scope.launch {
+            while (true) {
+                delay(2_000)
+                val status = tunnel.status() ?: continue
+                if (status.startsWith("BLOCKED") || status.startsWith("ERROR")) {
+                    AppLogger.e(TAG, "tunnel helper reports: $status")
+                    _blockedNotice.value = status.substringAfter(':').trim()
+                    _lastError.value = "The tunnel stopped. " + status.substringAfter(':').trim()
+                    teardown(helperAlreadyBlocked = true)
+                    return@launch
+                }
+            }
+        }
     }
 
     private fun scheduleRenewal(initial: ProxyPass) {
@@ -180,7 +257,7 @@ class EmberEngine(dataDir: File) {
                 val chosen = target ?: return@launch
                 repeat(MAX_REDIAL_ATTEMPTS) { attempt ->
                     runCatching { session?.close() }
-                    val result = runCatching { dial(chosen, mintPass()) }
+                    val result = runCatching { dial(chosen, passForRedial()) }
                     val fresh = result.getOrNull()
                     if (fresh != null) {
                         session = fresh
@@ -198,18 +275,23 @@ class EmberEngine(dataDir: File) {
         }
     }
 
-    private fun teardown() = teardownBlocking()
-
-    private fun teardownBlocking() {
+    private suspend fun teardown(helperAlreadyBlocked: Boolean = false) {
         renewJob?.cancel()
         renewJob = null
+        watchJob?.cancel()
+        watchJob = null
+        if (_wholeDevice.value && !helperAlreadyBlocked) {
+            runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
+        }
         runCatching { socks?.stop() }
         runCatching { http?.stop() }
         socks = null
         http = null
         runCatching { session?.close() }
         session = null
+        edgeIp = null
         _connectedAtMs.value = null
+        _wholeDevice.value = false
         _state.value = ConnectionState.DISCONNECTED
     }
 }

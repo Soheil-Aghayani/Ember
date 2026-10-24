@@ -14,3 +14,6 @@ android/build/
 *.jks
 keystore.properties
 android/src/main/jni/
+
+desktop/appResources/windows-x64/tunnel/
+desktop/build/

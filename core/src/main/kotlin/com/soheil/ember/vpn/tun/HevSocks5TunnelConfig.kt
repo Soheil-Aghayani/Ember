@@ -53,7 +53,13 @@ object HevSocks5TunnelConfig {
         return (packed and MAPDNS_NETMASK_BITS) == MAPDNS_NETWORK_BITS
     }
 
-    fun write(dir: File, socksPort: Int, useMapDns: Boolean = true, mtu: Int = TUN_MTU): String {
+    fun write(
+        dir: File,
+        socksPort: Int,
+        useMapDns: Boolean = true,
+        mtu: Int = TUN_MTU,
+        tunnelName: String? = null,
+    ): String {
 
         val mapdnsBlock = if (useMapDns) {
             """
@@ -92,8 +98,13 @@ object HevSocks5TunnelConfig {
               log-level: 'warn'
             """.trimIndent() + "\n"
 
+        val finalYaml = if (tunnelName != null) {
+            yaml.replaceFirst("tunnel:\n", "tunnel:\n  name: '$tunnelName'\n")
+        } else {
+            yaml
+        }
         val file = File(dir, FILE_NAME)
-        file.writeText(yaml)
+        file.writeText(finalYaml)
         return file.absolutePath
     }
 }
