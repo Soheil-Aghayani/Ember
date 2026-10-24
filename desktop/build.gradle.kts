@@ -83,9 +83,14 @@ compose.desktop {
         mainClass = "ember.MainKt"
         nativeDistributions {
             appResourcesRootDir.set(layout.projectDirectory.dir("appResources"))
-            targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
+            targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Ember"
             packageVersion = "1.0.0"
+            windows {
+                menuGroup = "Ember"
+                shortcut = true
+                dirChooser = true
+            }
         }
     }
 }

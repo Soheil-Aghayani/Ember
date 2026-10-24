@@ -80,14 +80,14 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Build Windows app folder
-        run: gradle -p desktop createDistributable --no-daemon
+      - name: Build Windows installer
+        run: gradle -p desktop packageExe --no-daemon
 
-      - name: Upload Windows app
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: ember-desktop-windows
-          path: desktop/build/compose/binaries/main/app/Ember
+          name: ember-windows-installer
+          path: desktop/build/compose/binaries/main/exe/*.exe
 
   release:
     needs: build
