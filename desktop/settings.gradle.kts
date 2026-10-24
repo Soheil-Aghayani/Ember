@@ -14,3 +14,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ember-desktop"
+
+include(":core")
+project(":core").projectDir = file("../core")

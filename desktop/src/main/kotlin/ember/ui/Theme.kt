@@ -71,6 +71,9 @@ data class EmberStatusColors(val connected: Color, val connecting: Color)
 val LocalEmberStatusColors = staticCompositionLocalOf { EmberStatusColors(Color(0xFF1E7A3C), Color(0xFF8A5A00)) }
 
 @Composable
+fun statusColors(): EmberStatusColors = LocalEmberStatusColors.current
+
+@Composable
 fun EmberTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val status = if (darkTheme) EmberStatusColors(Color(0xFF5FD17F), Color(0xFFFFC46B))
     else EmberStatusColors(Color(0xFF1E7A3C), Color(0xFF8A5A00))
