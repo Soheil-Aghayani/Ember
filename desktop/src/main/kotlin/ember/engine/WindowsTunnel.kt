@@ -27,6 +27,7 @@ class WindowsTunnel(dataDir: File) {
     private val stopFile = File(stateDir, "stop")
     private val configFile = File(stateDir, "config.json")
     val logFile = File(stateDir, "helper.log")
+    val privileged = PrivilegedTask(dataDir)
 
     private val resourcesDir: File? =
         System.getProperty("compose.application.resources.dir")?.let(::File)
@@ -58,6 +59,7 @@ class WindowsTunnel(dataDir: File) {
         onProgress: (String) -> Unit = {},
     ) {
         val helper = script ?: error("The network helper is missing from this installation.")
+        stopStaleHelper()
         statusFile.delete()
         stopFile.delete()
         logFile.delete()
@@ -74,8 +76,12 @@ class WindowsTunnel(dataDir: File) {
             .put("parentPid", ProcessHandle.current().pid())
         configFile.writeText(config.toString())
 
-        onProgress("Waiting for you to allow administrator access in the Windows prompt…")
-        val launcher = elevate(helper, "Up", configFile)
+        val noPrompt = privileged.isInstalled()
+        onProgress(
+            if (noPrompt) "Starting the secure network adapter…"
+            else "Waiting for you to allow administrator access in the Windows prompt…",
+        )
+        val launcher = if (noPrompt) privileged.run("Up") else elevate(helper, "Up", configFile)
 
         val started = System.currentTimeMillis()
         var launcherExitedAt: Long? = null
@@ -114,6 +120,18 @@ class WindowsTunnel(dataDir: File) {
         error("The network helper did not finish starting in time. Details may be in ${logFile.absolutePath}")
     }
 
+    /** A helper left over from an earlier connection (for example one holding the kill switch) must end first. */
+    private suspend fun stopStaleHelper() {
+        val current = status() ?: return
+        if (current == "DOWN" || current.startsWith("ERROR")) return
+        stopFile.writeText("stop")
+        val deadline = System.currentTimeMillis() + 10_000L
+        while (System.currentTimeMillis() < deadline) {
+            if (status() == "DOWN") return
+            delay(300)
+        }
+    }
+
     /** Asks the helper to restore routes and firewall rules, and waits for it. */
     suspend fun stop() {
         val current = status() ?: return
@@ -134,7 +152,7 @@ class WindowsTunnel(dataDir: File) {
         configFile.writeText(JSONObject().put("stateDir", stateDir.absolutePath).toString())
         stopFile.writeText("stop")
         statusFile.delete()
-        elevate(helper, "Restore", configFile)
+        if (privileged.isInstalled()) privileged.run("Restore") else elevate(helper, "Restore", configFile)
         val deadline = System.currentTimeMillis() + STOP_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
             if (status() == "DOWN") return
