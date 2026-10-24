@@ -22,11 +22,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +35,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,33 +49,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.FxaAuthRepository
+import com.soheil.ember.data.LogLevel
 import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
 import com.soheil.ember.data.ServerListClient
-import com.soheil.ember.data.formatBytes
 import com.soheil.ember.data.SessionStatus
+import com.soheil.ember.data.formatBytes
+import com.soheil.ember.data.formatBytesPerSecond
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.data.model.ProxyCandidate
 import com.soheil.ember.data.model.VpnCountry
 import com.soheil.ember.data.model.emojiFlag
+import ember.engine.Autostart
 import ember.engine.EmberEngine
 import ember.engine.HTTP_PORT
 import ember.engine.LOCAL_BIND
 import ember.engine.SOCKS_PORT
+import ember.engine.TrafficStats
+import ember.engine.UpdateCheck
+import java.awt.Desktop
+import java.net.URI
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
+import kotlinx.coroutines.withTimeoutOrNull
 
 private enum class Page(val label: String, val icon: String) {
     Home("Home", "home"),
     Locations("Locations", "locations"),
     Settings("Settings", "settings"),
+    Logs("Logs", "logs"),
 }
 
 private enum class Session { Checking, SignedOut, SignedIn }
@@ -80,12 +99,48 @@ private enum class Session { Checking, SignedOut, SignedIn }
 private val CardShape = RoundedCornerShape(16.dp)
 
 @Composable
-fun EmberApp(engine: EmberEngine) {
+fun EmberApp(
+    engine: EmberEngine,
+    theme: String,
+    onThemeChange: (String) -> Unit,
+    update: String?,
+    onDismissUpdate: () -> Unit,
+) {
     var session by remember { mutableStateOf(Session.Checking) }
 
     LaunchedEffect(Unit) {
         val status = withContext(Dispatchers.IO) { runCatching { engine.auth.restoreSession() }.getOrNull() }
         session = if (status == SessionStatus.NEEDS_LOGIN || status == null) Session.SignedOut else Session.SignedIn
+    }
+
+    var startupHandled by remember { mutableStateOf(false) }
+    var locationReady by remember { mutableStateOf(false) }
+    var restoredLocation by remember { mutableStateOf<ProxyCandidate?>(null) }
+    LaunchedEffect(session) {
+        if (session != Session.SignedIn || startupHandled) return@LaunchedEffect
+        startupHandled = true
+        val country = engine.settings.lastCountry
+        if (country.isNotBlank()) {
+            val countries = withContext(Dispatchers.IO) {
+                try {
+                    withTimeoutOrNull(10_000) { engine.servers.fetchCountries() }
+                        ?: engine.servers.loadCachedCountries()
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Exception) {
+                    engine.servers.loadCachedCountries()
+                }
+            }
+            restoredLocation = if (engine.settings.lastCity.isBlank()) {
+                ServerListClient.candidatesForCountry(countries, country).randomOrNull()
+            } else {
+                ServerListClient.candidatesForCity(countries, country, engine.settings.lastCity).randomOrNull()
+            }
+        }
+        locationReady = true
+        if (engine.settings.autoConnect && engine.state.value == ConnectionState.DISCONNECTED) {
+            engine.connect(restoredLocation)
+        }
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -94,7 +149,11 @@ fun EmberApp(engine: EmberEngine) {
                 CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
             }
             Session.SignedOut -> LoginPage(engine.auth) { session = Session.SignedIn }
-            Session.SignedIn -> MainShell(engine) {
+            Session.SignedIn -> if (!locationReady) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                }
+            } else MainShell(engine, restoredLocation, theme, onThemeChange, update, onDismissUpdate) {
                 engine.disconnect()
                 engine.tokenStore.clear()
                 session = Session.SignedOut
@@ -213,9 +272,17 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
 }
 
 @Composable
-private fun MainShell(engine: EmberEngine, onSignOut: () -> Unit) {
+private fun MainShell(
+    engine: EmberEngine,
+    restoredLocation: ProxyCandidate?,
+    theme: String,
+    onThemeChange: (String) -> Unit,
+    update: String?,
+    onDismissUpdate: () -> Unit,
+    onSignOut: () -> Unit,
+) {
     var page by remember { mutableStateOf(Page.Home) }
-    var selected by remember { mutableStateOf<ProxyCandidate?>(null) }
+    var selected by remember(restoredLocation) { mutableStateOf(restoredLocation) }
 
     Row(Modifier.fillMaxSize()) {
         Sidebar(page) { page = it }
@@ -225,12 +292,15 @@ private fun MainShell(engine: EmberEngine, onSignOut: () -> Unit) {
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
                 when (page) {
-                    Page.Home -> HomePage(engine, selected) { page = Page.Locations }
-                    Page.Locations -> LocationsPage(engine.servers, selected) {
-                        selected = it
+                    Page.Home -> HomePage(engine, selected, update, onDismissUpdate) { page = Page.Locations }
+                    Page.Locations -> LocationsPage(engine.servers, selected, engine.settings.lastCity) { candidate, country, city ->
+                        engine.settings.lastCountry = country
+                        engine.settings.lastCity = city
+                        selected = candidate
                         page = Page.Home
                     }
-                    Page.Settings -> SettingsPage(engine, onSignOut)
+                    Page.Settings -> SettingsPage(engine, theme, onThemeChange, onSignOut)
+                    Page.Logs -> LogsPage()
                 }
             }
         }
@@ -270,12 +340,19 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
 }
 
 @Composable
-private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocations: () -> Unit) {
+private fun HomePage(
+    engine: EmberEngine, selected: ProxyCandidate?, update: String?, onDismissUpdate: () -> Unit,
+    onOpenLocations: () -> Unit,
+) {
     val state by engine.state.collectAsState()
     val error by engine.lastError.collectAsState()
     val connectedAt by engine.connectedAtMs.collectAsState()
     val blocked by engine.blockedNotice.collectAsState()
     val whole by engine.wholeDevice.collectAsState()
+    val traffic = remember(state, whole) {
+        if (state == ConnectionState.CONNECTED && whole) TrafficStats() else null
+    }
+    DisposableEffect(traffic) { onDispose { traffic?.close() } }
     val wholeSetting = engine.settings.wholeDevice
     val progress by engine.progress.collectAsState()
     var showAdminNotice by remember { mutableStateOf(false) }
@@ -327,6 +404,11 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
     }
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (update != null) {
+            UpdateBanner(update, onDismissUpdate)
+            Spacer(Modifier.height(12.dp))
+        }
+        traffic?.let { TrafficCard(it) }
         Spacer(Modifier.height(16.dp))
         Box(
             Modifier.size(180.dp).clip(CircleShape).background(ring.copy(alpha = 0.15f)).clickable {
@@ -505,7 +587,12 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
 }
 
 @Composable
-private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, onPick: (ProxyCandidate?) -> Unit) {
+private fun LocationsPage(
+    servers: ServerListClient,
+    selected: ProxyCandidate?,
+    selectedCity: String,
+    onPick: (ProxyCandidate?, String, String) -> Unit,
+) {
     var countries by remember { mutableStateOf<List<VpnCountry>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var failure by remember { mutableStateOf<String?>(null) }
@@ -539,19 +626,19 @@ private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, 
 
     Card {
         Column {
-            LocationRow("Recommended", "Automatically chosen for the best performance", selected == null) { onPick(null) }
+            LocationRow("Recommended", "Automatically chosen for the best performance", selected == null) { onPick(null, "", "") }
             for (country in ordered) {
                 HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val open = country.code in expanded
                 LocationRow(
                     country.name,
                     plural(country.cities.size, "city", "cities"),
-                    selected?.countryCode == country.code && selected.cityCode.isBlank(),
+                    selected?.countryCode == country.code && selectedCity.isBlank(),
                     flagCode = country.code,
                     expanded = open,
                     onToggle = { expanded = if (open) expanded - country.code else expanded + country.code },
                 ) {
-                    onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull())
+                    onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
                 }
                 if (open) {
                     for (city in country.cities) {
@@ -559,10 +646,10 @@ private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, 
                         LocationRow(
                             city.name.ifBlank { city.code },
                             plural(city.servers.size, "server", "servers"),
-                            selected?.countryCode == country.code && selected.cityCode == city.code,
+                            selected?.countryCode == country.code && selectedCity == city.code,
                             indent = 16,
                         ) {
-                            onPick(ServerListClient.candidatesForCity(countries, country.code, city.code).randomOrNull())
+                            onPick(ServerListClient.candidatesForCity(countries, country.code, city.code).randomOrNull(), country.code, city.code)
                         }
                     }
                 }
@@ -613,18 +700,28 @@ private fun LocationRow(
 }
 
 @Composable
-private fun SettingsPage(engine: EmberEngine, onSignOut: () -> Unit) {
+private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, onSignOut: () -> Unit) {
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
     val available = engine.tunnel.isAvailable
+    val setupScope = rememberCoroutineScope()
+    var noPrompt by remember { mutableStateOf(false) }
+    var noPromptBusy by remember { mutableStateOf(true) }
+    var noPromptError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        noPrompt = withContext(Dispatchers.IO) { available && engine.tunnel.privileged.isInstalled() }
+        noPromptBusy = false
+    }
 
     Text("Settings", style = MaterialTheme.typography.headlineLarge)
+    Spacer(Modifier.height(16.dp))
+    GeneralSettings(engine, theme, onThemeChange)
     Spacer(Modifier.height(16.dp))
     Card {
         Column {
             SwitchRow(
                 "Whole-device mode (experimental)",
-                if (available) "Route all apps through Ember. Asks for administrator permission each time you connect."
+                if (available) "Route all apps through Ember. Windows asks for administrator permission when you connect, unless you use the one-time setup below."
                 else "Not available in this build. It needs the Windows tunnel components.",
                 whole && available,
                 enabled = available,
@@ -641,6 +738,37 @@ private fun SettingsPage(engine: EmberEngine, onSignOut: () -> Unit) {
             ) {
                 killSwitch = it
                 engine.settings.killSwitch = it
+            }
+            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow(
+                "Connect without Windows prompts",
+                "One-time setup with a single Windows prompt. After that, connecting needs no prompt. " +
+                    "Programs already running as you could then start Ember's network helper.",
+                noPrompt,
+                enabled = available && !noPromptBusy,
+            ) { wanted ->
+                noPromptBusy = true
+                noPromptError = null
+                setupScope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            if (wanted) engine.tunnel.privileged.install() else engine.tunnel.privileged.uninstall()
+                        }
+                        noPrompt = wanted
+                    } catch (failure: Throwable) {
+                        noPromptError = failure.message ?: "The setup did not finish."
+                    } finally {
+                        noPromptBusy = false
+                    }
+                }
+            }
+            noPromptError?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
             }
         }
     }
@@ -699,4 +827,142 @@ private fun formatDuration(seconds: Long): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
+}
+
+@Composable
+private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit) {
+    var keepInTray by remember { mutableStateOf(engine.settings.keepInTray) }
+    var autoConnect by remember { mutableStateOf(engine.settings.autoConnect) }
+    var autostart by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(true) }
+    var failure by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        autostart = withContext(Dispatchers.IO) { Autostart.isEnabled() }
+        busy = false
+    }
+    Card {
+        Column {
+            Text("General", Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SwitchRow("Keep running in the tray when the window is closed",
+                "Open Ember again from the icon near the Windows clock.", keepInTray,
+                enabled = androidx.compose.ui.window.isTraySupported) {
+                keepInTray = it
+                engine.settings.keepInTray = it
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow("Start Ember when I sign in to Windows", "Start quietly in the tray.", autostart,
+                enabled = Autostart.supported && !busy) { enabled ->
+                busy = true
+                failure = null
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { Autostart.setEnabled(enabled) }
+                    if (saved) autostart = enabled
+                    else failure = "Could not change Windows startup. Try again from the installed Ember app."
+                    busy = false
+                }
+            }
+            failure?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow("Connect automatically when Ember starts", "Use your last chosen location after signing in.", autoConnect) {
+                autoConnect = it
+                engine.settings.autoConnect = it
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(Modifier.padding(16.dp)) {
+                Text("Appearance", style = MaterialTheme.typography.bodyLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (choice in listOf("Light", "Dark", "System")) {
+                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(choice) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrafficCard(traffic: TrafficStats) {
+    val reading by traffic.readings.collectAsState()
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Live traffic", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (reading.available) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Download", style = MaterialTheme.typography.bodySmall)
+                        Text(formatBytesPerSecond(reading.downloadSpeed), style = MaterialTheme.typography.titleMedium)
+                    }
+                    Column {
+                        Text("Upload", style = MaterialTheme.typography.bodySmall)
+                        Text(formatBytesPerSecond(reading.uploadSpeed), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Text("This session: ${formatBytes(reading.downloaded)} downloaded, ${formatBytes(reading.uploaded)} uploaded",
+                    style = MaterialTheme.typography.bodySmall)
+            } else Text("Waiting for traffic readings...", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(version: String, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    Card {
+        Column(Modifier.padding(16.dp)) {
+            Text("Ember $version is available", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        runCatching {
+                            if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(UpdateCheck.RELEASES_URL))
+                        }
+                    }
+                }) { Text("View update") }
+                TextButton(onClick = onDismiss) { Text("Dismiss") }
+            }
+        }
+    }
+}
+
+private enum class LogFilter { All, Info, Problems }
+
+@Composable
+private fun LogsPage() {
+    val entries by AppLogger.entries.collectAsState()
+    var filter by remember { mutableStateOf(LogFilter.All) }
+    val clipboard = LocalClipboardManager.current
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US) }
+    val lines = remember(entries, filter) {
+        entries.asReversed().filter {
+            when (filter) {
+                LogFilter.All -> true
+                LogFilter.Info -> it.level == LogLevel.INFO
+                LogFilter.Problems -> it.level == LogLevel.WARN || it.level == LogLevel.ERROR
+            }
+        }.map { "${dateFormat.format(Date(it.timestampMillis))} ${it.level} [${it.tag}] ${it.message}" }
+    }
+    Text("Logs", style = MaterialTheme.typography.headlineLarge)
+    Spacer(Modifier.height(16.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        for (choice in LogFilter.entries) {
+            FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text(choice.name) })
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty()) { Text("Copy") }
+        OutlinedButton(onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty()) { Text("Clear") }
+    }
+    Spacer(Modifier.height(12.dp))
+    Card {
+        SelectionContainer {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (lines.isEmpty()) Text("No log entries to show.", style = MaterialTheme.typography.bodySmall)
+                for (line in lines) Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
 }
