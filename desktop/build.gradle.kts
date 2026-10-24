@@ -1,3 +1,5 @@
+import java.net.URL
+import java.security.MessageDigest
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -53,8 +55,8 @@ val fetchTunnelBinaries = tasks.register("fetchTunnelBinaries") {
         val downloads = layout.buildDirectory.dir("tunnel-downloads").get().asFile.apply { mkdirs() }
         for (asset in tunnelAssets) {
             val zip = File(downloads, asset.fileName)
-            java.net.URL(asset.url).openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
-            val actual = java.security.MessageDigest.getInstance("SHA-256").digest(zip.readBytes())
+            URL(asset.url).openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
+            val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes())
                 .joinToString("") { "%02x".format(it) }
             check(actual == asset.sha256) { "Checksum mismatch for ${asset.fileName}: expected ${asset.sha256}, got $actual" }
             copy {
