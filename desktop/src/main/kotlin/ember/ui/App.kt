@@ -704,6 +704,14 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
     val available = engine.tunnel.isAvailable
+    val setupScope = rememberCoroutineScope()
+    var noPrompt by remember { mutableStateOf(false) }
+    var noPromptBusy by remember { mutableStateOf(true) }
+    var noPromptError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        noPrompt = withContext(Dispatchers.IO) { available && engine.tunnel.privileged.isInstalled() }
+        noPromptBusy = false
+    }
 
     Text("Settings", style = MaterialTheme.typography.headlineLarge)
     Spacer(Modifier.height(16.dp))
@@ -713,7 +721,7 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
         Column {
             SwitchRow(
                 "Whole-device mode (experimental)",
-                if (available) "Route all apps through Ember. Asks for administrator permission each time you connect."
+                if (available) "Route all apps through Ember. Windows asks for administrator permission when you connect, unless you use the one-time setup below."
                 else "Not available in this build. It needs the Windows tunnel components.",
                 whole && available,
                 enabled = available,
@@ -730,6 +738,37 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             ) {
                 killSwitch = it
                 engine.settings.killSwitch = it
+            }
+            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow(
+                "Connect without Windows prompts",
+                "One-time setup with a single Windows prompt. After that, connecting needs no prompt. " +
+                    "Programs already running as you could then start Ember's network helper.",
+                noPrompt,
+                enabled = available && !noPromptBusy,
+            ) { wanted ->
+                noPromptBusy = true
+                noPromptError = null
+                setupScope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            if (wanted) engine.tunnel.privileged.install() else engine.tunnel.privileged.uninstall()
+                        }
+                        noPrompt = wanted
+                    } catch (failure: Throwable) {
+                        noPromptError = failure.message ?: "The setup did not finish."
+                    } finally {
+                        noPromptBusy = false
+                    }
+                }
+            }
+            noPromptError?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
             }
         }
     }
