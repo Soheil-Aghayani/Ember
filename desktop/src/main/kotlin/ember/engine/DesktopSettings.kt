@@ -16,6 +16,10 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("wholeDevice", "false").toBoolean()
         set(value) = put("wholeDevice", value.toString())
 
+    var adminNoticeSeen: Boolean
+        get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
+        set(value) = put("adminNoticeSeen", value.toString())
+
     var killSwitch: Boolean
         get() = props.getProperty("killSwitch", "true").toBoolean()
         set(value) = put("killSwitch", value.toString())

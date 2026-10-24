@@ -12,8 +12,21 @@ param(
     [Parameter(Mandatory = $true)][string]$ConfigPath
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Log and report even if the very first steps fail (the config lives in the state folder).
+$bootDir = Split-Path -Parent $ConfigPath
+function Boot-Log([string]$m) {
+    try { Add-Content -LiteralPath (Join-Path $bootDir 'helper.log') -Value ("{0} {1}" -f (Get-Date -Format s), $m) -Encoding ascii } catch { }
+}
+Boot-Log ("helper started: mode=$Mode user=$([Environment]::UserName) ps=$($PSVersionTable.PSVersion)")
+trap {
+    Boot-Log ("fatal: " + $_.Exception.Message + " at line " + $_.InvocationInfo.ScriptLineNumber)
+    try { Set-Content -LiteralPath (Join-Path $bootDir 'status') -Value ('ERROR: ' + $_.Exception.Message) -Encoding ascii } catch { }
+    exit 1
+}
+
+Set-StrictMode -Version Latest
 
 $RuleGroup = 'Ember'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path

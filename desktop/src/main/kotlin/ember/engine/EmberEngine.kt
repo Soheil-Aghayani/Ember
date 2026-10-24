@@ -71,6 +71,10 @@ class EmberEngine(private val dataDir: File) {
     private val _blockedNotice = MutableStateFlow<String?>(null)
     val blockedNotice: StateFlow<String?> = _blockedNotice
 
+    /** Plain-language step shown on Home while connecting. */
+    private val _progress = MutableStateFlow<String?>(null)
+    val progress: StateFlow<String?> = _progress
+
     private val _connectedTarget = MutableStateFlow<ProxyCandidate?>(null)
     val connectedTarget: StateFlow<ProxyCandidate?> = _connectedTarget
 
@@ -116,11 +120,14 @@ class EmberEngine(private val dataDir: File) {
         _state.value = ConnectionState.CONNECTING
         _wholeDevice.value = wholeDevice
         _lastError.value = null
+        _progress.value = "Choosing a server..."
+
         connectJob = scope.launch {
             try {
                 val chosen = candidate ?: recommendedCandidate()
                 target = chosen
                 EdgeAddressResolver.invalidate()
+                _progress.value = "Connecting to " + chosen.countryName.ifBlank { chosen.countryCode } + "..."
                 val pass = mintPass()
                 edgeIp = if (wholeDevice) resolveIpv4(chosen.host) else null
                 session = dial(chosen, pass)
@@ -128,13 +135,14 @@ class EmberEngine(private val dataDir: File) {
                     val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
                     s.start()
                     socks = s
-                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch)
+                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, onProgress = { _progress.value = it })
                     startWatchingTunnel()
                 } else {
                     startLocalProxies()
                 }
                 _connectedAtMs.value = System.currentTimeMillis()
                 _connectedTarget.value = chosen
+                _progress.value = null
                 _state.value = ConnectionState.CONNECTED
                 checkExit()
                 AppLogger.i(TAG, "connected via ${chosen.authority} (wholeDevice=$wholeDevice)")
@@ -333,6 +341,7 @@ class EmberEngine(private val dataDir: File) {
         edgeIp = null
         _connectedAtMs.value = null
         _connectedTarget.value = null
+        _progress.value = null
         _exit.value = ExitStatus()
         _wholeDevice.value = false
         _state.value = ConnectionState.DISCONNECTED

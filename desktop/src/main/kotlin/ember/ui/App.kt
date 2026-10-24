@@ -23,7 +23,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -67,7 +69,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private enum class Page(val label: String) { Home("Home"), Locations("Locations"), Settings("Settings") }
+private enum class Page(val label: String, val icon: String) {
+    Home("Home", "home"),
+    Locations("Locations", "locations"),
+    Settings("Settings", "settings"),
+}
 
 private enum class Session { Checking, SignedOut, SignedIn }
 
@@ -252,11 +258,12 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
                     .clickable { onSelect(p) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
-                Text(
-                    p.label,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                )
+                val contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EmberIcon(p.icon, 20.dp, contentColor)
+                    Spacer(Modifier.width(12.dp))
+                    Text(p.label, style = MaterialTheme.typography.titleSmall, color = contentColor)
+                }
             }
         }
     }
@@ -270,6 +277,8 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
     val blocked by engine.blockedNotice.collectAsState()
     val whole by engine.wholeDevice.collectAsState()
     val wholeSetting = engine.settings.wholeDevice
+    val progress by engine.progress.collectAsState()
+    var showAdminNotice by remember { mutableStateOf(false) }
     val target by engine.connectedTarget.collectAsState()
     val exit by engine.exit.collectAsState()
     val quota by engine.quota.collectAsState()
@@ -295,11 +304,37 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
         ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
     }
 
+    if (showAdminNotice) {
+        AlertDialog(
+            onDismissRequest = { showAdminNotice = false },
+            title = { Text("Allow administrator access") },
+            text = {
+                Text(
+                    "To protect your whole device, Ember sets up a secure network adapter and routing rules, " +
+                        "which needs administrator access. Windows will ask next, naming \"Windows PowerShell\" " +
+                        "(that runs Ember's network helper). Choose Yes to continue.",
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    engine.settings.adminNoticeSeen = true
+                    showAdminNotice = false
+                    engine.connect(selected)
+                }) { Text("Continue") }
+            },
+            dismissButton = { TextButton(onClick = { showAdminNotice = false }) { Text("Cancel") } },
+        )
+    }
+
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(16.dp))
         Box(
             Modifier.size(180.dp).clip(CircleShape).background(ring.copy(alpha = 0.15f)).clickable {
-                if (state == ConnectionState.DISCONNECTED) engine.connect(selected) else engine.disconnect()
+                when {
+                    state != ConnectionState.DISCONNECTED -> engine.disconnect()
+                    wholeSetting && engine.tunnel.isAvailable && !engine.settings.adminNoticeSeen -> showAdminNotice = true
+                    else -> engine.connect(selected)
+                }
             },
             contentAlignment = Alignment.Center,
         ) {
@@ -326,7 +361,11 @@ private fun HomePage(engine: EmberEngine, selected: ProxyCandidate?, onOpenLocat
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            if (state == ConnectionState.CONNECTED) formatDuration(elapsed) else "00:00:00",
+            when (state) {
+                ConnectionState.CONNECTED -> formatDuration(elapsed)
+                ConnectionState.CONNECTING -> progress ?: "Connecting..."
+                ConnectionState.DISCONNECTED -> "00:00:00"
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -495,9 +534,10 @@ private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, 
                 val open = country.code in expanded
                 LocationRow(
                     country.name,
-                    "${country.cities.size} cities",
+                    plural(country.cities.size, "city", "cities"),
                     selected?.countryCode == country.code && selected.cityCode.isBlank(),
                     flagCode = country.code,
+                    expanded = open,
                     onToggle = { expanded = if (open) expanded - country.code else expanded + country.code },
                 ) {
                     onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull())
@@ -507,7 +547,7 @@ private fun LocationsPage(servers: ServerListClient, selected: ProxyCandidate?, 
                         HorizontalDivider(Modifier.padding(start = 32.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         LocationRow(
                             city.name.ifBlank { city.code },
-                            "${city.servers.size} servers",
+                            plural(city.servers.size, "server", "servers"),
                             selected?.countryCode == country.code && selected.cityCode == city.code,
                             indent = 16,
                         ) {
@@ -527,6 +567,7 @@ private fun LocationRow(
     isSelected: Boolean,
     indent: Int = 0,
     flagCode: String? = null,
+    expanded: Boolean = false,
     onToggle: (() -> Unit)? = null,
     onPick: () -> Unit,
 ) {
@@ -544,13 +585,18 @@ private fun LocationRow(
         }
         if (isSelected) Text("Selected", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (onToggle != null) {
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "Cities",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onToggle).padding(8.dp),
-            )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onToggle),
+                contentAlignment = Alignment.Center,
+            ) {
+                EmberIcon(
+                    if (expanded) "chevron-up" else "chevron-down",
+                    20.dp,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (expanded) "Hide cities" else "Show cities",
+                )
+            }
         }
     }
 }
@@ -611,6 +657,8 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
         Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
+
+private fun plural(n: Int, one: String, many: String) = if (n == 1) "1 $one" else "$n $many"
 
 private fun resetLabel(resetEpochSeconds: Long): String {
     val secondsLeft = resetEpochSeconds - System.currentTimeMillis() / 1000
