@@ -1,5 +1,21 @@
 package ember.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -51,7 +67,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
@@ -94,8 +109,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 
 private enum class Page(val icon: String) {
     Home("home"),
@@ -125,24 +140,35 @@ fun EmberApp(
         session = if (status == SessionStatus.NEEDS_LOGIN || status == null) Session.SignedOut else Session.SignedIn
     }
 
+    var countries by remember { mutableStateOf<List<VpnCountry>>(emptyList()) }
+    var countriesLoading by remember { mutableStateOf(true) }
+    var countriesFailure by remember { mutableStateOf<String?>(null) }
+    val strings = LocalStrings.current
+    LaunchedEffect(engine) {
+        try {
+            countries = withContext(Dispatchers.IO) { engine.servers.loadCachedCountries() }
+            countries = withContext(Dispatchers.IO) {
+                withTimeoutOrNull(10_000) { engine.servers.fetchCountries() } ?: countries
+            }
+            if (countries.isEmpty()) countriesFailure = strings.serverListFailed
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            if (countries.isEmpty()) countriesFailure = failure.message ?: strings.serverListFailed
+        } finally {
+            countriesLoading = false
+        }
+    }
+
     var startupHandled by remember { mutableStateOf(false) }
     var locationReady by remember { mutableStateOf(false) }
     var restoredLocation by remember { mutableStateOf<ProxyCandidate?>(null) }
-    LaunchedEffect(session) {
+    LaunchedEffect(session, countriesLoading, countries.isEmpty()) {
         if (session != Session.SignedIn || startupHandled) return@LaunchedEffect
+        if (engine.settings.lastCountry.isNotBlank() && countriesLoading && countries.isEmpty()) return@LaunchedEffect
         startupHandled = true
         val country = engine.settings.lastCountry
         if (country.isNotBlank()) {
-            val countries = withContext(Dispatchers.IO) {
-                try {
-                    withTimeoutOrNull(10_000) { engine.servers.fetchCountries() }
-                        ?: engine.servers.loadCachedCountries()
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (_: Exception) {
-                    engine.servers.loadCachedCountries()
-                }
-            }
             restoredLocation = if (engine.settings.lastCity.isBlank()) {
                 ServerListClient.candidatesForCountry(countries, country).randomOrNull()
             } else {
@@ -165,7 +191,7 @@ fun EmberApp(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
                 }
-            } else MainShell(engine, restoredLocation, theme, onThemeChange, language, onLanguageChange, update, onDismissUpdate) {
+            } else MainShell(engine, countries, countriesLoading, countriesFailure, restoredLocation, theme, onThemeChange, language, onLanguageChange, update, onDismissUpdate) {
                 engine.disconnect()
                 engine.tokenStore.clear()
                 session = Session.SignedOut
@@ -287,6 +313,9 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
 @Composable
 private fun MainShell(
     engine: EmberEngine,
+    countries: List<VpnCountry>,
+    countriesLoading: Boolean,
+    countriesFailure: String?,
     restoredLocation: ProxyCandidate?,
     theme: String,
     onThemeChange: (String) -> Unit,
@@ -299,6 +328,16 @@ private fun MainShell(
     var page by remember { mutableStateOf(Page.Home) }
     var selected by remember(restoredLocation) { mutableStateOf(restoredLocation) }
 
+    val state by engine.state.collectAsState()
+    val pickLocation: (ProxyCandidate?, String, String) -> Unit = { candidate, country, city ->
+        if (engine.state.value == ConnectionState.DISCONNECTED) {
+            engine.settings.lastCountry = country
+            engine.settings.lastCity = city
+            selected = candidate
+            page = Page.Home
+        }
+    }
+
     Row(Modifier.fillMaxSize()) {
         Sidebar(page) { page = it }
         Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
@@ -307,13 +346,10 @@ private fun MainShell(
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
                 when (page) {
-                    Page.Home -> HomePage(engine, selected, update, onDismissUpdate) { page = Page.Locations }
-                    Page.Locations -> LocationsPage(engine.servers, selected, engine.settings.lastCity) { candidate, country, city ->
-                        engine.settings.lastCountry = country
-                        engine.settings.lastCity = city
-                        selected = candidate
-                        page = Page.Home
-                    }
+                    Page.Home -> HomePage(engine, selected, countries, countriesLoading, countriesFailure,
+                        pickLocation, update, onDismissUpdate) { page = Page.Locations }
+                    Page.Locations -> LocationsPage(countries, countriesLoading, countriesFailure,
+                        state == ConnectionState.DISCONNECTED, selected, engine.settings.lastCity, pickLocation)
                     Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange, onSignOut)
                     Page.Logs -> LogsPage()
                 }
@@ -336,12 +372,20 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
         }
         for (p in Page.entries) {
             val active = p == selected
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
             Box(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                    .clickable { onSelect(p) }
+                    .background(when {
+                        active -> MaterialTheme.colorScheme.primaryContainer
+                        hovered -> MaterialTheme.colorScheme.surfaceVariant
+                        else -> MaterialTheme.colorScheme.surface
+                    })
+                    .hoverable(interaction)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(role = Role.Button) { onSelect(p) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
                 val contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
@@ -357,7 +401,9 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
 
 @Composable
 private fun HomePage(
-    engine: EmberEngine, selected: ProxyCandidate?, update: String?, onDismissUpdate: () -> Unit,
+    engine: EmberEngine, selected: ProxyCandidate?, countries: List<VpnCountry>,
+    countriesLoading: Boolean, countriesFailure: String?,
+    onPick: (ProxyCandidate?, String, String) -> Unit, update: String?, onDismissUpdate: () -> Unit,
     onOpenLocations: () -> Unit,
 ) {
     val strings = LocalStrings.current
@@ -377,7 +423,11 @@ private fun HomePage(
     val exit by engine.exit.collectAsState()
     val quota by engine.quota.collectAsState()
     LaunchedEffect(Unit) { engine.refreshQuota() }
-    val status = statusColors()
+    var menuOpen by remember { mutableStateOf(false) }
+    val canPick = state == ConnectionState.DISCONNECTED
+    LaunchedEffect(canPick) { if (!canPick) menuOpen = false }
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     var elapsed by remember { mutableStateOf(0L) }
 
     LaunchedEffect(state, connectedAt) {
@@ -392,10 +442,17 @@ private fun HomePage(
         }
     }
 
-    val ring = when (state) {
-        ConnectionState.CONNECTED -> status.connected
-        ConnectionState.CONNECTING -> status.connecting
+    val ring by animateColorAsState(when (state) {
+        ConnectionState.CONNECTED -> MaterialTheme.colorScheme.tertiary
+        ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondary
         ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
+    }, tween(220))
+    val connectedScale = remember { Animatable(1f) }
+    LaunchedEffect(state) {
+        if (state == ConnectionState.CONNECTED) {
+            connectedScale.snapTo(0.97f)
+            connectedScale.animateTo(1f, tween(200))
+        } else connectedScale.snapTo(1f)
     }
 
     if (showAdminNotice) {
@@ -421,7 +478,9 @@ private fun HomePage(
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
         Box(
-            Modifier.size(180.dp).clip(CircleShape).background(ring.copy(alpha = 0.15f)).clickable {
+            Modifier.size(180.dp).scale(connectedScale.value).clip(CircleShape)
+                .background(ring.copy(alpha = connectingRingAlpha(state)))
+                .pointerHoverIcon(PointerIcon.Hand).clickable(role = Role.Button) {
                 when {
                     state != ConnectionState.DISCONNECTED -> engine.disconnect()
                     wholeSetting && engine.tunnel.isAvailable && !engine.settings.adminNoticeSeen -> showAdminNotice = true
@@ -480,13 +539,52 @@ private fun HomePage(
         val shownName = if (shownCode.length == 2) {
             localizedCountry(shownCode, location?.countryName.orEmpty(), strings)
         } else strings.recommended
-        Card(Modifier.clickable(onClick = onOpenLocations)) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(12.dp))
-                Text(shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.width(12.dp))
-                EmberIcon("chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.fillMaxWidth()) {
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().background(
+                        if (hovered && canPick) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                    ).hoverable(interaction, enabled = canPick)
+                        .pointerHoverIcon(if (canPick) PointerIcon.Hand else PointerIcon.Default)
+                        .clickable(enabled = canPick, role = Role.Button) { menuOpen = !menuOpen }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    if (canPick) {
+                        Spacer(Modifier.width(12.dp))
+                        EmberIcon(if (menuOpen) "chevron-up" else "chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            DropdownMenu(expanded = menuOpen && canPick, onDismissRequest = { menuOpen = false },
+                modifier = Modifier.heightIn(max = 360.dp).widthIn(min = 260.dp)) {
+                DropdownMenuItem(
+                    text = { Text(strings.recommended) },
+                    leadingIcon = { EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    trailingIcon = { if (isRecommended) Text(strings.selected, color = MaterialTheme.colorScheme.primary) },
+                    onClick = { onPick(null, "", ""); menuOpen = false },
+                )
+                for (country in countries.filter { it.code.isNotBlank() && it.code != RECOMMENDED_COUNTRY_CODE }
+                    .sortedBy { localizedCountry(it.code, it.name, strings) }) {
+                    DropdownMenuItem(
+                        text = { Text(localizedCountry(country.code, country.name, strings)) },
+                        leadingIcon = { FlagIcon(country.code) },
+                        trailingIcon = { if (selected?.countryCode == country.code) Text(strings.selected, color = MaterialTheme.colorScheme.primary) },
+                        onClick = {
+                            onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
+                            menuOpen = false
+                        },
+                    )
+                }
+                if (countriesLoading && countries.isEmpty()) {
+                    CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp), strokeWidth = 2.dp)
+                }
+                countriesFailure?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                DropdownMenuItem(text = { Text(strings.moreLocations) }, onClick = { menuOpen = false; onOpenLocations() })
             }
         }
         quota?.remaining?.let { remaining ->
@@ -539,33 +637,24 @@ private fun HomePage(
 
 @Composable
 private fun LocationsPage(
-    servers: ServerListClient,
+    countries: List<VpnCountry>,
+    loading: Boolean,
+    failure: String?,
+    enabled: Boolean,
     selected: ProxyCandidate?,
     selectedCity: String,
     onPick: (ProxyCandidate?, String, String) -> Unit,
 ) {
     val strings = LocalStrings.current
-    var countries by remember { mutableStateOf<List<VpnCountry>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var failure by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(setOf<String>()) }
-
-    LaunchedEffect(Unit) {
-        val cached = withContext(Dispatchers.IO) { servers.loadCachedCountries() }
-        if (cached.isNotEmpty()) {
-            countries = cached
-            loading = false
-        }
-        runCatching { servers.fetchCountries() }
-            .onSuccess { countries = it }
-            .onFailure { if (countries.isEmpty()) failure = it.message ?: strings.serverListFailed }
-        loading = false
+    val pick: (ProxyCandidate?, String, String) -> Unit = { candidate, country, city ->
+        if (enabled) onPick(candidate, country, city)
     }
 
     Text(strings.chooseLocation, style = MaterialTheme.typography.headlineLarge)
     Spacer(Modifier.height(16.dp))
 
-    if (loading) {
+    if (loading && countries.isEmpty()) {
         CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
         return
     }
@@ -578,7 +667,7 @@ private fun LocationsPage(
 
     Card {
         Column {
-            LocationRow(strings.recommended, strings.automaticLocation, selected == null) { onPick(null, "", "") }
+            LocationRow(strings.recommended, strings.automaticLocation, selected == null) { pick(null, "", "") }
             for (country in ordered) {
                 HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val open = country.code in expanded
@@ -590,7 +679,7 @@ private fun LocationsPage(
                     expanded = open,
                     onToggle = { expanded = if (open) expanded - country.code else expanded + country.code },
                 ) {
-                    onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
+                    pick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
                 }
                 if (open) {
                     for (city in country.cities) {
@@ -601,7 +690,7 @@ private fun LocationsPage(
                             selected?.countryCode == country.code && selectedCity == city.code,
                             indent = 16,
                         ) {
-                            onPick(ServerListClient.candidatesForCity(countries, country.code, city.code).randomOrNull(), country.code, city.code)
+                            pick(ServerListClient.candidatesForCity(countries, country.code, city.code).randomOrNull(), country.code, city.code)
                         }
                     }
                 }
@@ -671,10 +760,10 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
     Spacer(Modifier.height(16.dp))
     GeneralSettings(engine, theme, onThemeChange, language, onLanguageChange)
     Spacer(Modifier.height(16.dp))
-    AdvancedSettings(engine)
-    Spacer(Modifier.height(16.dp))
     Card {
         Column {
+            Text(strings.protection, Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             SwitchRow(
                 strings.wholeDevice,
                 if (available) strings.wholeDeviceHelp
@@ -727,6 +816,8 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             }
         }
     }
+    Spacer(Modifier.height(16.dp))
+    AdvancedSettings(engine)
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {
@@ -832,19 +923,19 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(Modifier.padding(16.dp)) {
-                Text(strings.language, style = MaterialTheme.typography.bodyLarge)
+                Text(strings.appearance, style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((code, label) in listOf("en" to strings.englishLanguage, "fa" to strings.persianLanguage)) {
-                        FilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
+                    for (choice in listOf("Light", "Dark", "System")) {
+                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) })
                     }
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(Modifier.padding(16.dp)) {
-                Text(strings.appearance, style = MaterialTheme.typography.bodyLarge)
+                Text(strings.language, style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (choice in listOf("Light", "Dark", "System")) {
-                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) })
+                    for ((code, label) in listOf("en" to strings.englishLanguage, "fa" to strings.persianLanguage)) {
+                        FilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
                     }
                 }
             }
@@ -941,51 +1032,60 @@ private fun AdvancedSettings(engine: EmberEngine) {
     val strings = LocalStrings.current
     var mode by remember { mutableStateOf(engine.settings.tlsSplitMode) }
     var mtuText by remember { mutableStateOf(engine.settings.mtu.toString()) }
+    var expanded by remember { mutableStateOf(false) }
     val validMtu = parseMtu(mtuText) != null
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(strings.advanced, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(strings.tlsFragmentation, style = MaterialTheme.typography.bodyLarge)
-            Text(strings.tlsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Column(Modifier.selectableGroup()) {
-                for (choice in TlsSplitMode.entries) {
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = mode == choice, role = Role.RadioButton, onClick = {
-                            mode = choice
-                            engine.settings.tlsSplitMode = choice
-                        }).padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = mode == choice, onClick = null)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(strings.tlsLabel(choice), style = MaterialTheme.typography.bodyLarge)
-                            Text(strings.tlsDescription(choice), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand)
+                .clickable(role = Role.Button) { expanded = !expanded }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(strings.advanced, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EmberIcon(if (expanded) "chevron-up" else "chevron-down", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (expanded) {
+                Text(strings.tlsFragmentation, style = MaterialTheme.typography.bodyLarge)
+                Text(strings.tlsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.selectableGroup()) {
+                    for (choice in TlsSplitMode.entries) {
+                        Row(
+                            Modifier.fillMaxWidth().selectable(selected = mode == choice, role = Role.RadioButton, onClick = {
+                                mode = choice
+                                engine.settings.tlsSplitMode = choice
+                            }).padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = mode == choice, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(strings.tlsLabel(choice), style = MaterialTheme.typography.bodyLarge)
+                                Text(strings.tlsDescription(choice), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(strings.mtuHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = mtuText,
+                    onValueChange = { value ->
+                        mtuText = value
+                        parseMtu(value)?.let { engine.settings.mtu = it }
+                    },
+                    label = { Text("MTU") },
+                    isError = !validMtu,
+                    supportingText = { if (!validMtu) Text(strings.mtuValidation(MTU_RANGE.first, MTU_RANGE.last)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = {
+                    engine.settings.mtu = HevSocks5TunnelConfig.TUN_MTU
+                    mtuText = engine.settings.mtu.toString()
+                }) { Text(strings.resetDefault) }
+                Text(strings.nextConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(strings.mtuHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(
-                value = mtuText,
-                onValueChange = { value ->
-                    mtuText = value
-                    parseMtu(value)?.let { engine.settings.mtu = it }
-                },
-                label = { Text("MTU") },
-                isError = !validMtu,
-                supportingText = { if (!validMtu) Text(strings.mtuValidation(MTU_RANGE.first, MTU_RANGE.last)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextButton(onClick = {
-                engine.settings.mtu = HevSocks5TunnelConfig.TUN_MTU
-                mtuText = engine.settings.mtu.toString()
-            }) { Text(strings.resetDefault) }
-            Text(strings.nextConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -993,3 +1093,14 @@ private fun AdvancedSettings(engine: EmberEngine) {
 private fun parseMtu(value: String): Int? =
     value.takeIf { it.isNotEmpty() && it.all { char -> char in '0'..'9' } }
         ?.toIntOrNull()?.takeIf { it in MTU_RANGE }
+
+@Composable
+private fun connectingRingAlpha(state: ConnectionState): Float {
+    if (state != ConnectionState.CONNECTING) return 0.15f
+    val transition = rememberInfiniteTransition()
+    val alpha by transition.animateFloat(
+        initialValue = 0.12f, targetValue = 0.20f,
+        animationSpec = infiniteRepeatable(tween(300), RepeatMode.Reverse),
+    )
+    return alpha
+}

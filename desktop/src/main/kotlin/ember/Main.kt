@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
@@ -63,6 +64,13 @@ fun main(args: Array<String>) = application {
         state = windowState,
         visible = visible,
     ) {
+        val density = LocalDensity.current
+        LaunchedEffect(density) {
+            window.minimumSize = java.awt.Dimension(
+                with(density) { 760.dp.roundToPx() },
+                with(density) { 560.dp.roundToPx() },
+            )
+        }
         EmberTheme(darkTheme = when (theme) {
             "Light" -> false
             "Dark" -> true
