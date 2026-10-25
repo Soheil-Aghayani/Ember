@@ -1,0 +1,53 @@
+name: Publish preview
+
+# Manual: publishes the Windows installer and Android debug APK of an existing "Android CI" run
+# as a clearly labelled pre-release.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "ID of the Android CI run whose artifacts to publish"
+        required: true
+      tag:
+        description: "Release tag"
+        required: true
+        default: "v0.1.0-preview"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the build artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir dl
+          cd dl
+          gh run download "${{ inputs.run_id }}" -R "${{ github.repository }}" -n ember-windows-installer -n ember-debug-apk
+          find . -type f
+
+      - name: Create the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(gh run view "${{ inputs.run_id }}" -R "${{ github.repository }}" --json headSha --jq .headSha)
+          EXE=$(find dl -name '*.exe' | head -n 1)
+          APK=$(find dl -name '*.apk' | head -n 1)
+          VERSION=$(basename "$EXE" .exe | sed 's/^Ember-//')
+          cp "$APK" "Ember-${VERSION}-android-debug.apk"
+          cat > notes.md <<'NOTES'
+          **Experimental preview. Not for anyone whose safety depends on a VPN.**
+
+          - **Windows:** `Ember-<version>.exe` (Windows 10/11, 64-bit). The installer is not code-signed, so Windows may say "Windows protected your PC": choose *More info*, then *Run anyway*. Proxy mode needs no administrator rights. Whole-device mode (Settings) changes routes and firewall rules and asks for administrator permission; it has only been tested by its author.
+          - **Android:** `Ember-<version>-android-debug.apk` (Android 8.0 or newer). A debug build, signed with a debug key.
+          - Ember is not affiliated with Mozilla. It uses the free 50 GB per month that a Firefox account includes.
+          - If your internet stays blocked after a crash on Windows, see `desktop/README.md` (Troubleshooting).
+          NOTES
+          gh release create "${{ inputs.tag }}" "$EXE" "Ember-${VERSION}-android-debug.apk" \
+            --target "$SHA" --prerelease \
+            --title "Ember ${{ inputs.tag }} (experimental preview)" \
+            --notes-file notes.md
