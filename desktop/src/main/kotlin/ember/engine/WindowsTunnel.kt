@@ -57,6 +57,7 @@ class WindowsTunnel(dataDir: File) {
         killSwitch: Boolean,
         mtu: Int = HevSocks5TunnelConfig.TUN_MTU,
         tcpBufferSize: Int = HevSocks5TunnelConfig.DEFAULT_TCP_BUFFER_SIZE_BYTES,
+        excludeCidrs: List<String> = emptyList(),
         onProgress: (String) -> Unit = {},
     ) {
         val helper = script ?: error("The network helper is missing from this installation.")
@@ -73,6 +74,7 @@ class WindowsTunnel(dataDir: File) {
             .put("tunAddress", HevSocks5TunnelConfig.TUN_ADDRESS)
             .put("mapdnsAddress", HevSocks5TunnelConfig.MAPDNS_ADDRESS)
             .put("edgeIps", JSONArray(edgeIps))
+            .put("excludeCidrs", JSONArray(excludeCidrs))
             .put("killSwitch", killSwitch)
             .put("parentPid", ProcessHandle.current().pid())
         configFile.writeText(config.toString())

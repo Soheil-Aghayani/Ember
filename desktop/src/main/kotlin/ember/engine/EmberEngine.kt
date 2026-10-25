@@ -138,7 +138,7 @@ class EmberEngine(private val dataDir: File) {
                     val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
                     s.start()
                     socks = s
-                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, settings.tcpBufferBytes, onProgress = { _progress.value = it })
+                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, settings.tcpBufferBytes, resolveExclusions(), onProgress = { _progress.value = it })
                     startWatchingTunnel()
                 } else {
                     startLocalProxies()
@@ -186,11 +186,41 @@ class EmberEngine(private val dataDir: File) {
     private suspend fun recommendedCandidate(): ProxyCandidate {
         val countries = runCatching { withTimeout(SERVER_LIST_TIMEOUT_MS) { servers.fetchCountries() } }
             .getOrElse { servers.loadCachedCountries() }
-        return ServerListClient.candidatesForCountry(countries, RECOMMENDED_COUNTRY_CODE).randomOrNull()
+        val recommended = ServerListClient.candidatesForCountry(countries, RECOMMENDED_COUNTRY_CODE)
+        val best = if (settings.fastestServer) {
+            _progress.value = "Finding the fastest server..."
+            ServerPicker.fastest(recommended)
+        } else {
+            recommended.randomOrNull()
+        }
+        return best
             ?: countries.firstOrNull { it.code.isNotBlank() }
                 ?.let { ServerListClient.candidatesForCountry(countries, it.code).randomOrNull() }
             ?: error("No servers are available. Check your connection and try again.")
     }
+
+    /** Turns the user's "skip the VPN" list into IPv4 addresses and ranges (domains are looked up now, on the real network). */
+    private fun resolveExclusions(): List<String> {
+        val cidr = Regex("""^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$""")
+        val domain = Regex("""^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$""")
+        val result = linkedSetOf<String>()
+        for (entry in settings.excludedAddresses) {
+            when {
+                cidr.matches(entry) -> result.add(entry)
+                domain.matches(entry) -> runCatching {
+                    InetAddress.getAllByName(entry).filterIsInstance<Inet4Address>().forEach { result.add(it.hostAddress + "/32") }
+                }.onFailure { AppLogger.w(TAG, "could not look up $entry for the skip list", it) }
+                else -> AppLogger.w(TAG, "ignored an invalid skip-list entry: $entry")
+            }
+            if (result.size >= 300) break
+        }
+        return result.toList()
+    }
+
+    /** Measures download speed and delay through the running tunnel. */
+    suspend fun runSpeedTest(): Result<SpeedResult> =
+        if (_state.value == ConnectionState.CONNECTED) SpeedTest.run(SOCKS_PORT)
+        else Result.failure(IllegalStateException("Connect first, then test the speed."))
 
     private fun resolveIpv4(host: String): String =
         InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
