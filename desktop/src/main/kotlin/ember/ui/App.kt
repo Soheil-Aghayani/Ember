@@ -201,7 +201,7 @@ fun EmberApp(
 }
 
 @Composable
-private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
         modifier
             .fillMaxWidth()
@@ -597,6 +597,7 @@ private fun HomePage(
                 textAlign = TextAlign.Center,
             )
         }
+        if (connected) SpeedTestControl(engine)
         if (connected && !whole) {
             Spacer(Modifier.height(12.dp))
             Text(
@@ -745,6 +746,7 @@ private fun LocationRow(
 private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit, onSignOut: () -> Unit) {
     val strings = LocalStrings.current
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
+    var fastestServer by remember { mutableStateOf(engine.settings.fastestServer) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
     val available = engine.tunnel.isAvailable
     val setupScope = rememberCoroutineScope()
@@ -806,6 +808,11 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
                     }
                 }
             }
+            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow(strings.fastestServer, strings.fastestServerHelp, fastestServer) {
+                fastestServer = it
+                engine.settings.fastestServer = it
+            }
             noPromptError?.let {
                 Text(
                     it,
@@ -816,6 +823,8 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             }
         }
     }
+    Spacer(Modifier.height(16.dp))
+    SkipVpnSettings(engine, whole && available)
     Spacer(Modifier.height(16.dp))
     AdvancedSettings(engine)
     Spacer(Modifier.height(16.dp))
