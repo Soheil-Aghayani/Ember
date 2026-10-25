@@ -47,7 +47,7 @@ jobs:
           - Ember is not affiliated with Mozilla. It uses the free 50 GB per month that a Firefox account includes.
           - If your internet stays blocked after a crash on Windows, see `desktop/README.md` (Troubleshooting).
           NOTES
-          gh release create "${{ inputs.tag }}" "$EXE" "Ember-${VERSION}-android-debug.apk" \
+          gh release create -R "${{ github.repository }}" "${{ inputs.tag }}" "$EXE" "Ember-${VERSION}-android-debug.apk" \
             --target "$SHA" --prerelease \
             --title "Ember ${{ inputs.tag }} (experimental preview)" \
             --notes-file notes.md
