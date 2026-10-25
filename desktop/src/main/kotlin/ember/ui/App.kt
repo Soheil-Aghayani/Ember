@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,6 +57,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -418,12 +419,7 @@ private fun HomePage(
     }
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (update != null) {
-            UpdateBanner(update, onDismissUpdate)
-            Spacer(Modifier.height(12.dp))
-        }
-        traffic?.let { TrafficCard(it) }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
         Box(
             Modifier.size(180.dp).clip(CircleShape).background(ring.copy(alpha = 0.15f)).clickable {
                 when {
@@ -449,28 +445,81 @@ private fun HomePage(
         Spacer(Modifier.height(16.dp))
         Text(
             when (state) {
-                ConnectionState.CONNECTED -> if (whole) strings.connected else strings.proxyActive
+                ConnectionState.CONNECTED -> strings.connected
                 ConnectionState.CONNECTING -> strings.connecting
                 ConnectionState.DISCONNECTED -> strings.disconnected
             },
             style = MaterialTheme.typography.headlineMedium,
         )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            when (state) {
-                ConnectionState.CONNECTED -> formatDuration(elapsed)
-                ConnectionState.CONNECTING -> progress ?: strings.connecting
-                ConnectionState.DISCONNECTED -> "00:00:00"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        error?.let {
+        val secondary = when (state) {
+            ConnectionState.CONNECTED -> formatDuration(elapsed)
+            ConnectionState.CONNECTING -> progress
+            ConnectionState.DISCONNECTED -> null
+        }
+        if (!secondary.isNullOrBlank()) {
             Spacer(Modifier.height(8.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(
+                secondary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        traffic?.let { TrafficCaption(it) }
+        Spacer(Modifier.height(32.dp))
+
+        val connected = state == ConnectionState.CONNECTED
+        val location = if (connected) target else selected
+        val exitCode = if (connected) exit.info?.countryCode.orEmpty() else ""
+        val isRecommended = location == null || location.countryCode.equals(RECOMMENDED_COUNTRY_CODE, ignoreCase = true) || location.countryCode.isBlank()
+        val shownCode = when {
+            exitCode.length == 2 -> exitCode
+            isRecommended -> ""
+            else -> location?.countryCode.orEmpty()
+        }
+        val shownName = if (shownCode.length == 2) {
+            localizedCountry(shownCode, location?.countryName.orEmpty(), strings)
+        } else strings.recommended
+        Card(Modifier.clickable(onClick = onOpenLocations)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlagIcon(shownCode, 24.dp)
+                Spacer(Modifier.width(12.dp))
+                Text(shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.width(12.dp))
+                EmberIcon("chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        quota?.remaining?.let { remaining ->
+            Spacer(Modifier.height(12.dp))
+            val reset = quota?.resetEpochSeconds?.let { resetLabel(it, strings) }
+            Text(
+                strings.quotaFooter(formatBytes(remaining), reset),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (connected && !whole) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                strings.proxyModeCaption("$LOCAL_BIND:$SOCKS_PORT", "$LOCAL_BIND:$HTTP_PORT"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        error?.let {
+            Spacer(Modifier.height(16.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (connected) exit.error?.let {
+            Spacer(Modifier.height(12.dp))
+            Text(strings.connectionCheckFailed(it), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         blocked?.let { notice ->
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Card {
                 Column(Modifier.padding(16.dp)) {
                     Text(strings.internetBlocked, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
@@ -481,121 +530,9 @@ private fun HomePage(
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
-        val connectedTarget = target
-        if (state == ConnectionState.CONNECTED && connectedTarget != null) {
-            Card {
-                Column(Modifier.padding(16.dp)) {
-                    Text(strings.connectedTo, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    // Recommended is not a country: show where the connection really exits once that is known.
-                    val isRecommended = connectedTarget.countryCode.equals("REC", ignoreCase = true) || connectedTarget.countryCode.isBlank()
-                    val exitCode = exit.info?.countryCode.orEmpty()
-                    val shownCode = if (isRecommended) exitCode else connectedTarget.countryCode
-                    val shownName = when {
-                        !isRecommended -> localizedCountry(connectedTarget.countryCode, connectedTarget.countryName, strings)
-                        exitCode.length == 2 -> java.util.Locale("", exitCode).getDisplayCountry(Locale(strings.languageCode))
-                        else -> strings.recommendedLocation
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FlagIcon(shownCode, 32.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(shownName, style = MaterialTheme.typography.titleMedium)
-                            val detail = when {
-                                isRecommended -> strings.recommendedServer
-                                connectedTarget.cityCode.isNotBlank() -> connectedTarget.cityCode
-                                else -> null
-                            }
-                            if (detail != null) {
-                                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    val info = exit.info
-                    when {
-                        exit.checking -> Text(strings.checkingConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        info != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (info.countryCode.isNotBlank()) {
-                                FlagIcon(info.countryCode, 16.dp)
-                                Spacer(Modifier.width(6.dp))
-                            }
-                            Text(strings.exitIp(info.ip), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        exit.error != null -> Text(
-                            strings.connectionCheckFailed(exit.error.orEmpty()),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        } else {
-            Card(Modifier.clickable(onClick = onOpenLocations)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(strings.location, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (selected != null) {
-                            FlagIcon(selected.countryCode, 24.dp)
-                            Spacer(Modifier.width(10.dp))
-                        }
-                        Text(
-                            selected?.let { localizedCountry(it.countryCode, it.countryName, strings) } ?: strings.recommended,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Card {
-            Column(Modifier.padding(16.dp)) {
-                Text(strings.monthlyData, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                val q = quota
-                val remaining = q?.remaining
-                val max = q?.max
-                if (q == null || (remaining == null && max == null)) {
-                    Text(strings.notReported, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Text(
-                        buildString {
-                            if (remaining != null) append(strings.dataLeft(formatBytes(remaining)))
-                            if (max != null) append(if (remaining != null) strings.dataOf(formatBytes(max)) else strings.dataLimit(formatBytes(max)))
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (remaining != null && max != null && max > 0) {
-                        Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { (remaining.toFloat() / max.toFloat()).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                    }
-                }
-                q?.resetEpochSeconds?.let { reset ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(resetLabel(reset, strings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (!(whole || (state == ConnectionState.DISCONNECTED && wholeSetting))) Card {
-            Column(Modifier.padding(16.dp)) {
-                Text(strings.localProxy, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                Text("SOCKS5  $LOCAL_BIND:$SOCKS_PORT", style = MaterialTheme.typography.bodyMedium)
-                Text("HTTP  $LOCAL_BIND:$HTTP_PORT", style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    strings.proxyHelp,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        if (update != null) {
+            Spacer(Modifier.height(16.dp))
+            UpdateBanner(update, onDismissUpdate)
         }
     }
 }
@@ -910,27 +847,16 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
 }
 
 @Composable
-private fun TrafficCard(traffic: TrafficStats) {
-    val strings = LocalStrings.current
+private fun TrafficCaption(traffic: TrafficStats) {
     val reading by traffic.readings.collectAsState()
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(strings.liveTraffic, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (reading.available) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(strings.download, style = MaterialTheme.typography.bodySmall)
-                        Text(formatBytesPerSecond(reading.downloadSpeed), style = MaterialTheme.typography.titleMedium)
-                    }
-                    Column {
-                        Text(strings.upload, style = MaterialTheme.typography.bodySmall)
-                        Text(formatBytesPerSecond(reading.uploadSpeed), style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-                Text(strings.sessionTraffic(formatBytes(reading.downloaded), formatBytes(reading.uploaded)),
-                    style = MaterialTheme.typography.bodySmall)
-            } else Text(strings.waitingTraffic, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (reading.available) {
+        Spacer(Modifier.height(8.dp))
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text(
+                "↓ ${formatBytesPerSecond(reading.downloadSpeed)}   ↑ ${formatBytesPerSecond(reading.uploadSpeed)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -939,20 +865,20 @@ private fun TrafficCard(traffic: TrafficStats) {
 private fun UpdateBanner(version: String, onDismiss: () -> Unit) {
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text(strings.updateAvailable(version), style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        runCatching {
-                            if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(UpdateCheck.RELEASES_URL))
-                        }
-                    }
-                }) { Text(strings.viewUpdate) }
-                TextButton(onClick = onDismiss) { Text(strings.dismiss) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            strings.updateAvailable(version), modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = {
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(UpdateCheck.RELEASES_URL))
+                }
             }
-        }
+        }) { Text(strings.viewUpdate) }
+        TextButton(onClick = onDismiss) { Text(strings.dismiss) }
     }
 }
 
