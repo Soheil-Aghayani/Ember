@@ -65,6 +65,19 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("tcpBufferBytes")?.toIntOrNull()?.coerceIn(TCP_BUFFER_RANGE) ?: DEFAULT_TCP_BUFFER_BYTES
         set(value) = put("tcpBufferBytes", value.coerceIn(TCP_BUFFER_RANGE).toString())
 
+    /** Picks the quickest of a few recommended servers instead of a random one. */
+    var fastestServer: Boolean
+        get() = props.getProperty("fastestServer", "true").toBoolean()
+        set(value) = put("fastestServer", value.toString())
+
+    /**
+     * Addresses that skip the VPN in whole-device mode: IPv4 addresses, IPv4 ranges (10.1.0.0/16) or domain names
+     * (looked up when you connect). One entry per item.
+     */
+    var excludedAddresses: List<String>
+        get() = props.getProperty("excludedAddresses", "").split(';').map { it.trim() }.filter { it.isNotEmpty() }
+        set(value) = put("excludedAddresses", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains(';') }.distinct().joinToString(";"))
+
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
         set(value) = put("adminNoticeSeen", value.toString())

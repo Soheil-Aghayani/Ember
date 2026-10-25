@@ -124,6 +124,20 @@ $hevConfig = [string]$cfg.hevConfigPath
 $killSwitch = [bool]$cfg.killSwitch
 $parentPid = [int]$cfg.parentPid
 $edgeIps = @($cfg.edgeIps)
+# Ranges that skip the VPN (validated: IPv4 or IPv4/8..32 only, so nothing can bypass the whole internet).
+$excludeRoutes = New-Object System.Collections.ArrayList
+if ($cfg.PSObject.Properties['excludeCidrs']) {
+    foreach ($entry in @($cfg.excludeCidrs | ForEach-Object { $_ })) {
+        $text = [string]$entry
+        if ($text -notmatch '^(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?$') { Write-Log ("ignored invalid exclusion: $text"); continue }
+        $addr = $Matches[1]
+        $bits = if ($Matches[2]) { [int]$Matches[2] } else { 32 }
+        if (-not (Test-Ipv4 $addr) -or $bits -lt 8 -or $bits -gt 32) { Write-Log ("ignored invalid exclusion: $text"); continue }
+        $size = [long][math]::Pow(2, 32 - $bits)
+        $network = [long]([math]::Floor((ConvertTo-Long $addr) / $size) * $size)
+        [void]$excludeRoutes.Add((ConvertTo-Ip $network) + '/' + $bits)
+    }
+}
 foreach ($ip in @($tunAddress, $mapdns) + $edgeIps) {
     if (-not (Test-Ipv4 ([string]$ip))) { throw "invalid address in config: $ip" }
 }
@@ -170,6 +184,7 @@ function Set-Bypass($def) {
         $added.Remove($e)
     }
     foreach ($ip in $edgeIps) { Add-Route "$ip/32" $def.InterfaceIndex $def.NextHop 1 'bypass' }
+    foreach ($c in $excludeRoutes) { Add-Route $c $def.InterfaceIndex $def.NextHop 1 'bypass' }
 }
 
 # Block public IPv4 on every active adapter except the tunnel. While the tunnel is up, the default routes send
@@ -186,6 +201,7 @@ function Set-KillSwitch {
     }
     [void]$allowed.Add(@([long]3758096384, [long]4294967295))
     foreach ($ip in $edgeIps) { $n = ConvertTo-Long ([string]$ip); [void]$allowed.Add(@($n, $n)) }
+    foreach ($c in $excludeRoutes) { [void]$allowed.Add((Get-CidrRange $c)) }
     $blockRanges = Get-ComplementRanges $allowed
     New-NetFirewallRule -DisplayName 'Ember kill switch' -Group $RuleGroup -Direction Outbound -Action Block `
         -InterfaceAlias $aliases -RemoteAddress $blockRanges -PolicyStore ActiveStore | Out-Null

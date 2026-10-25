@@ -109,6 +109,8 @@ private const val TUN_PREFIX_LENGTH_IPV6 = 128
 private const val WAKE_LOCK_TAG = "com.soheil.ember:vpn"
 private const val WIFI_LOCK_TAG = "com.soheil.ember:vpn-wifi"
 
+private const val ANDROID_TCP_BUFFER_BYTES = 262_144
+
 private fun fullJitterBackoffMs(attempt: Int, baseMs: Long, capMs: Long): Long {
     val exponential = baseMs * (1L shl attempt.coerceIn(0, 10))
     val upperBound = exponential.coerceAtMost(capMs)
@@ -648,6 +650,8 @@ class EmberVpnService : VpnService() {
                     socksPort,
                     useMapDns = mapdnsActive,
                     mtu = settingsStore.mtu,
+                    // One connection moves at most buffer / round-trip time; 64 KB capped downloads near 0.8 MB/s.
+                    tcpBufferSize = ANDROID_TCP_BUFFER_BYTES,
                 )
                 val tunnelStarted = HevSocks5Tunnel.start(tunnelConfigPath, fd.fd)
                 if (!tunnelStarted) error("Failed to start the tun2socks tunnel (hev-socks5-tunnel)")
