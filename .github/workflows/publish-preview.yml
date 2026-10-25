@@ -37,7 +37,7 @@ jobs:
           SHA=$(gh run view "${{ inputs.run_id }}" -R "${{ github.repository }}" --json headSha --jq .headSha)
           EXE=$(find dl -name '*.exe' | head -n 1)
           APK=$(find dl -name '*.apk' | head -n 1)
-          VERSION=$(basename "$EXE" .exe | sed 's/^Ember-//')
+          VERSION=$(basename "$EXE" .exe | sed 's/^Ember-//; s/^Setup-//')
           cp "$APK" "Ember-${VERSION}-android-debug.apk"
           cat > notes.md <<'NOTES'
           **Experimental preview. Not for anyone whose safety depends on a VPN.**

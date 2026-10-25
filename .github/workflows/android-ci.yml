@@ -93,8 +93,9 @@ jobs:
       - name: Build the Windows installer
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "/DVersion=1.0.${{ github.run_number }}" "/DSourceDir=$env:GITHUB_WORKSPACE\desktopuild\composeinaries\mainpp\Ember" "/DOutputDir=$env:GITHUB_WORKSPACE\desktopuild\composeinaries\main\exe" desktop\packaging\ember.iss
+          $iscc = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          $ws = $env:GITHUB_WORKSPACE
+          & $iscc "/DVersion=1.0.${{ github.run_number }}" "/DSourceDir=$ws/desktop/build/compose/binaries/main/app/Ember" "/DOutputDir=$ws/desktop/build/compose/binaries/main/exe" "$ws/desktop/packaging/ember.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
 
       # Code signing with SignPath (free for open-source projects). Inactive until the repository variable
