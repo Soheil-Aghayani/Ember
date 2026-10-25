@@ -37,6 +37,9 @@ Ember signs in with your Firefox account, asks Mozilla's Guardian service for a 
 | Reconnect after sleep or network change | yes | yes |
 | Tray icon, start with Windows, auto-connect | yes | n/a |
 | Split tunneling, DNS over HTTPS, upstream proxy | no | yes |
+| Addresses that skip the VPN (websites or IP ranges) | yes (whole-device mode) | not yet |
+| Pick the fastest server automatically | yes | not yet |
+| Speed test through the tunnel | yes | not yet |
 | TLS fragmentation, custom MTU | yes | yes |
 | English and Persian (right-to-left) | yes (Windows) | not yet |
 | Light, dark and system theme | yes | yes |
