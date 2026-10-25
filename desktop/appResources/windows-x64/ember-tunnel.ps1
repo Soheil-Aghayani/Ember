@@ -85,12 +85,17 @@ function Write-Log([string]$text) {
 
 function Remove-AddedRoutes {
     if (-not (Test-Path -LiteralPath $routesFile)) { return }
-    $saved = @(Get-Content -LiteralPath $routesFile -Raw | ConvertFrom-Json)
-    foreach ($r in $saved) {
-        $prefix = [string]$r.prefix
-        $idx = [int]$r.ifIndex
-        if ($prefix -notmatch '^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$') { continue }
-        Remove-NetRoute -DestinationPrefix $prefix -InterfaceIndex $idx -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+    $parsed = Get-Content -LiteralPath $routesFile -Raw | ConvertFrom-Json
+    # Windows PowerShell 5.1 hands a JSON array back as a single object; piping it unrolls the entries.
+    foreach ($r in @($parsed | ForEach-Object { $_ })) {
+        try {
+            $prefix = [string]$r.prefix
+            $idx = [int]$r.ifIndex
+            if ($prefix -notmatch '^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$') { continue }
+            Remove-NetRoute -DestinationPrefix $prefix -InterfaceIndex $idx -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+        } catch {
+            Write-Log ('cleanup (route entry): ' + $_.Exception.Message)
+        }
     }
     Remove-Item -LiteralPath $routesFile -ErrorAction SilentlyContinue
 }
@@ -134,6 +139,8 @@ if (-not $hev) { throw 'hev-socks5-tunnel.exe was not found next to this script'
 
 $added = New-Object System.Collections.ArrayList
 function Add-Route([string]$prefix, [int]$ifIndex, [string]$nextHop, [int]$metric, [string]$kind = 'tun') {
+    # A route left behind by an earlier run must not stop this one.
+    Remove-NetRoute -DestinationPrefix $prefix -InterfaceIndex $ifIndex -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
     New-NetRoute -DestinationPrefix $prefix -InterfaceIndex $ifIndex -NextHop $nextHop -RouteMetric $metric `
         -PolicyStore ActiveStore -ErrorAction Stop | Out-Null
     [void]$added.Add(@{ prefix = $prefix; ifIndex = $ifIndex; kind = $kind })
@@ -185,6 +192,11 @@ function Set-KillSwitch {
     Write-Log ('kill switch rule set on: ' + ($aliases -join ', ') + ' (' + $blockRanges.Count + ' blocked ranges)')
 }
 
+# Undo anything an earlier run left behind (stale routes, firewall rules, a tunnel process).
+Invoke-Cleanup
+foreach ($ip in $edgeIps) {
+    Remove-NetRoute -DestinationPrefix ("$ip/32") -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+}
 Remove-Item -LiteralPath $stopFile -ErrorAction SilentlyContinue
 Write-State 'STARTING'
 Write-Log "up requested (killSwitch=$killSwitch)"

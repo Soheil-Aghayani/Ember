@@ -482,7 +482,7 @@ private fun HomePage(
         } else strings.recommended
         Card(Modifier.clickable(onClick = onOpenLocations)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                FlagIcon(shownCode, 24.dp)
+                if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(12.dp))
                 Text(shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.width(12.dp))
@@ -738,6 +738,12 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (available) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text(strings.repairNetwork) }
+                Spacer(Modifier.height(4.dp))
+                Text(strings.repairNetworkHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
     Spacer(Modifier.height(16.dp))
