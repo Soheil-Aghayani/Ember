@@ -82,10 +82,20 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Build Windows installer
+      - name: Build the app folder
         env:
           EMBER_VERSION: 1.0.${{ github.run_number }}
-        run: gradle -p desktop packageExe --no-daemon
+        run: gradle -p desktop createDistributable --no-daemon
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build the Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DVersion=1.0.${{ github.run_number }}" "/DSourceDir=$env:GITHUB_WORKSPACE\desktopuild\composeinaries\mainpp\Ember" "/DOutputDir=$env:GITHUB_WORKSPACE\desktopuild\composeinaries\main\exe" desktop\packaging\ember.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
 
       # Code signing with SignPath (free for open-source projects). Inactive until the repository variable
       # SIGNPATH_ORGANIZATION_ID and the secret SIGNPATH_API_TOKEN exist; see desktop/SIGNING.md.
