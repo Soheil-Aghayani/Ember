@@ -41,6 +41,11 @@ class WindowsTunnel(dataDir: File) {
         get() = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true) &&
             script != null && hevPresent
 
+    /** Asks the running helper to re-assert the route to Mozilla's server (used before redialing). */
+    fun requestRefresh() {
+        runCatching { File(stateDir, "refresh").writeText("1") }
+    }
+
     fun status(): String? = runCatching { statusFile.readText().trim() }.getOrNull()
 
     /** True when a previous run left the kill switch holding traffic (Ember crashed, or the tunnel died). */

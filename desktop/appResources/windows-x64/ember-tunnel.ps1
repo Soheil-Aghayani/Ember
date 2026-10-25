@@ -72,6 +72,7 @@ $stateDir = [string]$cfg.stateDir
 if (-not (Test-Path -LiteralPath $stateDir -PathType Container)) { throw 'stateDir is not a folder' }
 $statusFile = Join-Path $stateDir 'status'
 $stopFile = Join-Path $stateDir 'stop'
+$refreshFile = Join-Path $stateDir 'refresh'
 $routesFile = Join-Path $stateDir 'routes.json'
 $logFile = Join-Path $stateDir 'helper.log'
 
@@ -167,6 +168,16 @@ function Get-PhysicalDefault {
         Where-Object { $_.NextHop -ne '0.0.0.0' -and $_.InterfaceAlias -ne $adapterName } |
         Sort-Object RouteMetric |
         Select-Object -First 1
+}
+
+# True when every edge address still has its route on the physical network. If one is missing, the tunnel's own
+# connection to Mozilla would be sent into the tunnel and reset.
+function Test-Bypass {
+    foreach ($ip in $edgeIps) {
+        $found = Get-NetRoute -DestinationPrefix ("$ip/32") -ErrorAction SilentlyContinue | Where-Object { $_.NextHop -ne '0.0.0.0' }
+        if (-not $found) { return $false }
+    }
+    return $true
 }
 
 # Something that changes whenever the physical network changes (default route or the set of active adapters).
@@ -275,6 +286,23 @@ try {
     while ($true) {
         Start-Sleep -Milliseconds 1000
         $tick++
+        $refreshRequested = Test-Path -LiteralPath $refreshFile
+        if ($refreshRequested -or ($tick % 5 -eq 0)) {
+            # Ember asked for a refresh before redialing, or periodic self-check: restore the edge route if it vanished.
+            try {
+                if ($refreshRequested) { Remove-Item -LiteralPath $refreshFile -ErrorAction SilentlyContinue }
+                if ($refreshRequested -or -not (Test-Bypass)) {
+                    $now = Get-PhysicalDefault
+                    if ($now) {
+                        Write-Log $(if ($refreshRequested) { 'refresh requested; re-asserting the edge route' } else { 'edge route was missing; restoring it' })
+                        Set-Bypass $now
+                        if ($killSwitch) { Set-KillSwitch }
+                    }
+                }
+            } catch {
+                Write-Log ('route self-check failed: ' + $_.Exception.Message)
+            }
+        }
         if ($tick % 3 -eq 0) {
             # Wi-Fi changes, cable plugged in, wake from sleep: re-point the edge route and the kill switch.
             try {

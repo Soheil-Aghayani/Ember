@@ -41,7 +41,7 @@ private const val DIAL_TIMEOUT_MS = 30_000L
 private const val SERVER_LIST_TIMEOUT_MS = 10_000L
 private const val FALLBACK_PASS_RENEW_MS = 20 * 60_000L
 private const val RENEW_MARGIN_SECONDS = 120L
-private const val MAX_REDIAL_ATTEMPTS = 5
+private const val MAX_REDIAL_ATTEMPTS = 8
 
 const val SOCKS_PORT = 10808
 const val HTTP_PORT = 10809
@@ -377,7 +377,19 @@ class EmberEngine(private val dataDir: File) {
                 val chosen = target ?: return@launch
                 repeat(MAX_REDIAL_ATTEMPTS) { attempt ->
                     runCatching { session?.close() }
-                    val result = runCatching { dial(chosen, passForRedial()) }
+                    if (_wholeDevice.value) {
+                        // Make sure the connection to Mozilla leaves through the real network, not through the tunnel itself.
+                        tunnel.requestRefresh()
+                        delay(1_500)
+                    }
+                    val result = runCatching {
+                        val pass = if (attempt >= 2) {
+                            runCatching { withTimeout(8_000) { mintPass() } }.getOrElse { passForRedial() }
+                        } else {
+                            passForRedial()
+                        }
+                        dial(chosen, pass)
+                    }
                     val fresh = result.getOrNull()
                     if (fresh != null) {
                         session = fresh
@@ -385,7 +397,7 @@ class EmberEngine(private val dataDir: File) {
                         return@launch
                     }
                     AppLogger.w(TAG, "redial attempt ${attempt + 1} failed", result.exceptionOrNull())
-                    delay(1_000L * (attempt + 1))
+                    delay(minOf(15_000L, 1_500L * (attempt + 1)))
                 }
                 _lastError.value = "The VPN connection was lost and could not be restored."
                 teardown()
