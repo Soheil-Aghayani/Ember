@@ -6,6 +6,8 @@ import java.io.File
 import java.util.Properties
 
 val MTU_RANGE = 1200..1500
+val TCP_BUFFER_RANGE = 65_536..4_194_304
+const val DEFAULT_TCP_BUFFER_BYTES = 524_288
 
 data class QuotaInfo(val remaining: Long?, val max: Long?, val resetEpochSeconds: Long?)
 
@@ -54,6 +56,14 @@ class DesktopSettings(private val file: File) {
     var mtu: Int
         get() = props.getProperty("mtu")?.toIntOrNull()?.coerceIn(MTU_RANGE) ?: HevSocks5TunnelConfig.TUN_MTU
         set(value) = put("mtu", value.coerceIn(MTU_RANGE).toString())
+
+    /**
+     * Per-connection TCP buffer of the whole-device tunnel. One connection moves at most buffer / round-trip time,
+     * so the library default of 64 KB caps a single download at about 0.8 MB/s on a 80 ms path.
+     */
+    var tcpBufferBytes: Int
+        get() = props.getProperty("tcpBufferBytes")?.toIntOrNull()?.coerceIn(TCP_BUFFER_RANGE) ?: DEFAULT_TCP_BUFFER_BYTES
+        set(value) = put("tcpBufferBytes", value.coerceIn(TCP_BUFFER_RANGE).toString())
 
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
