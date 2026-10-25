@@ -28,7 +28,7 @@ object HevSocks5TunnelConfig {
 
     private const val UDP_READ_WRITE_TIMEOUT_MS = 60_000
 
-    private const val TCP_BUFFER_SIZE_BYTES = 65_536
+    const val DEFAULT_TCP_BUFFER_SIZE_BYTES = 65_536
 
     private const val TASK_STACK_SIZE_BYTES = 86_016
 
@@ -59,6 +59,7 @@ object HevSocks5TunnelConfig {
         useMapDns: Boolean = true,
         mtu: Int = TUN_MTU,
         tunnelName: String? = null,
+        tcpBufferSize: Int = DEFAULT_TCP_BUFFER_SIZE_BYTES,
     ): String {
 
         val mapdnsBlock = if (useMapDns) {
@@ -90,7 +91,7 @@ object HevSocks5TunnelConfig {
               connect-timeout: $CONNECT_TIMEOUT_MS
               tcp-read-write-timeout: $TCP_READ_WRITE_TIMEOUT_MS
               udp-read-write-timeout: $UDP_READ_WRITE_TIMEOUT_MS
-              tcp-buffer-size: $TCP_BUFFER_SIZE_BYTES
+              tcp-buffer-size: $tcpBufferSize
               udp-recv-buffer-size: $UDP_RECV_BUFFER_SIZE_BYTES
               udp-copy-buffer-nums: $UDP_COPY_BUFFER_NUMS
               max-session-count: $MAX_SESSION_COUNT

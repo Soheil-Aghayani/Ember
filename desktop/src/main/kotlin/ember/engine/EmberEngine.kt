@@ -138,7 +138,7 @@ class EmberEngine(private val dataDir: File) {
                     val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
                     s.start()
                     socks = s
-                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, onProgress = { _progress.value = it })
+                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, settings.tcpBufferBytes, onProgress = { _progress.value = it })
                     startWatchingTunnel()
                 } else {
                     startLocalProxies()
