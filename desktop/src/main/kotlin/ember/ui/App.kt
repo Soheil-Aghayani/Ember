@@ -78,6 +78,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.FxaAuthRepository
@@ -540,7 +543,9 @@ private fun HomePage(
         val shownName = if (shownCode.length == 2) {
             localizedCountry(shownCode, location?.countryName.orEmpty(), strings)
         } else strings.recommended
-        Box(Modifier.fillMaxWidth()) {
+        val density = LocalDensity.current
+        var pillWidthPx by remember { mutableStateOf(0) }
+        Box(Modifier.fillMaxWidth().onSizeChanged { pillWidthPx = it.width }) {
             Card {
                 Row(
                     Modifier.fillMaxWidth().background(
@@ -560,8 +565,19 @@ private fun HomePage(
                     }
                 }
             }
-            DropdownMenu(expanded = menuOpen && canPick, onDismissRequest = { menuOpen = false },
-                modifier = Modifier.heightIn(max = 360.dp).widthIn(min = 260.dp)) {
+            DropdownMenu(
+                expanded = menuOpen && canPick,
+                onDismissRequest = { menuOpen = false },
+                modifier = Modifier
+                    .width(with(density) { pillWidthPx.toDp() })
+                    .heightIn(max = 280.dp),
+                offset = DpOffset(0.dp, 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
                 DropdownMenuItem(
                     text = { Text(strings.recommended) },
                     leadingIcon = { EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
