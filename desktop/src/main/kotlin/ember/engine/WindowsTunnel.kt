@@ -2,7 +2,12 @@ package ember.engine
 
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
+import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.Shell32
+import com.sun.jna.platform.win32.WinUser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -14,11 +19,17 @@ private const val START_TIMEOUT_MS = 120_000L
 private const val HELPER_SILENT_TIMEOUT_MS = 20_000L
 private const val STOP_TIMEOUT_MS = 20_000L
 
+/** A helper start-up failure. [retryWithFallback] is true when the helper itself ran and reported a problem. */
+private class HelperFailure(message: String, val retryWithFallback: Boolean) : Exception(message)
+
+/** How the helper was launched: a process (PowerShell or scheduled task) or, for the native helper, just an outcome. */
+private class Launch(val process: Process?, val failure: String?, val launchedAt: Long = System.currentTimeMillis())
+
 /**
- * Whole-device mode on Windows. An elevated PowerShell helper (ember-tunnel.ps1, shipped in the
- * application folder) runs hev-socks5-tunnel on a Wintun adapter, routes traffic into it and applies the
- * kill switch. This class only starts and stops that helper and reads its status file; it never runs
- * as administrator itself.
+ * Whole-device mode on Windows. An elevated helper runs hev-socks5-tunnel on a Wintun adapter, routes
+ * traffic into it and applies the kill switch. Two helpers ship in the application folder:
+ * `ember-helper.exe` (native, about a second to set up) and `ember-tunnel.ps1` (PowerShell, the fallback).
+ * This class only starts and stops the helper and reads its status file; it never runs as administrator itself.
  */
 class WindowsTunnel(dataDir: File) {
 
@@ -33,13 +44,14 @@ class WindowsTunnel(dataDir: File) {
         System.getProperty("compose.application.resources.dir")?.let(::File)
 
     private val script: File? get() = resourcesDir?.resolve("ember-tunnel.ps1")?.takeIf { it.isFile }
+    private val nativeHelper: File? get() = resourcesDir?.resolve("ember-helper.exe")?.takeIf { it.isFile }
 
     private val hevPresent: Boolean
         get() = resourcesDir?.resolve("tunnel")?.walkTopDown()?.any { it.name == "hev-socks5-tunnel.exe" } == true
 
     val isAvailable: Boolean
         get() = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true) &&
-            script != null && hevPresent
+            (nativeHelper != null || script != null) && hevPresent
 
     /** Asks the running helper to re-assert the route to Mozilla's server (used before redialing). */
     fun requestRefresh() {
@@ -52,8 +64,24 @@ class WindowsTunnel(dataDir: File) {
     fun isBlocked(): Boolean = status()?.startsWith("BLOCKED") == true
 
     /**
-     * Starts the helper and waits for it to report UP. Windows shows an administrator prompt.
-     * [edgeIps] are the Mozilla edge addresses that must stay on the physical network.
+     * True when the status file says a tunnel was up but no native helper is running any more, for example after
+     * Windows restarted or Ember was killed. The firewall rules of that run may still be in place.
+     */
+    fun isStale(): Boolean {
+        val current = status() ?: return false
+        if (current == "DOWN" || current.startsWith("ERROR") || current.startsWith("BLOCKED")) return false
+        return nativeHelper != null && !nativeHelperRunning()
+    }
+
+    private fun nativeHelperRunning(): Boolean = runCatching {
+        ProcessHandle.allProcesses().anyMatch { handle ->
+            handle.info().command().map { it.endsWith("ember-helper.exe", ignoreCase = true) }.orElse(false)
+        }
+    }.getOrDefault(false)
+
+    /**
+     * Starts the helper and waits for it to report UP. Windows shows an administrator prompt unless the optional
+     * one-time setup was done. [edgeIps] are the Mozilla edge addresses that must stay on the physical network.
      * [onProgress] receives plain-language steps for the UI.
      */
     suspend fun start(
@@ -65,12 +93,7 @@ class WindowsTunnel(dataDir: File) {
         excludeCidrs: List<String> = emptyList(),
         onProgress: (String) -> Unit = {},
     ) {
-        val helper = script ?: error("The network helper is missing from this installation.")
         stopStaleHelper()
-        statusFile.delete()
-        stopFile.delete()
-        logFile.delete()
-
         val hevConfig = HevSocks5TunnelConfig.write(stateDir.parentFile, socksPort, useMapDns = true, mtu = mtu, tunnelName = ADAPTER_NAME, tcpBufferSize = tcpBufferSize)
         val config = JSONObject()
             .put("stateDir", stateDir.absolutePath)
@@ -82,6 +105,31 @@ class WindowsTunnel(dataDir: File) {
             .put("excludeCidrs", JSONArray(excludeCidrs))
             .put("killSwitch", killSwitch)
             .put("parentPid", ProcessHandle.current().pid())
+        val native = nativeHelper
+        val ps = script
+        if (native == null && ps == null) error("The network helper is missing from this installation.")
+
+        if (native != null) {
+            try {
+                startWith(native, native = true, config, onProgress)
+                return
+            } catch (failure: HelperFailure) {
+                if (!failure.retryWithFallback || ps == null) throw IllegalStateException(failure.message)
+                AppLogger.w(TAG, "the native helper failed (${failure.message}); trying the PowerShell helper")
+                onProgress("Trying the fallback helper…")
+            }
+        }
+        try {
+            startWith(ps!!, native = false, config, onProgress)
+        } catch (failure: HelperFailure) {
+            throw IllegalStateException(failure.message)
+        }
+    }
+
+    private suspend fun startWith(helper: File, native: Boolean, config: JSONObject, onProgress: (String) -> Unit) {
+        statusFile.delete()
+        stopFile.delete()
+        logFile.delete()
         configFile.writeText(config.toString())
 
         val noPrompt = privileged.isInstalled()
@@ -89,43 +137,48 @@ class WindowsTunnel(dataDir: File) {
             if (noPrompt) "Starting the secure network adapter…"
             else "Waiting for you to allow administrator access in the Windows prompt…",
         )
-        val launcher = if (noPrompt) privileged.run("Up") else elevate(helper, "Up", configFile)
+        val launch = if (noPrompt) Launch(privileged.run("Up"), null) else elevate(helper, native, "Up", configFile)
+        if (launch.failure != null) throw HelperFailure(launch.failure, retryWithFallback = false)
 
         val started = System.currentTimeMillis()
-        var launcherExitedAt: Long? = null
         var reportedAdapter = false
         while (System.currentTimeMillis() - started < START_TIMEOUT_MS) {
             val current = status()
             when {
                 current == "UP" -> return
-                current != null && current.startsWith("ERROR") -> error(current.removePrefix("ERROR:").trim())
+                current != null && current.startsWith("ERROR") ->
+                    throw HelperFailure(current.removePrefix("ERROR:").trim(), retryWithFallback = true)
                 current == "STARTING" && !reportedAdapter -> {
                     reportedAdapter = true
                     onProgress("Setting up the secure network adapter…")
                 }
             }
-            if (current == null && !launcher.isAlive) {
-                val exitedAt = launcherExitedAt ?: System.currentTimeMillis().also { launcherExitedAt = it }
-                if (launcher.exitValue() != 0) {
-                    val detail = launcher.inputStream.bufferedReader().readText().trim()
-                    error(
-                        if (detail.contains("canceled", ignoreCase = true) || detail.contains("cancelled", ignoreCase = true)) {
-                            "Administrator access was not allowed, so the tunnel could not start."
-                        } else {
-                            "Windows could not start the network helper: ${detail.ifBlank { "exit code ${launcher.exitValue()}" }}"
-                        },
-                    )
+            if (current == null) {
+                val process = launch.process
+                if (process != null && !process.isAlive) {
+                    if (process.exitValue() != 0) {
+                        val detail = process.inputStream.bufferedReader().readText().trim()
+                        throw HelperFailure(
+                            if (detail.contains("canceled", ignoreCase = true) || detail.contains("cancelled", ignoreCase = true)) {
+                                "Administrator access was not allowed, so the tunnel could not start."
+                            } else {
+                                "Windows could not start the network helper: ${detail.ifBlank { "exit code ${process.exitValue()}" }}"
+                            },
+                            retryWithFallback = false,
+                        )
+                    }
                 }
-                if (System.currentTimeMillis() - exitedAt > HELPER_SILENT_TIMEOUT_MS) {
-                    error(
-                        "The network helper was allowed to run but did not report back. " +
-                            "Details may be in ${logFile.absolutePath}",
+                val silentFor = System.currentTimeMillis() - (if (process != null && !process.isAlive) started else launch.launchedAt)
+                if ((process == null || !process.isAlive) && silentFor > HELPER_SILENT_TIMEOUT_MS) {
+                    throw HelperFailure(
+                        "The network helper was allowed to run but did not report back. Details may be in ${logFile.absolutePath}",
+                        retryWithFallback = native,
                     )
                 }
             }
-            delay(400)
+            delay(150)
         }
-        error("The network helper did not finish starting in time. Details may be in ${logFile.absolutePath}")
+        throw HelperFailure("The network helper did not finish starting in time. Details may be in ${logFile.absolutePath}", retryWithFallback = false)
     }
 
     /** A helper left over from an earlier connection (for example one holding the kill switch) must end first. */
@@ -148,28 +201,51 @@ class WindowsTunnel(dataDir: File) {
         val deadline = System.currentTimeMillis() + STOP_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
             if (status() == "DOWN") return
-            delay(300)
+            delay(150)
         }
         AppLogger.w(TAG, "the tunnel helper did not confirm shutdown; running a restore")
         restore()
     }
 
-    /** Undoes the kill switch and any leftovers. Windows shows an administrator prompt. */
+    /** Undoes the kill switch and any leftovers. Windows shows an administrator prompt unless the one-time setup was done. */
     suspend fun restore() {
-        val helper = script ?: return
+        val native = nativeHelper
+        val helper = native ?: script ?: return
         configFile.writeText(JSONObject().put("stateDir", stateDir.absolutePath).toString())
         stopFile.writeText("stop")
         statusFile.delete()
-        if (privileged.isInstalled()) privileged.run("Restore") else elevate(helper, "Restore", configFile)
+        if (privileged.isInstalled()) {
+            privileged.run("Restore")
+        } else {
+            val launch = elevate(helper, native != null, "Restore", configFile)
+            if (launch.failure != null) error(launch.failure)
+        }
         val deadline = System.currentTimeMillis() + STOP_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
             if (status() == "DOWN") return
-            delay(300)
+            delay(150)
         }
-        error("Restoring the network timed out. Run ember-tunnel.ps1 -Mode Restore as administrator.")
+        error("Restoring the network timed out. Run ember-helper.exe restore as administrator, or use Windows' firewall settings to remove the \"Ember\" rules.")
     }
 
-    private fun elevate(helper: File, mode: String, config: File): Process {
+    private suspend fun elevate(helper: File, native: Boolean, mode: String, config: File): Launch =
+        withContext(Dispatchers.IO) {
+            if (native) elevateNative(helper, mode, config) else elevatePowerShell(helper, mode, config)
+        }
+
+    /** Starts the native helper with the Windows administrator prompt (ShellExecute "runas"); returns when the prompt is answered. */
+    private fun elevateNative(helper: File, mode: String, config: File): Launch {
+        val parameters = "${mode.lowercase()} --config \"${config.absolutePath}\""
+        val result = Shell32.INSTANCE.ShellExecute(null, "runas", helper.absolutePath, parameters, helper.parent, WinUser.SW_HIDE)
+        val code = Pointer.nativeValue(result?.pointer)
+        return when {
+            code > 32 -> Launch(null, null)
+            code == 5L || code == 1223L -> Launch(null, "Administrator access was not allowed, so the tunnel could not start.")
+            else -> Launch(null, "Windows could not start the network helper (error $code).")
+        }
+    }
+
+    private fun elevatePowerShell(helper: File, mode: String, config: File): Launch {
         val helperPath = helper.absolutePath
         val configPath = config.absolutePath
         require(!helperPath.contains('\'') && !configPath.contains('\'')) { "Unsupported character in an installation path." }
@@ -177,8 +253,9 @@ class WindowsTunnel(dataDir: File) {
         val command = "Start-Process -FilePath powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList $args"
         // -EncodedCommand avoids every quoting problem between the JVM and PowerShell.
         val encoded = Base64.getEncoder().encodeToString(command.toByteArray(Charsets.UTF_16LE))
-        return ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded)
+        val process = ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded)
             .redirectErrorStream(true)
             .start()
+        return Launch(process, null)
     }
 }

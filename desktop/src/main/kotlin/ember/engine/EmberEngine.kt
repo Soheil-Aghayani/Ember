@@ -110,6 +110,8 @@ class EmberEngine(private val dataDir: File) {
         UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
         if (tunnel.isBlocked()) {
             _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
+        } else if (tunnel.isStale()) {
+            _blockedNotice.value = "Ember was closed while the tunnel was on (or Windows restarted). Leftover network rules may still block or redirect traffic."
         }
     }
 

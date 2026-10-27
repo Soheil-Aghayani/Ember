@@ -23,6 +23,7 @@ class PrivilegedTask(dataDir: File) {
     private val resourcesDir: File? =
         System.getProperty("compose.application.resources.dir")?.let(::File)
     private val script: File? get() = resourcesDir?.resolve("ember-tunnel.ps1")?.takeIf { it.isFile }
+    private val nativeHelper: File? get() = resourcesDir?.resolve("ember-helper.exe")?.takeIf { it.isFile }
     private val configFile = File(dataDir, "tunnel-state/config.json")
 
     private fun schtasks(vararg args: String): Process =
@@ -41,16 +42,24 @@ class PrivilegedTask(dataDir: File) {
 
     /** Registers the tasks. Windows shows one administrator prompt. */
     suspend fun install() {
-        val helper = script ?: error("The network helper is missing from this installation.")
+        val native = nativeHelper
+        val helper = native ?: script ?: error("The network helper is missing from this installation.")
         val user = (System.getenv("USERDOMAIN") ?: "") + "\\" + System.getProperty("user.name")
         val unsafe = listOf(helper.absolutePath, configFile.absolutePath, user).any { it.contains('\'') || it.contains('"') }
         require(!unsafe) { "Unsupported character in a path or user name." }
+        // The native helper runs directly; the PowerShell script runs through powershell.exe.
+        val taskAction = if (native != null) {
+            "${'$'}arg = ${'$'}mode.ToLower() + ' --config \"${configFile.absolutePath}\"'\n" +
+                "                ${'$'}action = New-ScheduledTaskAction -Execute '${native.absolutePath}' -Argument ${'$'}arg"
+        } else {
+            "${'$'}arg = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"${helper.absolutePath}\" -Mode ' + ${'$'}mode + ' -ConfigPath \"${configFile.absolutePath}\"'\n" +
+                "                ${'$'}action = New-ScheduledTaskAction -Execute ${'$'}ps -Argument ${'$'}arg"
+        }
         val register = """
             ${'$'}ErrorActionPreference = 'Stop'
             ${'$'}ps = Join-Path ${'$'}env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
             function Reg(${'$'}name, ${'$'}mode) {
-                ${'$'}arg = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${helper.absolutePath}" -Mode ' + ${'$'}mode + ' -ConfigPath "${configFile.absolutePath}"'
-                ${'$'}action = New-ScheduledTaskAction -Execute ${'$'}ps -Argument ${'$'}arg
+                $taskAction
                 ${'$'}principal = New-ScheduledTaskPrincipal -UserId '$user' -LogonType Interactive -RunLevel Highest
                 ${'$'}settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
                 Register-ScheduledTask -TaskName ${'$'}name -TaskPath '\Ember\' -Action ${'$'}action -Principal ${'$'}principal -Settings ${'$'}settings -Force | Out-Null
