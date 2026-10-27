@@ -72,10 +72,26 @@ val fetchTunnelBinaries = tasks.register("fetchTunnelBinaries") {
     }
 }
 
+// The native tunnel helper (Rust, ../helper) replaces the slow PowerShell helper. If cargo is not installed the
+// build continues and the app falls back to the PowerShell helper.
+val buildNativeHelper = tasks.register<Exec>("buildNativeHelper") {
+    workingDir = file("../helper")
+    commandLine("cargo", "build", "--release")
+    onlyIf {
+        runCatching { ProcessBuilder("cargo", "--version").redirectErrorStream(true).start().waitFor() == 0 }.getOrDefault(false)
+    }
+    doLast {
+        copy {
+            from(file("../helper/target/release/ember-helper.exe"))
+            into(layout.projectDirectory.dir("appResources/windows-x64"))
+        }
+    }
+}
+
 val isWindowsHost = System.getProperty("os.name").startsWith("Windows")
 if (isWindowsHost) {
     tasks.matching { it.name == "run" || it.name.startsWith("package") || it.name == "createDistributable" || it.name == "prepareAppResources" }
-        .configureEach { dependsOn(fetchTunnelBinaries) }
+        .configureEach { dependsOn(fetchTunnelBinaries, buildNativeHelper) }
 }
 
 compose.desktop {

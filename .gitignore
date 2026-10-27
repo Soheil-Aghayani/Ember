@@ -17,3 +17,6 @@ android/src/main/jni/
 
 desktop/appResources/windows-x64/tunnel/
 desktop/build/
+
+desktop/appResources/windows-x64/ember-helper.exe
+helper/target/

@@ -58,9 +58,20 @@ Filename: "{app}\Ember.exe"; Description: "Start Ember"; Flags: nowait postinsta
 
 [UninstallRun]
 ; Remove any route or firewall rule Ember left behind (harmless when there is nothing to remove).
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\app\resources\ember-tunnel.ps1"" -Mode Restore -ConfigPath ""{userappdata}\Ember\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberNetwork"
+Filename: "{app}\app\resources\ember-helper.exe"; Parameters: "restore --config ""{userappdata}\Ember\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberNative"; Check: NativeHelperExists
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\app\resources\ember-tunnel.ps1"" -Mode Restore -ConfigPath ""{userappdata}\Ember\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberScript"; Check: ScriptHelperOnly
 
 [Code]
+function NativeHelperExists: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{app}\app\resources\ember-helper.exe'));
+end;
+
+function ScriptHelperOnly: Boolean;
+begin
+  Result := not NativeHelperExists;
+end;
+
 // An earlier Ember was installed with the MSI installer: remove it first so the two cannot fight over the same folder.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
