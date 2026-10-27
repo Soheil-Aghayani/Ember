@@ -219,10 +219,14 @@ function Set-KillSwitch {
     Write-Log ('kill switch rule set on: ' + ($aliases -join ', ') + ' (' + $blockRanges.Count + ' blocked ranges)')
 }
 
-# Undo anything an earlier run left behind (stale routes, firewall rules, a tunnel process).
-Invoke-Cleanup
-foreach ($ip in $edgeIps) {
-    Remove-NetRoute -DestinationPrefix ("$ip/32") -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+# Undo anything an earlier run left behind (stale routes, firewall rules, a tunnel process). A clean disconnect leaves
+# nothing behind, so the (slow) cleanup only runs when there is something to clean.
+if ((Test-Path -LiteralPath $routesFile) -or (Get-Process -Name 'hev-socks5-tunnel' -ErrorAction SilentlyContinue)) {
+    Write-Log 'cleaning up leftovers of an earlier run'
+    Invoke-Cleanup
+    foreach ($ip in $edgeIps) {
+        Remove-NetRoute -DestinationPrefix ("$ip/32") -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue
+    }
 }
 Remove-Item -LiteralPath $stopFile -ErrorAction SilentlyContinue
 Write-State 'STARTING'

@@ -60,12 +60,15 @@ internal fun SpeedTestControl(engine: EmberEngine) {
             failure?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
-            TextButton(onClick = {
-                testing = true
-                result = null
-                failure = null
-                attempt++
-            }) {
+            TextButton(
+                onClick = {
+                    testing = true
+                    result = null
+                    failure = null
+                    attempt++
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+            ) {
                 Text(when {
                     failure != null -> strings.tryAgain
                     result != null -> strings.testAgain
