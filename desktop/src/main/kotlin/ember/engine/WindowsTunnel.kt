@@ -2,7 +2,6 @@ package ember.engine
 
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
-import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.Shell32
 import com.sun.jna.platform.win32.WinUser
 import kotlinx.coroutines.Dispatchers
@@ -236,8 +235,8 @@ class WindowsTunnel(dataDir: File) {
     /** Starts the native helper with the Windows administrator prompt (ShellExecute "runas"); returns when the prompt is answered. */
     private fun elevateNative(helper: File, mode: String, config: File): Launch {
         val parameters = "${mode.lowercase()} --config \"${config.absolutePath}\""
-        val result = Shell32.INSTANCE.ShellExecute(null, "runas", helper.absolutePath, parameters, helper.parent, WinUser.SW_HIDE)
-        val code = Pointer.nativeValue(result?.pointer)
+        // ShellExecute returns a value above 32 on success and an error code (5 = access denied / prompt declined) otherwise.
+        val code = Shell32.INSTANCE.ShellExecute(null, "runas", helper.absolutePath, parameters, helper.parent, WinUser.SW_HIDE).toLong()
         return when {
             code > 32 -> Launch(null, null)
             code == 5L || code == 1223L -> Launch(null, "Administrator access was not allowed, so the tunnel could not start.")

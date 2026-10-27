@@ -525,7 +525,7 @@ private fun HomePage(
             )
         }
         traffic?.let { TrafficCaption(it) }
-        if (connected) SpeedTestControl(engine)
+        if (state == ConnectionState.CONNECTED) SpeedTestControl(engine)
         Spacer(Modifier.height(32.dp))
 
         val connected = state == ConnectionState.CONNECTED
