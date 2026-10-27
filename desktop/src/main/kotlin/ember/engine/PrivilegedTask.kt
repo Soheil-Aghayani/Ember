@@ -37,6 +37,19 @@ class PrivilegedTask(dataDir: File) {
 
     fun isInstalled(): Boolean = taskExists(UP_TASK) && taskExists(RESTORE_TASK)
 
+    /**
+     * True when the registered tasks start the helper this installation ships. Tasks made by an older Ember point at the
+     * PowerShell script; after an update to the native helper they must be registered again (one administrator prompt).
+     */
+    fun isCurrent(): Boolean {
+        if (nativeHelper == null) return true
+        return runCatching {
+            val p = schtasks("/query", "/tn", UP_TASK, "/xml")
+            val xml = p.inputStream.readBytes().toString(Charsets.UTF_8).replace("\u0000", "")
+            p.waitFor(15, TimeUnit.SECONDS) && xml.contains("ember-helper.exe", ignoreCase = true)
+        }.getOrDefault(false)
+    }
+
     /** Starts the helper through its scheduled task (no prompt). */
     fun run(mode: String): Process = schtasks("/run", "/tn", if (mode == "Up") UP_TASK else RESTORE_TASK)
 
@@ -70,7 +83,7 @@ class PrivilegedTask(dataDir: File) {
         elevatedPowerShell(register)
         val deadline = System.currentTimeMillis() + INSTALL_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
-            if (isInstalled()) return
+            if (isInstalled() && isCurrent()) return
             delay(500)
         }
         error("The one-time setup did not finish. Was the administrator prompt declined?")

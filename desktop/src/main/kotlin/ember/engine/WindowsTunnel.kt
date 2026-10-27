@@ -131,7 +131,12 @@ class WindowsTunnel(dataDir: File) {
         logFile.delete()
         configFile.writeText(config.toString())
 
-        val noPrompt = privileged.isInstalled()
+        if (native && privileged.isInstalled() && !privileged.isCurrent()) {
+            // The one-time setup was made by an older Ember and still starts the slow PowerShell helper: register it again.
+            onProgress("Updating the one-time setup (one Windows prompt)…")
+            runCatching { privileged.install() }.onFailure { AppLogger.w(TAG, "could not update the one-time setup", it) }
+        }
+        val noPrompt = privileged.isInstalled() && privileged.isCurrent() && (native || nativeHelper == null)
         onProgress(
             if (noPrompt) "Starting the secure network adapter…"
             else "Waiting for you to allow administrator access in the Windows prompt…",
@@ -213,7 +218,7 @@ class WindowsTunnel(dataDir: File) {
         configFile.writeText(JSONObject().put("stateDir", stateDir.absolutePath).toString())
         stopFile.writeText("stop")
         statusFile.delete()
-        if (privileged.isInstalled()) {
+        if (privileged.isInstalled() && privileged.isCurrent()) {
             privileged.run("Restore")
         } else {
             val launch = elevate(helper, native != null, "Restore", configFile)
