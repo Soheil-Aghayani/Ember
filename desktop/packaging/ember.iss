@@ -27,7 +27,8 @@ DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=Ember-{#Version}
 SetupIconFile=ember.ico
-UninstallDisplayIcon={app}\Ember.exe
+UninstallDisplayIcon={app}\ember.ico
+ChangesAssociations=yes
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -48,10 +49,11 @@ Type: filesandordirs; Name: "{app}\runtime"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "ember.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Ember"; Filename: "{app}\Ember.exe"
-Name: "{autodesktop}\Ember"; Filename: "{app}\Ember.exe"; Tasks: desktopicon
+Name: "{group}\Ember"; Filename: "{app}\Ember.exe"; IconFilename: "{app}\ember.ico"
+Name: "{autodesktop}\Ember"; Filename: "{app}\Ember.exe"; IconFilename: "{app}\ember.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Ember.exe"; Description: "Start Ember"; Flags: nowait postinstall skipifsilent
