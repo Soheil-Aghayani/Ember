@@ -1,6 +1,13 @@
 package ember.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Animatable
@@ -344,11 +351,24 @@ private fun MainShell(
     Row(Modifier.fillMaxSize()) {
         Sidebar(page) { page = it }
         Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
-        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+        AnimatedContent(
+            targetState = page,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentAlignment = Alignment.TopCenter,
+            transitionSpec = {
+                // The new page rises or sinks in from the side of the sidebar item it came from, while the old one fades out.
+                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                (fadeIn(tween(240, delayMillis = 70)) +
+                    slideInVertically(tween(300, easing = FastOutSlowInEasing)) { direction * it / 20 } +
+                    scaleIn(tween(300, easing = FastOutSlowInEasing), initialScale = 0.97f)) togetherWith
+                    fadeOut(tween(110))
+            },
+            label = "page",
+        ) { current ->
             Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(32.dp),
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
-                when (page) {
+                when (current) {
                     Page.Home -> HomePage(engine, selected, countries, countriesLoading, countriesFailure,
                         pickLocation, update, onDismissUpdate) { page = Page.Locations }
                     Page.Locations -> LocationsPage(countries, countriesLoading, countriesFailure,
@@ -377,21 +397,29 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
             val active = p == selected
             val interaction = remember { MutableInteractionSource() }
             val hovered by interaction.collectIsHoveredAsState()
+            // The highlight fades from the old item to the new one instead of jumping.
+            val background by animateColorAsState(
+                when {
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    hovered -> MaterialTheme.colorScheme.surfaceVariant
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                tween(220),
+            )
             Box(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(when {
-                        active -> MaterialTheme.colorScheme.primaryContainer
-                        hovered -> MaterialTheme.colorScheme.surfaceVariant
-                        else -> MaterialTheme.colorScheme.surface
-                    })
+                    .background(background)
                     .hoverable(interaction)
                     .pointerHoverIcon(PointerIcon.Hand)
                     .clickable(role = Role.Button) { onSelect(p) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
-                val contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                val contentColor by animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    tween(220),
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EmberIcon(p.icon, 20.dp, contentColor)
                     Spacer(Modifier.width(12.dp))
