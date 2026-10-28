@@ -115,6 +115,8 @@ class WindowsTunnel(dataDir: File) {
             } catch (failure: HelperFailure) {
                 if (!failure.retryWithFallback || ps == null) throw IllegalStateException(failure.message)
                 AppLogger.w(TAG, "the native helper failed (${failure.message}); trying the PowerShell helper")
+                // The fallback helper rewrites helper.log; keep what the native one wrote.
+                runCatching { File(stateDir, "helper.log").copyTo(File(stateDir, "helper-native.log"), overwrite = true) }
                 onProgress("Trying the fallback helper…")
             }
         }

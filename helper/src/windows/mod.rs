@@ -235,15 +235,21 @@ impl Session<'_> {
             self.config.kill_switch
         ));
         let start = Instant::now();
-        let adapters = net::adapters()?;
-        let default = net::physical_default(&self.config.adapter_name, &adapters)?
-            .ok_or("no default IPv4 route found")?;
+        let adapters = step("listing adapters", net::adapters())?;
+        let default = step(
+            "finding the default route",
+            net::physical_default(&self.config.adapter_name, &adapters),
+        )?
+        .ok_or("no default IPv4 route found")?;
         self.state.elapsed("physical default found", start);
-        self.kill_switch(&adapters)?;
-        self.bypass(&default)?;
+        step("kill switch", self.kill_switch(&adapters))?;
+        step("bypass routes", self.bypass(&default))?;
 
         let start = Instant::now();
-        *child = Some(process::spawn(hev, &self.config.hev_config_path)?);
+        *child = Some(step(
+            "starting the tunnel process",
+            process::spawn(hev, &self.config.hev_config_path),
+        )?);
         let proc = child.as_mut().ok_or("tunnel process was not started")?;
         let adapter = loop {
             if proc.try_wait().map_err(|e| e.to_string())?.is_some() {
@@ -265,21 +271,23 @@ impl Session<'_> {
         };
         self.state.elapsed("tunnel adapter appeared", start);
         let start = Instant::now();
-        net::configure(
-            &adapter,
-            self.config.tun_address,
-            self.config.mapdns_address,
+        step(
+            "configuring the tunnel adapter",
+            net::configure(&adapter, self.config.tun_address, self.config.mapdns_address),
         )?;
         for text in ["0.0.0.0/1", "128.0.0.0/1"] {
-            self.add_route(
-                Cidr::parse(text, 0, false).unwrap(),
-                adapter.index,
-                std::net::Ipv4Addr::UNSPECIFIED,
-                "tun",
+            step(
+                "adding the tunnel routes",
+                self.add_route(
+                    Cidr::parse(text, 0, false).unwrap(),
+                    adapter.index,
+                    std::net::Ipv4Addr::UNSPECIFIED,
+                    "tun",
+                ),
             )?;
         }
         self.state.elapsed("tunnel interface configured", start);
-        self.guards()?;
+        step("firewall guards", self.guards())?;
         self.state.status("UP")?;
         self.state.elapsed("tunnel is up", total);
         self.watch(proc)
@@ -485,4 +493,9 @@ pub fn entry() -> i32 {
             1
         }
     }
+}
+
+/// Prefixes an error with the start-up step it came from, so a failure says where it happened.
+fn step<T>(name: &str, result: Result<T>) -> Result<T> {
+    result.map_err(|e| format!("{name}: {e}"))
 }
