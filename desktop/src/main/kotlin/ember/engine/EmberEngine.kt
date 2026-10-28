@@ -68,6 +68,21 @@ class EmberEngine(private val dataDir: File) {
     private val _connectedAtMs = MutableStateFlow<Long?>(null)
     val connectedAtMs: StateFlow<Long?> = _connectedAtMs
 
+    /** The network the computer is on right now (see [NetworkIdentity]), refreshed every few seconds. */
+    private val _network = MutableStateFlow<String?>(null)
+    val currentNetwork: StateFlow<String?> = _network
+
+    /** Marks the network the computer is on as trusted, so [DesktopSettings.autoConnectUntrusted] leaves it alone. */
+    fun trustCurrentNetwork(): Boolean {
+        val id = _network.value ?: NetworkIdentity.current() ?: return false
+        settings.trustedNetworks = (settings.trustedNetworks + id).distinct()
+        return true
+    }
+
+    fun untrustNetwork(id: String) {
+        settings.trustedNetworks = settings.trustedNetworks.filter { it != id }
+    }
+
     /** Non-null while the kill switch is holding traffic after a crash or a dead tunnel. */
     private val _blockedNotice = MutableStateFlow<String?>(null)
     val blockedNotice: StateFlow<String?> = _blockedNotice
@@ -108,6 +123,7 @@ class EmberEngine(private val dataDir: File) {
         AppLogger.sink = FileLogSink(File(dataDir, "ember.log"))
         NettyLoggingBridge.install()
         UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
+        startNetworkTrustWatch()
         if (tunnel.isBlocked()) {
             _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
         } else if (tunnel.isStale()) {
@@ -315,6 +331,31 @@ class EmberEngine(private val dataDir: File) {
      * Reconnects the tunnel to Mozilla after the computer wakes from sleep or the physical network changes
      * (Wi-Fi switched, cable plugged in). In whole-device mode the helper re-points its own routes.
      */
+    /**
+     * Watches which network the computer is on. When it joins a network that is not trusted (and the user turned on
+     * "connect on untrusted networks"), Ember connects once; it never reconnects on a network the user left on purpose.
+     */
+    private fun startNetworkTrustWatch() {
+        scope.launch {
+            var previous: String? = null
+            while (true) {
+                val id = NetworkIdentity.current()
+                _network.value = id
+                val joinedNew = id != null && id != previous
+                previous = id
+                if (joinedNew && settings.autoConnectUntrusted &&
+                    id !in settings.trustedNetworks &&
+                    _state.value == ConnectionState.DISCONNECTED &&
+                    tokenStore.loadAuth() != null
+                ) {
+                    AppLogger.i(TAG, "joined an untrusted network (${NetworkIdentity.displayName(id!!)}); connecting")
+                    connect(null)
+                }
+                delay(5_000)
+            }
+        }
+    }
+
     private fun startNetworkWatch() {
         netWatchJob?.cancel()
         netWatchJob = scope.launch {

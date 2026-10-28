@@ -78,6 +78,16 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("excludedAddresses", "").split(';').map { it.trim() }.filter { it.isNotEmpty() }
         set(value) = put("excludedAddresses", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains(';') }.distinct().joinToString(";"))
 
+    /** Connect by itself when the computer joins a network that is not in [trustedNetworks]. */
+    var autoConnectUntrusted: Boolean
+        get() = props.getProperty("autoConnectUntrusted", "false").toBoolean()
+        set(value) = put("autoConnectUntrusted", value.toString())
+
+    /** Network ids (see [NetworkIdentity]) where Ember does not connect by itself, for example the home Wi-Fi. */
+    var trustedNetworks: List<String>
+        get() = props.getProperty("trustedNetworks", "").split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        set(value) = put("trustedNetworks", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains('\n') }.distinct().joinToString("\n"))
+
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
         set(value) = put("adminNoticeSeen", value.toString())
