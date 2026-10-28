@@ -20,3 +20,11 @@ A standard (OV) code-signing certificate from a certificate authority, or Micros
 
 ## What signing does not do
 It does not make Windows trust the app instantly. SmartScreen still learns from downloads, and a signed app from a new publisher can show a warning for a while.
+
+## Building locally (current setup)
+Ember is built on the developer's PC, not on GitHub, so the SignPath steps in `.github/workflows/android-ci.yml` are not used. To sign a local build you need a code-signing certificate (a purchased OV or EV certificate, or a Microsoft Azure Trusted Signing account). Then:
+1. Install the Windows SDK's `signtool.exe` (or use the Azure signing client).
+2. Register it in Inno Setup (Tools > Configure Sign Tools) under a name such as `ember`, and add `SignTool=ember` and `SignedUninstaller=yes` to the `[Setup]` section of `desktop/packaging/ember.iss`.
+3. Rebuild the installer with `ISCC`.
+
+A self-signed certificate does not help: Windows SmartScreen only trusts certificates issued by a recognised authority.

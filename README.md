@@ -48,10 +48,10 @@ Ember signs in with your Firefox account, asks Mozilla's Guardian service for a 
 
 ## Download
 
-Builds are produced by GitHub Actions. See the [Releases](https://github.com/Soheil-Aghayani/Ember/releases) page for installers, or open a run of the **Android CI** workflow in the Actions tab and download its artifacts:
+Ember is built on the developer's own computer; installers are kept in a local releases folder (see "Build" below).
 
 - **Windows:** `Ember-<version>.exe` (Windows 10/11, 64-bit). Windows may warn about an unknown publisher because the installer is not signed yet: choose **More info**, then **Run anyway**.
-- **Android:** `ember-debug-apk` (Android 8.0 or newer).
+- **Android:** a debug APK built with the Android SDK (Android 8.0 or newer).
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
 
@@ -82,20 +82,23 @@ Design: warm neutrals with Firefox orange and violet accents, Inter typeface, So
 
 ## Build
 
-There is no need to install anything locally: the **Android CI** workflow builds everything (Android APK, Windows installer). Start it from the Actions tab (**Run workflow**), or:
+Windows (on a Windows PC): JDK 17 or newer, Gradle 8.10, Rust (`cargo`) and [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
 ```bash
-gh workflow run android-ci.yml --ref main
+# 1. the app folder (also builds the native helper in helper/ and fetches the checksum-verified tunnel engine)
+EMBER_VERSION=1.0.40 gradle -p desktop createDistributable
+
+# 2. the installer
+ISCC.exe /DVersion=1.0.40 /DSourceDir=desktop/build/compose/binaries/main/app/Ember /DOutputDir=desktop/build/compose/binaries/main/exe desktop/packaging/ember.iss
 ```
 
-To build on your own machine you need JDK 17, Gradle 8.10, Android SDK 35 with NDK `26.1.10909125` (Android) and `git` on `PATH`:
+Android needs Android SDK 35 with NDK `26.1.10909125`:
 
 ```bash
-gradle :android:assembleDebug      # Android
-gradle -p desktop packageExe       # Windows installer (run on Windows)
+gradle :android:assembleDebug
 ```
 
-Windows installer versions are `1.0.<CI run number>`.
+The helper's unit tests run with `cargo test --manifest-path helper/Cargo.toml`.
 
 <br>
 
