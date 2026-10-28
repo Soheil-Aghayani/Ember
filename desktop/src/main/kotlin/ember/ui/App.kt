@@ -840,6 +840,11 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
         }
     }
     Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(16.dp))
+    Text(strings.trustedNetworksTitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+    TrustedNetworksSettings(engine)
+    Spacer(Modifier.height(16.dp))
     SkipVpnSettings(engine, whole && available)
     Spacer(Modifier.height(16.dp))
     AdvancedSettings(engine)

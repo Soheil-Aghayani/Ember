@@ -103,6 +103,7 @@ compose.desktop {
             packageName = "Ember"
             packageVersion = System.getenv("EMBER_VERSION") ?: "1.0.0"
             windows {
+                iconFile.set(project.file("packaging/ember.ico"))
                 menuGroup = "Ember"
                 shortcut = true
                 dirChooser = true
