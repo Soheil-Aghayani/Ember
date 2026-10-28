@@ -13,8 +13,8 @@ Ember is a free, open-source VPN client (MIT) that signs in with a Firefox accou
 
 ## Rules
 
-1. **Never push to `main`.** Work on a branch named `agent/<short-task>` and open a pull request. A human or Claude reviews and merges.
-2. **There is no local build.** Gradle and the Android SDK are not installed. CI is the check: run the `Android CI` workflow on your branch (`gh workflow run android-ci.yml --ref <branch>`) and make sure the `build`, `desktop` and `desktop-windows` jobs pass.
+1. **Work locally only.** Do not push to GitHub, run GitHub Actions or publish releases; the project is built and kept on this computer. Work on a branch named `agent/<short-task>` (in your own git worktree if another session is editing the main folder) and commit locally. Do not commit to `main`; a human or Claude reviews and merges.
+2. **Build and check locally.** Gradle 8.10 is in `D:\Programming\tools\gradle\gradle-8.10.2\bin` (set `JAVA_HOME` to `C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot` and add `C:\Users\Soheil\.cargo\bin` to `PATH`). `gradle -p desktop createDistributable` builds the Windows app folder (it also builds `helper/` and `desktop-rust/` with cargo); `D:\Programming\tools\InnoSetup\ISCC.exe` makes the installer from `desktop/packaging/ember.iss`. Run `cargo test` in `helper/`. The Android app cannot be built here (no Android SDK). Never run the installer or the network helper yourself; the owner tests them.
 3. **Do not change these without being asked:** `desktop/appResources/windows-x64/ember-tunnel.ps1` (it changes routes and firewall rules on a real machine), anything under `core/src/main/kotlin/com/soheil/ember/vpn/`, `core/.../data/FxaAuthRepository.kt`, the signing/CI release steps, and `LICENSE`.
 4. **Never run network-altering scripts** (`ember-tunnel.ps1`, `route`, `netsh`, firewall changes) on the developer's machine.
 5. **No secrets.** Do not commit tokens, passwords, keystores or personal data. Do not print credentials in logs.
@@ -28,7 +28,7 @@ Source of truth: `design/tokens.json` (colours, Inter type scale from Apple's HI
 
 ## Versions and releases
 
-Desktop installer versions are `1.0.<CI run number>` (set from CI). Manual CI runs on a branch build the Windows installer and attach it to the draft release `desktop-test`. The Android debug APK is the `ember-debug-apk` artifact.
+Desktop installer versions are set with the `EMBER_VERSION` environment variable (`1.0.<n>`, counting up from the last installer in `C:\Users\Soheil\Downloads\Programs`). Finished installers are copied to that folder, and release notes plus checksums live in `D:\Programming\Ember-releases`.
 
 ## Good tasks for an agent
 
