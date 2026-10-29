@@ -99,12 +99,6 @@ object EmberDesktopMetrics {
     val windowControlInset: Dp = 8.dp
     val brandMark: Dp = 20.dp
     val brandGap: Dp = 8.dp
-    val tabBarHeight: Dp = 58.dp
-    val tabGroupMaxWidth: Dp = 540.dp
-    val tabHeight: Dp = 42.dp
-    val tabGroupInset: Dp = 4.dp
-    val tabGap: Dp = 4.dp
-    val tabSegmentRadius: Dp = 8.dp
     val countryPickerWidth: Dp = 360.dp
     val countryPickerMaxHeight: Dp = 420.dp
     val countryListMaxHeight: Dp = 300.dp

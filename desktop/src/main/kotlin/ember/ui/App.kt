@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -376,12 +377,12 @@ private fun MainShell(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        MacTabBar(page) { page = it }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Row(Modifier.fillMaxSize()) {
+        Sidebar(page) { page = it }
+        Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
         AnimatedContent(
             targetState = page,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             contentAlignment = Alignment.TopCenter,
             transitionSpec = {
                 // The new page rises or sinks in from the side of the sidebar item it came from, while the old one fades out.
@@ -394,7 +395,7 @@ private fun MainShell(
             label = "page",
         ) { current ->
             Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
                 when (current) {
                     Page.Home -> HomePage(engine, selected, countries, countriesLoading, countriesFailure,
@@ -410,73 +411,47 @@ private fun MainShell(
 }
 
 @Composable
-private fun MacTabBar(selected: Page, onSelect: (Page) -> Unit) {
+private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
     val strings = LocalStrings.current
-    Row(
-        Modifier.fillMaxWidth().height(EmberDesktopMetrics.tabBarHeight),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        Modifier.width(220.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(
-            Modifier.widthIn(max = EmberDesktopMetrics.tabGroupMaxWidth).fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(EmberDesktopMetrics.tabGroupInset)
-                .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(EmberDesktopMetrics.tabGap),
-        ) {
-            for (p in Page.entries) {
-                val active = p == selected
-                val interaction = remember { MutableInteractionSource() }
-                val hovered by interaction.collectIsHoveredAsState()
-                val background by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.surface
-                    else if (hovered) MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                    tween(150),
-                )
+        Row(Modifier.padding(start = 8.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Image(painterResource("ember_logo.png"), contentDescription = null, modifier = Modifier.size(36.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Ember", style = MaterialTheme.typography.headlineSmall)
+        }
+        for (p in Page.entries) {
+            val active = p == selected
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
+            val background by animateColorAsState(
+                when {
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    hovered -> MaterialTheme.colorScheme.surfaceVariant
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                tween(220),
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(background)
+                    .hoverable(interaction)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(role = Role.Button) { onSelect(p) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
                 val contentColor by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    tween(150),
+                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    tween(220),
                 )
-                Box(
-                    Modifier.weight(1f).height(EmberDesktopMetrics.tabHeight)
-                        .clip(RoundedCornerShape(EmberDesktopMetrics.tabSegmentRadius))
-                        .background(background)
-                        .then(
-                            if (active) Modifier.border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(EmberDesktopMetrics.tabSegmentRadius),
-                            ) else Modifier,
-                        )
-                        .hoverable(interaction)
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .selectable(
-                            selected = active,
-                            interactionSource = interaction,
-                            indication = null,
-                            role = Role.Tab,
-                        ) { onSelect(p) }
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        EmberIcon(p.icon, 18.dp, contentColor)
-                        Spacer(Modifier.width(7.dp))
-                        Text(
-                            when (p) {
-                                Page.Home -> strings.home
-                                Page.Locations -> strings.locations
-                                Page.Settings -> strings.settings
-                                Page.Logs -> strings.logs
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = contentColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EmberIcon(p.icon, 20.dp, contentColor)
+                    Spacer(Modifier.width(12.dp))
+                    Text(when (p) { Page.Home -> strings.home; Page.Locations -> strings.locations; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
                 }
             }
         }
