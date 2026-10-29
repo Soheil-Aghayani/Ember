@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -21,9 +22,32 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.soheil.ember.ui.theme.EmberTvDimensions
 
 private val GroupShape = RoundedCornerShape(16.dp)
+
+@Composable
+fun Modifier.emberTvFocusRing(
+    enabled: Boolean,
+    shape: Shape = RoundedCornerShape(16.dp),
+): Modifier {
+    if (!enabled) return this
+    var isFocused by remember { mutableStateOf(false) }
+    return onFocusChanged { isFocused = it.isFocused }
+        .border(
+            width = EmberTvDimensions.focusRing,
+            color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+            shape = shape,
+        )
+}
 
 /** Inset grouped list section (Apple HIG style): small caption above a rounded card of rows. */
 @Composable
@@ -62,13 +86,25 @@ fun EmberDivider() {
 fun EmberTopBar(
     title: String,
     onBack: () -> Unit,
+    isTelevision: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
         title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
         navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_solar_alt_arrow_left), contentDescription = "Back")
+            if (isTelevision) {
+                EmberTvActionButton(
+                    onClick = onBack,
+                    modifier = Modifier.widthIn(min = 120.dp).padding(start = 12.dp),
+                    minHeight = 48.dp,
+                ) {
+                    Icon(painterResource(R.drawable.ic_solar_alt_arrow_left), contentDescription = null)
+                    Text("Back")
+                }
+            } else {
+                IconButton(onClick = onBack) {
+                    Icon(painterResource(R.drawable.ic_solar_alt_arrow_left), contentDescription = "Back")
+                }
             }
         },
         actions = actions,

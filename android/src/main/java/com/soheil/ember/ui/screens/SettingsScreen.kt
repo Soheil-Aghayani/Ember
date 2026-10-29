@@ -5,6 +5,7 @@ import androidx.compose.ui.res.painterResource
 import com.soheil.ember.ui.components.EmberDivider
 import com.soheil.ember.ui.components.EmberGroup
 import com.soheil.ember.ui.components.EmberTopBar
+import com.soheil.ember.ui.components.emberTvFocusRing
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -65,6 +66,7 @@ fun SettingsScreen(
     onOpenLogs: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
+    isTelevision: Boolean = false,
 ) {
     val context = LocalContext.current
     var exitCheckEnabled by remember { mutableStateOf(settingsStore.exitCheckEnabled) }
@@ -247,7 +249,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = { EmberTopBar("Settings", onBack) },
+        topBar = { EmberTopBar("Settings", onBack, isTelevision = isTelevision) },
     ) { padding ->
         Column(
             Modifier
@@ -274,7 +276,7 @@ fun SettingsScreen(
                     headlineContent = { Text("Tunnel MTU") },
                     supportingContent = { Text(mtu.toString()) },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showMtuDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showMtuDialog = true },
                 )
             }
             EmberGroup("DNS") {
@@ -289,7 +291,7 @@ fun SettingsScreen(
                         Text(subtitle)
                     },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showDnsProviderDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showDnsProviderDialog = true },
                 )
                 EmberDivider()
                 ListItem(
@@ -303,7 +305,7 @@ fun SettingsScreen(
                         Text(subtitle)
                     },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showBootstrapDnsDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showBootstrapDnsDialog = true },
                 )
             }
             EmberGroup("Local proxy") {
@@ -325,14 +327,14 @@ fun SettingsScreen(
                     headlineContent = { Text("Local address") },
                     supportingContent = { Text(socksBindAddress) },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showSocksBindDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showSocksBindDialog = true },
                 )
                 EmberDivider()
                 ListItem(
                     headlineContent = { Text("SOCKS5 port") },
                     supportingContent = { Text(socksPort.toString()) },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showSocksPortDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showSocksPortDialog = true },
                 )
                 EmberDivider()
                 ListItem(
@@ -354,7 +356,7 @@ fun SettingsScreen(
                         headlineContent = { Text("HTTP port") },
                         supportingContent = { Text(httpProxyPort.toString()) },
                         trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                        modifier = Modifier.clickable { showHttpPortDialog = true },
+                        modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showHttpPortDialog = true },
                     )
             }
             }
@@ -371,7 +373,7 @@ fun SettingsScreen(
                         )
                     },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showSplitTunnelDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showSplitTunnelDialog = true },
                 )
             }
             EmberGroup("Advanced") {
@@ -379,14 +381,14 @@ fun SettingsScreen(
                     headlineContent = { Text("Custom edge address") },
                     supportingContent = { Text(customEdgeAddress.ifBlank { "Not set" }) },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showEdgeAddressDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showEdgeAddressDialog = true },
                 )
                 EmberDivider()
                 ListItem(
                     headlineContent = { Text("TLS fragmentation") },
                     supportingContent = { Text(tlsSplitMode.label) },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable { showTlsSplitDialog = true },
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showTlsSplitDialog = true },
                 )
                 EmberDivider()
                 ListItem(
@@ -408,7 +410,7 @@ fun SettingsScreen(
                         headlineContent = { Text("Proxy type") },
                         supportingContent = { Text(upstreamProxyType.name) },
                         trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                        modifier = Modifier.clickable { showUpstreamProxyTypeDialog = true },
+                        modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showUpstreamProxyTypeDialog = true },
                     )
                     EmberDivider()
                     ListItem(
@@ -423,7 +425,7 @@ fun SettingsScreen(
                             )
                         },
                         trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                        modifier = Modifier.clickable { showUpstreamProxyAddressDialog = true },
+                        modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showUpstreamProxyAddressDialog = true },
                     )
                     EmberDivider()
                     ListItem(
@@ -432,7 +434,7 @@ fun SettingsScreen(
                             Text(if (upstreamProxyUsername.isBlank()) "None" else upstreamProxyUsername)
                         },
                         trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                        modifier = Modifier.clickable { showUpstreamProxyCredentialsDialog = true },
+                        modifier = Modifier.emberTvFocusRing(isTelevision).clickable { showUpstreamProxyCredentialsDialog = true },
                     )
             }
             }
@@ -441,7 +443,7 @@ fun SettingsScreen(
                     headlineContent = { Text("View logs") },
                     supportingContent = { Text("Recent connection activity") },
                     trailingContent = { Icon(painterResource(R.drawable.ic_solar_alt_arrow_right), contentDescription = null) },
-                    modifier = Modifier.clickable(onClick = onOpenLogs),
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable(onClick = onOpenLogs),
                 )
                 EmberDivider()
                 ListItem(
@@ -453,7 +455,7 @@ fun SettingsScreen(
                     headlineContent = { Text("Source code") },
                     supportingContent = { Text(GITHUB_URL) },
                     leadingContent = { Icon(painterResource(R.drawable.ic_solar_code), contentDescription = null) },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.emberTvFocusRing(isTelevision).clickable {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL)))
                     },
                 )

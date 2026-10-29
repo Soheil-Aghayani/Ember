@@ -63,7 +63,7 @@ private suspend fun writeLogFile(context: Context): File = withContext(Dispatche
 }
 
 @Composable
-fun LogsScreen(onBack: () -> Unit) {
+fun LogsScreen(onBack: () -> Unit, isTelevision: Boolean = false) {
     val entries by AppLogger.entries.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -82,6 +82,7 @@ fun LogsScreen(onBack: () -> Unit) {
             EmberTopBar(
                 title = if (visible.size == entries.size) "Logs (${entries.size})" else "Logs (${visible.size}/${entries.size})",
                 onBack = onBack,
+                isTelevision = isTelevision,
                 actions = {
                     IconButton(onClick = {
                         if (entries.isEmpty()) {

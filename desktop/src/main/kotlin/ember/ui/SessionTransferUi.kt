@@ -151,6 +151,6 @@ internal fun CodeSignIn(auth: FxaAuthRepository, onSignedIn: () -> Unit, onBack:
     TextButton(onClick = onBack) { Text(strings.transferBack) }
     error?.let {
         Spacer(Modifier.height(8.dp))
-        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }

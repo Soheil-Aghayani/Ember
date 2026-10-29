@@ -1,6 +1,7 @@
 package com.soheil.ember.ui.screens
 
 import com.soheil.ember.ui.components.FlagIcon
+import com.soheil.ember.ui.components.EmberInlineErrorMessage
 import com.soheil.ember.R
 import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.animateColorAsState
@@ -84,6 +85,8 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onOpenServers: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenLogs: () -> Unit,
+    isTelevision: Boolean = false,
 ) {
     val state by EmberVpnService.state.collectAsState()
     val lastError by EmberVpnService.lastError.collectAsState()
@@ -173,6 +176,59 @@ fun HomeScreen(
                     }
             }
         }
+    }
+
+    val isConnected = state == ConnectionState.CONNECTED
+    val ipDisplay = if (isConnected) {
+        vpnEdgeIp?.let {
+            if (it.countryCode.isNotEmpty()) "${it.ip} • ${it.countryCode}" else it.ip
+        } ?: "Checking…"
+    } else {
+        realIp?.let {
+            if (it.countryCode.isNotEmpty()) "${it.ip} • ${it.countryCode}" else it.ip
+        } ?: app.settingsStore.cachedRealIp?.let { cachedIp ->
+            val cachedCountry = app.settingsStore.cachedRealCountry
+            if (!cachedCountry.isNullOrEmpty()) "$cachedIp • $cachedCountry" else cachedIp
+        } ?: "Checking…"
+    }
+    val remaining = quotaRemaining
+    val max = quotaMax
+    val quotaText = when {
+        isUnlimited -> "Unlimited"
+        remaining != null && max != null -> "${formatBytes(remaining)} / ${formatBytes(max)}"
+        remaining != null -> formatBytes(remaining)
+        max != null -> "Limited to ${formatBytes(max)}"
+        else -> "—"
+    }
+    val quotaFraction = when {
+        isUnlimited -> 1f
+        max != null && max > 0L && remaining != null ->
+            (remaining.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+        else -> 0f
+    }
+
+    if (isTelevision) {
+        TvHomeScreen(
+            state = state,
+            lastError = lastError,
+            sessionBytes = liveStats.sessionBytes,
+            elapsedSeconds = elapsedSeconds,
+            pingLatency = pingLatency,
+            ipDisplay = ipDisplay,
+            selectedProxy = selectedProxy,
+            quotaText = quotaText,
+            quotaFraction = quotaFraction,
+            ringColor = ringColor,
+            scale = scale,
+            statusColors = statusColors,
+            themeController = themeController,
+            onRequestConnect = onRequestConnect,
+            onDisconnect = onDisconnect,
+            onOpenServers = onOpenServers,
+            onOpenSettings = onOpenSettings,
+            onOpenLogs = onOpenLogs,
+        )
+        return
     }
 
     Scaffold(
@@ -301,14 +357,10 @@ fun HomeScreen(
                 val error = lastError
                 if (error != null && state != ConnectionState.CONNECTING) {
                     Spacer(Modifier.height(8.dp))
-                    Text(
+                    EmberInlineErrorMessage(
                         text = error,
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
                 }
 
@@ -348,20 +400,6 @@ fun HomeScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        val isConnected = state == ConnectionState.CONNECTED
-                        val ipDisplay = if (isConnected) {
-                            vpnEdgeIp?.let {
-                                if (it.countryCode.isNotEmpty()) "${it.ip} • ${it.countryCode}" else it.ip
-                            } ?: "Checking\u2026"
-                        } else {
-                            realIp?.let {
-                                if (it.countryCode.isNotEmpty()) "${it.ip} • ${it.countryCode}" else it.ip
-                            } ?: app.settingsStore.cachedRealIp?.let { cachedIp ->
-                                val cachedCountry = app.settingsStore.cachedRealCountry
-                                if (!cachedCountry.isNullOrEmpty()) "$cachedIp • $cachedCountry" else cachedIp
-                            } ?: "Checking\u2026"
-                        }
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -407,10 +445,6 @@ fun HomeScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        val isConnected = state == ConnectionState.CONNECTED
-                        val remaining = quotaRemaining
-                        val max = quotaMax
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -488,13 +522,6 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             Spacer(Modifier.width(8.dp))
-                            val quotaText = when {
-                                isUnlimited -> "Unlimited"
-                                remaining != null && max != null -> "${formatBytes(remaining)} / ${formatBytes(max)}"
-                                remaining != null -> formatBytes(remaining)
-                                max != null -> "Limited to ${formatBytes(max)}"
-                                else -> "\u2014"
-                            }
                             Text(
                                 quotaText,
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -503,13 +530,6 @@ fun HomeScreen(
                         }
 
                         Spacer(Modifier.height(8.dp))
-
-                        val quotaFraction = when {
-                            isUnlimited -> 1f
-                            max != null && max > 0L && remaining != null ->
-                                (remaining.toFloat() / max.toFloat()).coerceIn(0f, 1f)
-                            else -> 0f
-                        }
 
                         LinearProgressIndicator(
                             progress = { quotaFraction },
@@ -529,7 +549,7 @@ fun HomeScreen(
     }
 }
 
-private fun formatDuration(seconds: Long): String {
+internal fun formatDuration(seconds: Long): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
     val s = seconds % 60

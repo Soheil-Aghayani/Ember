@@ -41,11 +41,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.R
+import com.soheil.ember.ui.components.EmberInlineErrorMessage
 import com.soheil.ember.data.BrowserSignIn
 import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
 import com.soheil.ember.data.FXA_SIGN_UP_URL
@@ -59,13 +60,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     authRepository: FxaAuthRepository,
+    isTelevision: Boolean = false,
     onSignedIn: () -> Unit,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var awaitingTwoFactor by rememberSaveable { mutableStateOf(authRepository.pendingSessionToken != null) }
-    var useTransferCode by rememberSaveable { mutableStateOf(false) }
+    var useTransferCode by rememberSaveable { mutableStateOf(isTelevision) }
     var browserJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var transferCode by rememberSaveable { mutableStateOf("") }
     var transferPassphrase by rememberSaveable { mutableStateOf("") }
@@ -162,10 +164,10 @@ fun LoginScreen(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 520.dp)
+                .widthIn(max = if (isTelevision) 720.dp else 520.dp)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(if (isTelevision) 48.dp else 24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Image(
@@ -189,13 +191,15 @@ fun LoginScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.padding(top = 12.dp))
-                Button(
-                    onClick = { scanTransferQr() },
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text("Scan QR code") }
-                Spacer(Modifier.padding(top = 16.dp))
+                if (!isTelevision) {
+                    Button(
+                        onClick = { scanTransferQr() },
+                        enabled = !isLoading,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text("Scan QR code") }
+                    Spacer(Modifier.padding(top = 16.dp))
+                }
                 Text(
                     "Or enter the code by hand",
                     style = MaterialTheme.typography.labelMedium,
@@ -207,6 +211,11 @@ fun LoginScreen(
                     onValueChange = { transferCode = it },
                     label = { Text("Code") },
                     maxLines = 4,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -216,7 +225,12 @@ fun LoginScreen(
                     onValueChange = { transferPassphrase = it },
                     label = { Text("Passphrase") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        imeAction = ImeAction.Done,
+                    ),
                     keyboardActions = KeyboardActions(onDone = {
                         focusManager.clearFocus()
                         doSubmitTransfer()
@@ -390,13 +404,10 @@ fun LoginScreen(
 
             errorMessage?.let {
                 Spacer(Modifier.padding(top = 12.dp))
-                Text(
+                EmberInlineErrorMessage(
                     text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 )
             }
         }

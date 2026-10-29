@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         app = app,
                         themeController = themeController,
+                        isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK),
                         onRequestConnect = { requestConnect() },
                         onDisconnect = { EmberVpnService.stop(this) },
                     )

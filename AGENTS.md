@@ -7,16 +7,16 @@ Ember is a free, open-source VPN client (MIT) that signs in with a Firefox accou
 | Target | Status | Compatibility rule |
 |---|---|---|
 | Windows PC | Current target | Windows desktop app; whole-device mode is experimental and must not be run by an agent. |
-| Android phone | Current target | Android app is phone-oriented and uses touch-first layouts. |
-| Sony Smart TV | Planned; model and OS not identified | Do not claim the phone app supports TV. Record the exact TV model and OS, then decide whether Android/Google TV can be supported or a separate client is required. A TV client needs remote-first focus/D-pad navigation and real-device validation. |
+| Android phone | Current target | Android app keeps its existing touch-first experience. |
+| Sony Smart TV | Initial Android TV experience implemented; physical-device validation pending | Known target: Sony BRAVIA BF1, Android TV OS 12. Keep TV screens remote-first and do not call TV support verified until the owner checks it on this device. |
 
-Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A successful phone build is not evidence of Sony TV support.
+Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A successful Android build is not evidence of Sony TV runtime support.
 
 ## Layout
 
 | Folder | What it is |
 |---|---|
-| `android/` | Android app (Kotlin, Jetpack Compose, Material 3). Package `com.soheil.ember`. |
+| `android/` | Android phone and Android TV app (Kotlin, Jetpack Compose, Material 3). Package `com.soheil.ember`; TV UI is selected from the Leanback device feature. |
 | `core/` | JVM-only engine shared by Android and desktop: Firefox sign-in, Mozilla proxy pass, server list, HTTP/2 tunnel, local SOCKS5/HTTP proxies. No Android APIs allowed here. |
 | `desktop/` | Compose Desktop app, Windows first. `desktop/appResources/windows-x64/ember-tunnel.ps1` is the elevated tunnel helper. |
 | `design/` | Design tokens (`tokens.json`), brand assets, store graphics. |

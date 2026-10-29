@@ -351,7 +351,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
 
             error?.let {
                 Spacer(Modifier.height(12.dp))
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -664,7 +664,7 @@ private fun HomePage(
                 if (countriesLoading && countries.isEmpty()) {
                     CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp), strokeWidth = 2.dp)
                 }
-                countriesFailure?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+                countriesFailure?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 DropdownMenuItem(text = { Text(strings.moreLocations) }, onClick = { menuOpen = false; onOpenLocations() })
             }
@@ -690,13 +690,13 @@ private fun HomePage(
         }
         error?.let {
             Spacer(Modifier.height(16.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (connected) exit.error?.let {
             Spacer(Modifier.height(12.dp))
             Text(strings.connectionCheckFailed(it), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         blocked?.let { notice ->
             Spacer(Modifier.height(16.dp))
@@ -741,7 +741,7 @@ private fun LocationsPage(
         return
     }
     failure?.let {
-        Text(it, color = MaterialTheme.colorScheme.error)
+        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
 
@@ -898,7 +898,7 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 )
             }
@@ -1011,7 +1011,7 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
                     busy = false
                 }
             }
-            failure?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error,
+            failure?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             SwitchRow(strings.autoConnect, strings.autoConnectHelp, autoConnect) {

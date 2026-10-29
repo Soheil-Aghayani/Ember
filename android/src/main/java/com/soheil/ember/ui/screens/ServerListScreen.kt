@@ -4,17 +4,23 @@ import com.soheil.ember.ui.components.FlagIcon
 import com.soheil.ember.R
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
 import com.soheil.ember.ui.components.EmberDivider
 import com.soheil.ember.ui.components.EmberTopBar
+import com.soheil.ember.ui.components.EmberInlineErrorMessage
+import com.soheil.ember.ui.theme.EmberTvDimensions
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +67,7 @@ fun ServerListScreen(
     proxyStateStore: ProxyStateStore,
     onServerSelected: () -> Unit,
     onBack: () -> Unit,
+    isTelevision: Boolean = false,
 ) {
     var countries by remember { mutableStateOf<List<VpnCountry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -108,21 +115,27 @@ fun ServerListScreen(
     }
 
     Scaffold(
-        topBar = { EmberTopBar("Choose location", onBack) },
+        topBar = { EmberTopBar("Choose location", onBack, isTelevision = isTelevision) },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             when {
                 isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                errorMessage != null && countries.isEmpty() -> Text(
+                errorMessage != null && countries.isEmpty() -> EmberInlineErrorMessage(
                     text = errorMessage.orEmpty(),
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.error,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth()
                         .padding(24.dp),
                 )
-                else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                else -> LazyColumn(
+                    modifier = if (isTelevision) {
+                        Modifier.widthIn(max = EmberTvDimensions.locationsMaxWidth).fillMaxWidth()
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
                     items(
                         rows,
                         key = { row ->
@@ -135,6 +148,7 @@ fun ServerListScreen(
                         },
                     ) { row ->
 
+                        var isFocused by remember(row) { mutableStateOf(false) }
                         val selected = selectedState
                         when (row) {
                             is LocationRow.RecommendedRow -> ListItem(
@@ -148,8 +162,28 @@ fun ServerListScreen(
                                         Icon(painterResource(R.drawable.ic_solar_check_circle), contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = if (isTelevision && isFocused) {
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                ),
                                 modifier = Modifier
                                     .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                                    .heightIn(min = if (isTelevision) EmberTvDimensions.locationRowMinHeight else 0.dp)
+                                    .onFocusChanged { isFocused = it.isFocused }
+                                    .then(
+                                        if (isTelevision && isFocused) {
+                                            Modifier.border(
+                                                EmberTvDimensions.focusRing,
+                                                MaterialTheme.colorScheme.primary,
+                                                RoundedCornerShape(16.dp),
+                                            )
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
                                     .clip(RoundedCornerShape(16.dp))
                                     .clickable {
                                         val candidates = ServerListClient.candidatesForCountry(countries, row.country.code)
@@ -231,8 +265,28 @@ fun ServerListScreen(
                                             Icon(painterResource(R.drawable.ic_solar_check_circle), contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                         }
                                     },
+                                    colors = ListItemDefaults.colors(
+                                        containerColor = if (isTelevision && isFocused) {
+                                            MaterialTheme.colorScheme.surfaceContainerHigh
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        },
+                                    ),
                                     modifier = Modifier
                                         .padding(horizontal = 16.dp)
+                                        .heightIn(min = if (isTelevision) EmberTvDimensions.locationRowMinHeight else 0.dp)
+                                        .onFocusChanged { isFocused = it.isFocused }
+                                        .then(
+                                            if (isTelevision && isFocused) {
+                                                Modifier.border(
+                                                    EmberTvDimensions.focusRing,
+                                                    MaterialTheme.colorScheme.primary,
+                                                    cityShape,
+                                                )
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
                                         .clip(cityShape)
                                         .clickable {
                                             val candidates = ServerListClient.candidatesForCity(countries, row.country.code, city.code)

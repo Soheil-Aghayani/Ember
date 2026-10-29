@@ -28,6 +28,7 @@ fun EmberNavGraph(
     navController: NavHostController = rememberNavController(),
     app: EmberVpnApp,
     themeController: ThemeController,
+    isTelevision: Boolean = false,
     onRequestConnect: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
@@ -46,6 +47,7 @@ fun EmberNavGraph(
         composable(EmberRoutes.LOGIN) {
             LoginScreen(
                 authRepository = app.authRepository,
+                isTelevision = isTelevision,
                 onSignedIn = {
                     navController.navigate(EmberRoutes.HOME) { popUpTo(EmberRoutes.LOGIN) { inclusive = true } }
                 },
@@ -55,10 +57,12 @@ fun EmberNavGraph(
             HomeScreen(
                 app = app,
                 themeController = themeController,
+                isTelevision = isTelevision,
                 onRequestConnect = onRequestConnect,
                 onDisconnect = onDisconnect,
                 onOpenServers = { navController.navigate(EmberRoutes.SERVERS) },
                 onOpenSettings = { navController.navigate(EmberRoutes.SETTINGS) },
+                onOpenLogs = { navController.navigate(EmberRoutes.LOGS) },
             )
         }
         composable(EmberRoutes.SERVERS) {
@@ -67,6 +71,7 @@ fun EmberNavGraph(
                 proxyStateStore = app.proxyStateStore,
                 onServerSelected = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
+                isTelevision = isTelevision,
             )
         }
         composable(EmberRoutes.SETTINGS) {
@@ -81,10 +86,11 @@ fun EmberNavGraph(
                     navController.navigate(EmberRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
                 },
                 onBack = { navController.popBackStack() },
+                isTelevision = isTelevision,
             )
         }
         composable(EmberRoutes.LOGS) {
-            LogsScreen(onBack = { navController.popBackStack() })
+            LogsScreen(onBack = { navController.popBackStack() }, isTelevision = isTelevision)
         }
     }
 }

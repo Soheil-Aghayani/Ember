@@ -58,7 +58,7 @@ internal fun SpeedTestControl(engine: EmberEngine) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             failure?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             TextButton(
                 onClick = {
@@ -135,7 +135,7 @@ internal fun SkipVpnSettings(engine: EmberEngine, enabled: Boolean) {
                     }) { Text(strings.addAddress) }
                 }
                 if (invalid || atLimit) Text(if (invalid) strings.addressValidation else strings.addressLimit,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!enabled) Text(strings.needsWholeDevice, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)

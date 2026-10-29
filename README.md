@@ -4,7 +4,7 @@
 
 # Ember
 
-**A free, open-source VPN client for Windows PCs and Android phones that signs in with your Firefox account. Sony Smart TV support is planned.**
+**A free, open-source VPN client for Windows PCs and Android devices that signs in with your Firefox account. An initial Android TV experience targets the Sony BRAVIA BF1; real-TV validation is pending.**
 
 ![Android](https://img.shields.io/badge/Android-212121?style=for-the-badge&logo=android&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-212121?style=for-the-badge&logo=windows&logoColor=white)
@@ -31,7 +31,7 @@ Ember signs in with your Firefox account, asks Mozilla's Guardian service for a 
 |---|---|---|
 | Windows PC | Current target | Windows 10/11, 64-bit. Whole-device mode is experimental. |
 | Android phone | Current target | Android 8.0 or newer. |
-| Sony Smart TV | Planned; compatibility not established | No TV build exists yet. The exact TV model and operating system must be identified before choosing an implementation. |
+| Sony Smart TV | Initial Android TV experience implemented; device validation pending | Sony BRAVIA BF1, Android TV OS 12. The Android package has a TV launcher entry and remote-first screens; physical-TV behavior is not yet verified. |
 
 | | Windows | Android |
 |---|---|---|
@@ -60,6 +60,7 @@ Ember is built on the developer's own computer; installers are kept in a local r
 
 - **Windows:** `Ember-<version>.exe` (Windows 10/11, 64-bit). Windows may warn about an unknown publisher because the installer is not signed yet: choose **More info**, then **Run anyway**.
 - **Android:** a debug APK built with the Android SDK (Android 8.0 or newer).
+- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. TV support is still awaiting validation on the BRAVIA BF1.
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
 
@@ -78,7 +79,7 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 | Folder | Contents |
 |---|---|
-| `android/` | Android phone app: Kotlin, Jetpack Compose, VPN service, resources, and Android build configuration |
+| `android/` | Android phone and TV app: Kotlin, Jetpack Compose, VPN service, platform-aware screens, resources, and Android build configuration |
 | `desktop/` | Windows desktop app: Kotlin/Compose UI, resources, and installer packaging |
 | `core/` | Platform-neutral JVM logic: Firefox sign-in, session transfer, proxy pass, server list, HTTP/2 tunnel, local proxies |
 | `helper/` | Native Rust helper for Windows whole-device tunnel setup |
