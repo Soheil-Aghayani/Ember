@@ -93,12 +93,14 @@ val LocalEmberWindowControlColors = staticCompositionLocalOf { WindowControlColo
 object EmberDesktopMetrics {
     val titleBarHeight: Dp = 38.dp
     val windowControlTarget: Dp = 32.dp
-    val windowControlDot: Dp = 12.dp
+    val windowControlDot: Dp = 16.dp
     val windowControlGlyph: Dp = 8.dp
-    val windowControlGap: Dp = 4.dp
+    val windowControlGap: Dp = 0.dp
     val windowControlInset: Dp = 8.dp
     val brandMark: Dp = 20.dp
     val brandGap: Dp = 8.dp
+    val windowCornerRadius: Dp = 12.dp
+    val windowBorderWidth: Dp = 1.dp
     val countryPickerWidth: Dp = 360.dp
     val countryPickerMaxHeight: Dp = 420.dp
     val countryListMaxHeight: Dp = 300.dp
