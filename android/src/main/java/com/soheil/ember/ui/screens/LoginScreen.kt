@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,7 +44,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.R
+import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
+import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
+import com.soheil.ember.data.isBlockedByMozilla
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,6 +63,7 @@ fun LoginScreen(
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val uriHandler = LocalUriHandler.current
 
     BackHandler(enabled = awaitingTwoFactor) {
         authRepository.clearPendingSession()
@@ -75,7 +82,14 @@ fun LoginScreen(
             isLoading = false
             result.onSuccess { needsVerification ->
                 if (needsVerification) awaitingTwoFactor = true else onSignedIn()
-            }.onFailure { errorMessage = it.message ?: "Sign-in failed" }
+            }.onFailure {
+                errorMessage = if (it.isBlockedByMozilla()) {
+                    "Mozilla's security check blocked this sign-in from your network (HTTP 406). " +
+                        "Your password is not the problem. Try another network, or wait a few minutes and try again."
+                } else {
+                    it.message ?: "Sign-in failed"
+                }
+            }
         }
     }
 
@@ -186,6 +200,10 @@ fun LoginScreen(
                     } else {
                         Text("Continue")
                     }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { uriHandler.openUri(FXA_RESET_PASSWORD_URL) }) { Text("Forgot password?") }
+                    TextButton(onClick = { uriHandler.openUri(FXA_SIGN_UP_URL) }) { Text("Create account") }
                 }
             } else {
                 Text("Enter the confirmation code sent to your email", style = MaterialTheme.typography.bodyMedium)

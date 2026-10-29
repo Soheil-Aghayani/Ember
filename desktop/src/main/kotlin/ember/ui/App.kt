@@ -90,9 +90,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.AppLogger
+import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
+import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
 import com.soheil.ember.data.LogLevel
 import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
+import com.soheil.ember.data.isBlockedByMozilla
 import com.soheil.ember.data.ServerListClient
 import com.soheil.ember.data.SessionStatus
 import com.soheil.ember.data.TlsSplitMode
@@ -274,13 +277,18 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                             val result = auth.startLogin(FxaAuthRepository.normalizeEmail(email), password)
                             busy = false
                             result.onSuccess { verify -> if (verify) needsCode = true else onSignedIn() }
-                                .onFailure { error = it.message ?: strings.signInFailed }
+                                .onFailure { error = if (it.isBlockedByMozilla()) strings.signInBlocked else it.message ?: strings.signInFailed }
                         }
                     },
                     enabled = !busy && email.isNotBlank() && password.isNotBlank(),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                 ) { Text(if (busy) strings.signingIn else strings.continueLabel) }
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(FXA_RESET_PASSWORD_URL)) } }) { Text(strings.forgotPassword) }
+                    TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(FXA_SIGN_UP_URL)) } }) { Text(strings.createAccount) }
+                }
             } else {
                 Text(strings.codePrompt, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
