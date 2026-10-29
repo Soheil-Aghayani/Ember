@@ -54,6 +54,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 - [`helper/README.md`](../helper/README.md) — native helper details.
 - [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) — Sony BRAVIA BF1 target profile, TV behavior, and validation status.
 - [`FXA_BROWSER_SIGN_IN.md`](FXA_BROWSER_SIGN_IN.md) — browser OAuth registration blocker and the steps required before enabling the flow.
+- [`WINDOWS_APP_SPLIT_TUNNELING.md`](WINDOWS_APP_SPLIT_TUNNELING.md) — feasibility and safety requirements for Windows app-specific bypass.
 - [`design/README.md`](../design/README.md) — design assets and attributions.
 - [`history/2026-10-29-ember-sign-in.md`](history/2026-10-29-ember-sign-in.md) — archived sign-in task brief and completion record.
 

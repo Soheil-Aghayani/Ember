@@ -179,13 +179,37 @@ class EmberEngine(private val dataDir: File) {
                     AppLogger.i(TAG, "connect: upstream HTTP/2 stage took ${elapsedMsSince(upstreamStartedAtNanos)} ms")
                 }
                 if (wholeDevice) {
-                    val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
-                    s.start()
-                    socks = s
-                    tunnel.start(SOCKS_PORT, listOf(edgeIp!!), settings.killSwitch, settings.mtu, settings.tcpBufferBytes, resolveExclusions(), onProgress = { _progress.value = it })
-                    startWatchingTunnel()
+                    val setupStartedAtNanos = System.nanoTime()
+                    try {
+                        val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
+                        s.start()
+                        socks = s
+                        val exclusionsStartedAtNanos = System.nanoTime()
+                        val exclusions = try {
+                            resolveExclusions()
+                        } finally {
+                            AppLogger.i(TAG, "connect: skip-list DNS resolution stage took ${elapsedMsSince(exclusionsStartedAtNanos)} ms")
+                        }
+                        tunnel.start(
+                            socksPort = SOCKS_PORT,
+                            edgeIps = listOf(checkNotNull(edgeIp)),
+                            killSwitch = settings.killSwitch,
+                            mtu = settings.mtu,
+                            tcpBufferSize = settings.tcpBufferBytes,
+                            excludeCidrs = exclusions,
+                            onProgress = { _progress.value = it },
+                        )
+                        startWatchingTunnel()
+                    } finally {
+                        AppLogger.i(TAG, "connect: Windows tunnel setup stage took ${elapsedMsSince(setupStartedAtNanos)} ms")
+                    }
                 } else {
-                    startLocalProxies()
+                    val setupStartedAtNanos = System.nanoTime()
+                    try {
+                        startLocalProxies()
+                    } finally {
+                        AppLogger.i(TAG, "connect: local proxy setup stage took ${elapsedMsSince(setupStartedAtNanos)} ms")
+                    }
                 }
                 _connectedAtMs.value = System.currentTimeMillis()
                 _connectedTarget.value = chosen

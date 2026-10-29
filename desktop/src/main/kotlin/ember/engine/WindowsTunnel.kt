@@ -92,7 +92,12 @@ class WindowsTunnel(dataDir: File) {
         excludeCidrs: List<String> = emptyList(),
         onProgress: (String) -> Unit = {},
     ) {
-        stopStaleHelper()
+        val staleCleanupStartedAtNanos = System.nanoTime()
+        try {
+            stopStaleHelper()
+        } finally {
+            logElapsed("stale helper cleanup", staleCleanupStartedAtNanos)
+        }
         val hevConfig = HevSocks5TunnelConfig.write(stateDir.parentFile, socksPort, useMapDns = true, mtu = mtu, tunnelName = ADAPTER_NAME, tcpBufferSize = tcpBufferSize)
         val config = JSONObject()
             .put("stateDir", stateDir.absolutePath)
@@ -139,52 +144,67 @@ class WindowsTunnel(dataDir: File) {
             runCatching { privileged.install() }.onFailure { AppLogger.w(TAG, "could not update the one-time setup", it) }
         }
         val noPrompt = privileged.isInstalled() && privileged.isCurrent() && (native || nativeHelper == null)
+        AppLogger.i(TAG, "starting ${if (native) "native" else "PowerShell"} helper (one-time setup=$noPrompt)")
         onProgress(
             if (noPrompt) "Starting the secure network adapter…"
             else "Waiting for you to allow administrator access in the Windows prompt…",
         )
-        val launch = if (noPrompt) Launch(privileged.run("Up"), null) else elevate(helper, native, "Up", configFile)
+        val launchStartedAtNanos = System.nanoTime()
+        val launch = try {
+            if (noPrompt) Launch(privileged.run("Up"), null) else elevate(helper, native, "Up", configFile)
+        } finally {
+            logElapsed("helper launch and elevation request", launchStartedAtNanos)
+        }
         if (launch.failure != null) throw HelperFailure(launch.failure, retryWithFallback = false)
 
         val started = System.currentTimeMillis()
+        val waitStartedAtNanos = System.nanoTime()
         var reportedAdapter = false
-        while (System.currentTimeMillis() - started < START_TIMEOUT_MS) {
-            val current = status()
-            when {
-                current == "UP" -> return
-                current != null && current.startsWith("ERROR") ->
-                    throw HelperFailure(current.removePrefix("ERROR:").trim(), retryWithFallback = true)
-                current == "STARTING" && !reportedAdapter -> {
-                    reportedAdapter = true
-                    onProgress("Setting up the secure network adapter…")
+        try {
+            while (System.currentTimeMillis() - started < START_TIMEOUT_MS) {
+                val current = status()
+                when {
+                    current == "UP" -> return
+                    current != null && current.startsWith("ERROR") ->
+                        throw HelperFailure(current.removePrefix("ERROR:").trim(), retryWithFallback = true)
+                    current == "STARTING" && !reportedAdapter -> {
+                        reportedAdapter = true
+                        onProgress("Setting up the secure network adapter…")
+                    }
                 }
-            }
-            if (current == null) {
-                val process = launch.process
-                if (process != null && !process.isAlive) {
-                    if (process.exitValue() != 0) {
-                        val detail = process.inputStream.bufferedReader().readText().trim()
+                if (current == null) {
+                    val process = launch.process
+                    if (process != null && !process.isAlive) {
+                        if (process.exitValue() != 0) {
+                            val detail = process.inputStream.bufferedReader().readText().trim()
+                            throw HelperFailure(
+                                if (detail.contains("canceled", ignoreCase = true) || detail.contains("cancelled", ignoreCase = true)) {
+                                    "Administrator access was not allowed, so the tunnel could not start."
+                                } else {
+                                    "Windows could not start the network helper: ${detail.ifBlank { "exit code ${process.exitValue()}" }}"
+                                },
+                                retryWithFallback = false,
+                            )
+                        }
+                    }
+                    val silentFor = System.currentTimeMillis() - (if (process != null && !process.isAlive) started else launch.launchedAt)
+                    if ((process == null || !process.isAlive) && silentFor > HELPER_SILENT_TIMEOUT_MS) {
                         throw HelperFailure(
-                            if (detail.contains("canceled", ignoreCase = true) || detail.contains("cancelled", ignoreCase = true)) {
-                                "Administrator access was not allowed, so the tunnel could not start."
-                            } else {
-                                "Windows could not start the network helper: ${detail.ifBlank { "exit code ${process.exitValue()}" }}"
-                            },
-                            retryWithFallback = false,
+                            "The network helper was allowed to run but did not report back. Details may be in ${logFile.absolutePath}",
+                            retryWithFallback = native,
                         )
                     }
                 }
-                val silentFor = System.currentTimeMillis() - (if (process != null && !process.isAlive) started else launch.launchedAt)
-                if ((process == null || !process.isAlive) && silentFor > HELPER_SILENT_TIMEOUT_MS) {
-                    throw HelperFailure(
-                        "The network helper was allowed to run but did not report back. Details may be in ${logFile.absolutePath}",
-                        retryWithFallback = native,
-                    )
-                }
+                delay(150)
             }
-            delay(150)
+            throw HelperFailure("The network helper did not finish starting in time. Details may be in ${logFile.absolutePath}", retryWithFallback = false)
+        } finally {
+            logElapsed("waiting for helper readiness", waitStartedAtNanos)
         }
-        throw HelperFailure("The network helper did not finish starting in time. Details may be in ${logFile.absolutePath}", retryWithFallback = false)
+    }
+
+    private fun logElapsed(stage: String, startedAtNanos: Long) {
+        AppLogger.i(TAG, "$stage stage took ${(System.nanoTime() - startedAtNanos) / 1_000_000} ms")
     }
 
     /** A helper left over from an earlier connection (for example one holding the kill switch) must end first. */
