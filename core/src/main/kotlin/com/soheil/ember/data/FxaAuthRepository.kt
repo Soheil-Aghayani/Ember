@@ -92,6 +92,21 @@ class FxaAuthRepository(
         false
     }
 
+    /** The refresh token another device needs to join this session, see [SessionTransfer]. */
+    fun refreshTokenForTransfer(): String? = runCatching { tokenStore.loadAuth()?.refreshToken }.getOrNull()
+
+    /** Signs in with a refresh token from [SessionTransfer.open]; it is kept only when FxA accepts it. */
+    suspend fun signInWithRefreshToken(refreshToken: String): Result<Unit> = runCatching {
+        tokenStore.saveAuth(RuntimeAuth(accessToken = "", refreshToken = refreshToken, expiresAtEpochSeconds = 0))
+        try {
+            ensureFreshAccessToken(force = true)
+        } catch (failure: Throwable) {
+            runCatching { tokenStore.clear() }
+            throw failure
+        }
+        Unit
+    }
+
     suspend fun restoreSession(): SessionStatus {
         val stored = runCatching { tokenStore.loadAuth() }.getOrNull()
             ?: return SessionStatus.NEEDS_LOGIN

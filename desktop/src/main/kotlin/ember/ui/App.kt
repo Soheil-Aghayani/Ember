@@ -234,6 +234,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
     var needsCode by remember { mutableStateOf(auth.pendingSessionToken != null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var useCode by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(32.dp)) {
@@ -248,7 +249,9 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
             )
             Spacer(Modifier.height(24.dp))
 
-            if (!needsCode) {
+            if (useCode) {
+                CodeSignIn(auth, onSignedIn) { useCode = false }
+            } else if (!needsCode) {
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -289,6 +292,7 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                     TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(FXA_RESET_PASSWORD_URL)) } }) { Text(strings.forgotPassword) }
                     TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(FXA_SIGN_UP_URL)) } }) { Text(strings.createAccount) }
                 }
+                TextButton(onClick = { useCode = true }, modifier = Modifier.fillMaxWidth()) { Text(strings.signInWithCode) }
             } else {
                 Text(strings.codePrompt, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
@@ -903,6 +907,8 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             }
         }
     }
+    Spacer(Modifier.height(16.dp))
+    SessionTransferCard(engine.auth)
     Spacer(Modifier.height(16.dp))
     Card {
         Column(Modifier.padding(16.dp)) {

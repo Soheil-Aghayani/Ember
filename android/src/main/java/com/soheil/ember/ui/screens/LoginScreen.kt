@@ -47,6 +47,7 @@ import com.soheil.ember.R
 import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
 import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
+import com.soheil.ember.data.SessionTransfer
 import com.soheil.ember.data.isBlockedByMozilla
 import kotlinx.coroutines.launch
 
@@ -59,6 +60,9 @@ fun LoginScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var awaitingTwoFactor by rememberSaveable { mutableStateOf(authRepository.pendingSessionToken != null) }
+    var useTransferCode by rememberSaveable { mutableStateOf(false) }
+    var transferCode by rememberSaveable { mutableStateOf("") }
+    var transferPassphrase by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -90,6 +94,19 @@ fun LoginScreen(
                     it.message ?: "Sign-in failed"
                 }
             }
+        }
+    }
+
+    fun doSubmitTransfer() {
+        if (transferCode.isBlank() || transferPassphrase.isBlank() || isLoading) return
+        errorMessage = null
+        isLoading = true
+        scope.launch {
+            val opened = SessionTransfer.open(transferCode, transferPassphrase)
+            val failure = opened.exceptionOrNull()
+                ?: authRepository.signInWithRefreshToken(opened.getOrThrow()).exceptionOrNull()
+            isLoading = false
+            if (failure == null) onSignedIn() else errorMessage = failure.message ?: "Sign-in failed"
         }
     }
 
@@ -140,7 +157,58 @@ fun LoginScreen(
             )
             Spacer(Modifier.padding(top = 24.dp))
 
-            if (!awaitingTwoFactor) {
+            if (useTransferCode) {
+                Text(
+                    "On a device that is already signed in to Ember, open Settings and create a sign-in code. Enter it here with its passphrase.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.padding(top = 12.dp))
+                OutlinedTextField(
+                    value = transferCode,
+                    onValueChange = { transferCode = it },
+                    label = { Text("Code") },
+                    maxLines = 4,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.padding(top = 12.dp))
+                OutlinedTextField(
+                    value = transferPassphrase,
+                    onValueChange = { transferPassphrase = it },
+                    label = { Text("Passphrase") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        focusManager.clearFocus()
+                        doSubmitTransfer()
+                    }),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.padding(top = 20.dp))
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        doSubmitTransfer()
+                    },
+                    enabled = !isLoading && transferCode.isNotBlank() && transferPassphrase.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text("Continue")
+                    }
+                }
+                TextButton(onClick = { useTransferCode = false; errorMessage = null }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Use email and password instead")
+                }
+            } else if (!awaitingTwoFactor) {
                 OutlinedTextField(
                     value = email,
                     onValueChange = {
@@ -204,6 +272,9 @@ fun LoginScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { uriHandler.openUri(FXA_RESET_PASSWORD_URL) }) { Text("Forgot password?") }
                     TextButton(onClick = { uriHandler.openUri(FXA_SIGN_UP_URL) }) { Text("Create account") }
+                }
+                TextButton(onClick = { useTransferCode = true; errorMessage = null }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Sign in with a code from another device")
                 }
             } else {
                 Text("Enter the confirmation code sent to your email", style = MaterialTheme.typography.bodyMedium)
