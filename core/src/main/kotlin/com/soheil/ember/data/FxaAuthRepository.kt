@@ -35,8 +35,8 @@ class FxaRefreshFailure(
 ) : Exception(message, cause)
 
 private const val FXA_AUTH_SERVER = "https://api.accounts.firefox.com/v1"
-private const val FIREFOX_CLIENT_ID = "5882386c6d801776"
-private const val OAUTH_SCOPE = "profile https://identity.mozilla.com/apps/vpn"
+internal const val FIREFOX_CLIENT_ID = "5882386c6d801776"
+internal const val OAUTH_SCOPE = "profile https://identity.mozilla.com/apps/vpn"
 private const val PROTOCOL_VERSION = "identity.mozilla.com/picl/v1/"
 private const val PBKDF2_ROUNDS = 1000
 private const val STRETCHED_PW_LEN = 32
@@ -105,6 +105,27 @@ class FxaAuthRepository(
             throw failure
         }
         Unit
+    }
+
+    /** Finishes a [BrowserSignIn]: trades the one-time code for tokens. */
+    suspend fun signInWithAuthorizationCode(authorization: BrowserAuthorization): Result<Unit> = runCatching {
+        val body = JSONObject().apply {
+            put("client_id", FIREFOX_CLIENT_ID)
+            put("grant_type", "authorization_code")
+            put("code", authorization.code)
+            put("code_verifier", authorization.verifier)
+            put("redirect_uri", authorization.redirectUri)
+        }
+        val tokenData = fxaDo("POST", "/oauth/token", jsonBody = body)
+        val accessToken = tokenData.optString("access_token").takeIf { it.isNotBlank() }
+            ?: error("Mozilla returned no access token.")
+        tokenStore.saveAuth(
+            RuntimeAuth(
+                accessToken = accessToken,
+                refreshToken = tokenData.optString("refresh_token", "").ifBlank { null },
+                expiresAtEpochSeconds = expiryFrom(tokenData),
+            ),
+        )
     }
 
     suspend fun restoreSession(): SessionStatus {

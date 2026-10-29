@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.R
+import com.soheil.ember.data.BrowserSignIn
 import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
 import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
@@ -61,6 +63,7 @@ fun LoginScreen(
     var code by rememberSaveable { mutableStateOf("") }
     var awaitingTwoFactor by rememberSaveable { mutableStateOf(authRepository.pendingSessionToken != null) }
     var useTransferCode by rememberSaveable { mutableStateOf(false) }
+    var browserJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var transferCode by rememberSaveable { mutableStateOf("") }
     var transferPassphrase by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -268,6 +271,34 @@ fun LoginScreen(
                     } else {
                         Text("Continue")
                     }
+                }
+                Spacer(Modifier.padding(top = 8.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (browserJob != null) {
+                            browserJob?.cancel()
+                            browserJob = null
+                            return@OutlinedButton
+                        }
+                        errorMessage = null
+                        browserJob = scope.launch {
+                            val result = BrowserSignIn { url -> uriHandler.openUri(url) }.authorize()
+                                .mapCatching { authRepository.signInWithAuthorizationCode(it).getOrThrow() }
+                            browserJob = null
+                            result.onSuccess { onSignedIn() }.onFailure { errorMessage = it.message ?: "Sign-in failed" }
+                        }
+                    },
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(if (browserJob != null) "Cancel" else "Sign in with your browser") }
+                if (browserJob != null) {
+                    Spacer(Modifier.padding(top = 8.dp))
+                    Text(
+                        "Finish signing in in your browser, then come back here.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { uriHandler.openUri(FXA_RESET_PASSWORD_URL) }) { Text("Forgot password?") }
