@@ -38,7 +38,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 | Flow | Code owner | Status note |
 |---|---|---|
 | Email/password and email confirmation | `core/.../data/FxaAuthRepository.kt`; platform login screens | Existing sign-in path; password login can be rejected by a network security challenge. Do not attempt to bypass that challenge. |
-| Browser sign-in with PKCE | `core/.../data/BrowserSignIn.kt`, `FxaAuthRepository.kt` | Implemented in the current work; Firefox Account acceptance of the loopback redirect needs a real owner sign-in. |
+| Browser sign-in with PKCE | `core/.../data/BrowserSignIn.kt`, platform login screens | Disabled on Windows, Android phone, and Android TV until Mozilla registers Ember's redirect URI for a dedicated Firefox Account OAuth client. The current redirect is rejected as `Incorrect redirect_uri`; see [`FXA_BROWSER_SIGN_IN.md`](FXA_BROWSER_SIGN_IN.md). |
 | One-time sign-in code | `core/.../data/SessionTransfer.kt`, platform session-transfer UI | Encrypted refresh-token transfer with a short expiry; test only with generated fake tokens in local JVM checks. |
 | QR transfer | Desktop QR generation and Android ZXing scanner | QR contains the one-time code and passphrase together. Verify the scanner on a camera-equipped Android device; never use the owner's real credentials during testing. |
 
@@ -53,5 +53,12 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 - [`desktop/README.md`](../desktop/README.md), [`desktop/TUNNEL.md`](../desktop/TUNNEL.md), [`desktop/SIGNING.md`](../desktop/SIGNING.md) — Windows-specific behavior and packaging.
 - [`helper/README.md`](../helper/README.md) — native helper details.
 - [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) — Sony BRAVIA BF1 target profile, TV behavior, and validation status.
+- [`FXA_BROWSER_SIGN_IN.md`](FXA_BROWSER_SIGN_IN.md) — browser OAuth registration blocker and the steps required before enabling the flow.
 - [`design/README.md`](../design/README.md) — design assets and attributions.
 - [`history/2026-10-29-ember-sign-in.md`](history/2026-10-29-ember-sign-in.md) — archived sign-in task brief and completion record.
+
+## Connection diagnostics
+
+Android and Windows log monotonic durations for server selection, account/Guardian proxy-pass acquisition, upstream HTTP/2 setup, and total connect success or failure time. Android also records edge DNS and TUN setup durations; Windows records edge IPv4 resolution in whole-device mode. These stage labels let exported logs distinguish a slow control-plane request, DNS lookup, tunnel handshake, or retry without logging account credentials or tokens.
+
+Android edge DNS answers remain cached for the resolver's five-minute TTL and are invalidated when an underlying network becomes available or is lost. Android control-plane requests try the configured bootstrap DNS-over-HTTPS resolver only after system DNS returns `UnknownHostException`; choosing System DNS disables that fallback.

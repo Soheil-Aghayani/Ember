@@ -48,6 +48,7 @@ class EmberVpnApp : Application() {
         proxyStateStore = ProxyStateStore(this)
         settingsStore = SettingsStore(this)
         ControlPlaneHttp.tlsSplitModeProvider = { settingsStore.tlsSplitMode }
+        ControlPlaneHttp.bootstrapDnsAddressesProvider = { settingsStore.effectiveBootstrapAddresses }
         guardianClient = GuardianClient()
         serverListClient = ServerListClient(filesDir)
         authRepository = FxaAuthRepository(tokenStore)

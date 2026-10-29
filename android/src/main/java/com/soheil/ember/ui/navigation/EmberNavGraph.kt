@@ -78,7 +78,7 @@ fun EmberNavGraph(
             SettingsScreen(
                 settingsStore = app.settingsStore,
                 onOpenLogs = { navController.navigate(EmberRoutes.LOGS) },
-                onSignOut = {
+                onSwitchAccount = {
                     onDisconnect()
                     app.tokenStore.clear()
                     app.settingsStore.clearAccountSession()

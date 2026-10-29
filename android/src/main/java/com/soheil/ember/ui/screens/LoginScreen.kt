@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,7 +49,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.R
 import com.soheil.ember.ui.components.EmberInlineErrorMessage
-import com.soheil.ember.data.BrowserSignIn
 import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
 import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
@@ -68,7 +69,6 @@ fun LoginScreen(
     var code by rememberSaveable { mutableStateOf("") }
     var awaitingTwoFactor by rememberSaveable { mutableStateOf(authRepository.pendingSessionToken != null) }
     var useTransferCode by rememberSaveable { mutableStateOf(isTelevision) }
-    var browserJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var transferCode by rememberSaveable { mutableStateOf("") }
     var transferPassphrase by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -324,28 +324,25 @@ fun LoginScreen(
                 }
                 Spacer(Modifier.padding(top = 8.dp))
                 OutlinedButton(
-                    onClick = {
-                        if (browserJob != null) {
-                            browserJob?.cancel()
-                            browserJob = null
-                            return@OutlinedButton
-                        }
-                        errorMessage = null
-                        browserJob = scope.launch {
-                            val result = BrowserSignIn { url -> uriHandler.openUri(url) }.authorize()
-                                .mapCatching { authRepository.signInWithAuthorizationCode(it).getOrThrow() }
-                            browserJob = null
-                            result.onSuccess { onSignedIn() }.onFailure { errorMessage = it.message ?: "Sign-in failed" }
-                        }
-                    },
-                    enabled = !isLoading,
+                    onClick = {},
+                    enabled = false,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text(if (browserJob != null) "Cancel" else "Sign in with your browser") }
-                if (browserJob != null) {
-                    Spacer(Modifier.padding(top = 8.dp))
+                ) { Text("Sign in with your browser") }
+                Spacer(Modifier.padding(top = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_solar_info_circle),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        "Finish signing in in your browser, then come back here.",
+                        "Browser sign-in is unavailable until Mozilla registers Ember's redirect URL. Use email and password, or a code from another device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

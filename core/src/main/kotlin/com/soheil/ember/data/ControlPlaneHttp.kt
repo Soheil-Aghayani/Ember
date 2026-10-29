@@ -6,11 +6,16 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.soheil.ember.vpn.upstream.TlsClientHelloSplitter
+import com.soheil.ember.vpn.upstream.EdgeAddressResolver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import okhttp3.Dns
 import java.io.FilterOutputStream
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.net.SocketFactory
@@ -167,9 +172,42 @@ object ControlPlaneHttp {
     @Volatile
     var tlsSplitModeProvider: (() -> TlsSplitMode)? = null
 
+    /** Empty on platforms that should use the system resolver without a bootstrap fallback. */
+    @Volatile
+    var bootstrapDnsAddressesProvider: (() -> List<String>)? = null
+
     val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .cookieJar(cookieJar)
+            .dns(
+                object : Dns {
+                    override fun lookup(hostname: String): List<InetAddress> {
+                        try {
+                            return Dns.SYSTEM.lookup(hostname)
+                        } catch (systemFailure: UnknownHostException) {
+                            val bootstrapAddresses = bootstrapDnsAddressesProvider?.invoke().orEmpty()
+                            if (bootstrapAddresses.isEmpty()) throw systemFailure
+
+                            AppLogger.i(TAG, "system DNS could not resolve $hostname; trying configured bootstrap DNS")
+                            val address = try {
+                                runBlocking(Dispatchers.IO) {
+                                    EdgeAddressResolver.resolve(hostname, bootstrapAddresses)
+                                }
+                            } catch (fallbackFailure: Exception) {
+                                AppLogger.w(TAG, "bootstrap DNS lookup failed for $hostname", fallbackFailure)
+                                null
+                            } ?: throw systemFailure
+
+                            try {
+                                return listOf(InetAddress.getByName(address))
+                            } catch (invalidAddress: Exception) {
+                                AppLogger.w(TAG, "bootstrap DNS returned an unusable address for $hostname", invalidAddress)
+                                throw systemFailure
+                            }
+                        }
+                    }
+                },
+            )
             .socketFactory(ProtectingSocketFactory())
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

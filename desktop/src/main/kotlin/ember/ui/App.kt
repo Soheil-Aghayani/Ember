@@ -90,7 +90,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.AppLogger
-import com.soheil.ember.data.BrowserSignIn
 import com.soheil.ember.data.FXA_RESET_PASSWORD_URL
 import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
@@ -236,7 +235,6 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var useCode by remember { mutableStateOf(false) }
-    var browserJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(32.dp)) {
@@ -291,27 +289,20 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                 ) { Text(if (busy) strings.signingIn else strings.continueLabel) }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = {
-                        if (browserJob != null) {
-                            browserJob?.cancel()
-                            browserJob = null
-                            return@OutlinedButton
-                        }
-                        error = null
-                        browserJob = scope.launch {
-                            val result = BrowserSignIn { url -> runCatching { Desktop.getDesktop().browse(URI(url)) } }.authorize()
-                                .mapCatching { auth.signInWithAuthorizationCode(it).getOrThrow() }
-                            browserJob = null
-                            result.onSuccess { onSignedIn() }.onFailure { error = it.message ?: strings.signInFailed }
-                        }
-                    },
-                    enabled = !busy,
+                    onClick = {},
+                    enabled = false,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text(if (browserJob != null) strings.cancel else strings.browserSignIn) }
-                if (browserJob != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(strings.browserWaiting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ) { Text(strings.browserSignIn) }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    EmberIcon("info-circle", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        strings.browserSignInUnavailable,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(FXA_RESET_PASSWORD_URL)) } }) { Text(strings.forgotPassword) }
@@ -370,7 +361,7 @@ private fun MainShell(
     onLanguageChange: (String) -> Unit,
     update: String?,
     onDismissUpdate: () -> Unit,
-    onSignOut: () -> Unit,
+    onSwitchAccount: () -> Unit,
 ) {
     var page by remember { mutableStateOf(Page.Home) }
     var selected by remember(restoredLocation) { mutableStateOf(restoredLocation) }
@@ -410,7 +401,7 @@ private fun MainShell(
                         pickLocation, update, onDismissUpdate) { page = Page.Locations }
                     Page.Locations -> LocationsPage(countries, countriesLoading, countriesFailure,
                         state == ConnectionState.DISCONNECTED, selected, engine.settings.lastCity, pickLocation)
-                    Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange, onSignOut)
+                    Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange, onSwitchAccount)
                     Page.Logs -> LogsPage()
                 }
             }
@@ -824,7 +815,7 @@ private fun LocationRow(
 }
 
 @Composable
-private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit, onSignOut: () -> Unit) {
+private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit, onSwitchAccount: () -> Unit) {
     val strings = LocalStrings.current
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var fastestServer by remember { mutableStateOf(engine.settings.fastestServer) }
@@ -939,7 +930,17 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
         Column(Modifier.padding(16.dp)) {
             Text(strings.account, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onSignOut, shape = RoundedCornerShape(12.dp)) { Text(strings.signOut) }
+            Text(
+                strings.switchAccountHelp,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onSwitchAccount, shape = RoundedCornerShape(12.dp)) {
+                EmberIcon("logout", 18.dp, MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.width(8.dp))
+                Text(strings.switchAccount)
+            }
         }
     }
 }

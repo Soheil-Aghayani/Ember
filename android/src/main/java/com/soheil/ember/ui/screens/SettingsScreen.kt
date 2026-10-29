@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,14 +27,13 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -64,7 +64,7 @@ private const val GITHUB_URL = "https://github.com/Soheil-Aghayani/Ember"
 fun SettingsScreen(
     settingsStore: SettingsStore,
     onOpenLogs: () -> Unit,
-    onSignOut: () -> Unit,
+    onSwitchAccount: () -> Unit,
     onBack: () -> Unit,
     isTelevision: Boolean = false,
 ) {
@@ -460,19 +460,23 @@ fun SettingsScreen(
                     },
                 )
             }
-            Button(
-                onClick = onSignOut,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 32.dp),
-            ) {
-                Icon(painterResource(R.drawable.ic_solar_logout), contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Sign out")
+            EmberGroup("Account") {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text(
+                        "Sign out on this device and sign in with a different Firefox account.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onSwitchAccount,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).emberTvFocusRing(isTelevision),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_solar_logout), contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Switch account")
+                    }
+                }
             }
         }
     }

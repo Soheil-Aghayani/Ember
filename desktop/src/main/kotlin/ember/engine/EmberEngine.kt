@@ -15,7 +15,6 @@ import com.soheil.ember.vpn.ExitCheck
 import com.soheil.ember.vpn.IpLocationInfo
 import com.soheil.ember.vpn.socks.LocalHttpProxyServer
 import com.soheil.ember.vpn.socks.LocalSocks5Server
-import com.soheil.ember.vpn.upstream.EdgeAddressResolver
 import com.soheil.ember.vpn.upstream.H2UpstreamSession
 import com.soheil.ember.vpn.upstream.NettyLoggingBridge
 import com.soheil.ember.vpn.upstream.UpstreamTrust
@@ -42,6 +41,9 @@ private const val SERVER_LIST_TIMEOUT_MS = 10_000L
 private const val FALLBACK_PASS_RENEW_MS = 20 * 60_000L
 private const val RENEW_MARGIN_SECONDS = 120L
 private const val MAX_REDIAL_ATTEMPTS = 8
+
+private fun elapsedMsSince(startedAtNanos: Long): Long =
+    (System.nanoTime() - startedAtNanos) / 1_000_000L
 
 const val SOCKS_PORT = 10808
 const val HTTP_PORT = 10809
@@ -144,14 +146,38 @@ class EmberEngine(private val dataDir: File) {
         _progress.value = "Choosing a server..."
 
         connectJob = scope.launch {
+            val connectStartedAtNanos = System.nanoTime()
             try {
-                val chosen = candidate ?: recommendedCandidate()
+                val selectionStartedAtNanos = System.nanoTime()
+                val chosen = try {
+                    candidate ?: recommendedCandidate()
+                } finally {
+                    AppLogger.i(TAG, "connect: server selection stage took ${elapsedMsSince(selectionStartedAtNanos)} ms")
+                }
                 target = chosen
-                EdgeAddressResolver.invalidate()
                 _progress.value = "Connecting to " + chosen.countryName.ifBlank { chosen.countryCode } + "..."
-                val pass = mintPass()
-                edgeIp = if (wholeDevice) resolveIpv4(chosen.host) else null
-                session = dial(chosen, pass)
+                val passStartedAtNanos = System.nanoTime()
+                val pass = try {
+                    mintPass()
+                } finally {
+                    AppLogger.i(TAG, "connect: account and Guardian pass stage took ${elapsedMsSince(passStartedAtNanos)} ms")
+                }
+                edgeIp = if (wholeDevice) {
+                    val resolutionStartedAtNanos = System.nanoTime()
+                    try {
+                        resolveIpv4(chosen.host)
+                    } finally {
+                        AppLogger.i(TAG, "connect: edge address resolution stage took ${elapsedMsSince(resolutionStartedAtNanos)} ms")
+                    }
+                } else {
+                    null
+                }
+                val upstreamStartedAtNanos = System.nanoTime()
+                session = try {
+                    dial(chosen, pass)
+                } finally {
+                    AppLogger.i(TAG, "connect: upstream HTTP/2 stage took ${elapsedMsSince(upstreamStartedAtNanos)} ms")
+                }
                 if (wholeDevice) {
                     val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
                     s.start()
@@ -166,13 +192,17 @@ class EmberEngine(private val dataDir: File) {
                 _progress.value = null
                 _state.value = ConnectionState.CONNECTED
                 checkExit()
-                AppLogger.i(TAG, "connected via ${chosen.authority} (wholeDevice=$wholeDevice)")
+                AppLogger.i(
+                    TAG,
+                    "connected via ${chosen.authority} (wholeDevice=$wholeDevice) after ${elapsedMsSince(connectStartedAtNanos)} ms",
+                )
                 scheduleRenewal(pass)
                 startNetworkWatch()
             } catch (cancel: CancellationException) {
+                AppLogger.i(TAG, "connect aborted after ${elapsedMsSince(connectStartedAtNanos)} ms")
                 throw cancel
             } catch (failure: Throwable) {
-                AppLogger.e(TAG, "connect failed", failure)
+                AppLogger.e(TAG, "connect failed after ${elapsedMsSince(connectStartedAtNanos)} ms", failure)
                 _lastError.value = failure.message ?: failure.javaClass.simpleName
                 teardown()
             }

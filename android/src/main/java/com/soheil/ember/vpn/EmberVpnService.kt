@@ -111,6 +111,9 @@ private const val WIFI_LOCK_TAG = "com.soheil.ember:vpn-wifi"
 
 private const val ANDROID_TCP_BUFFER_BYTES = 262_144
 
+private fun elapsedMsSince(startedAtNanos: Long): Long =
+    (System.nanoTime() - startedAtNanos) / 1_000_000L
+
 private fun fullJitterBackoffMs(attempt: Int, baseMs: Long, capMs: Long): Long {
     val exponential = baseMs * (1L shl attempt.coerceIn(0, 10))
     val upperBound = exponential.coerceAtMost(capMs)
@@ -175,6 +178,7 @@ class EmberVpnService : VpnService() {
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
+            EdgeAddressResolver.invalidate()
             reportUnderlyingNetwork(network)
         }
 
@@ -183,6 +187,7 @@ class EmberVpnService : VpnService() {
         }
 
         override fun onLost(network: Network) {
+            EdgeAddressResolver.invalidate()
             if (boundNetwork != network) return
             boundNetwork = null
             reportedUnderlying = null
@@ -487,14 +492,13 @@ class EmberVpnService : VpnService() {
     }
 
     private suspend fun connect() {
-
+        val connectStartedAtNanos = System.nanoTime()
         val myGeneration = ++connectionGeneration
 
         lastUnhealthyRedialAt = 0L
 
         boundNetwork = null
 
-        EdgeAddressResolver.invalidate()
         runCatching {
             AppLogger.i(TAG, "connect: starting")
             val tokenStore = TokenStore(applicationContext)
@@ -502,7 +506,12 @@ class EmberVpnService : VpnService() {
             val proxyStateStore = ProxyStateStore(applicationContext)
             val settingsStore = SettingsStore(applicationContext)
 
-            val primaryCandidate = resolveConnectCandidate(proxyStateStore)
+            val selectionStartedAtNanos = System.nanoTime()
+            val primaryCandidate = try {
+                resolveConnectCandidate(proxyStateStore)
+            } finally {
+                AppLogger.i(TAG, "connect: server selection stage took ${elapsedMsSince(selectionStartedAtNanos)} ms")
+            }
             ensureGenerationCurrent(myGeneration)
 
             var candidates = listOf(primaryCandidate)
@@ -635,28 +644,33 @@ class EmberVpnService : VpnService() {
                         "local proxy at $socksBindAddress:$socksPort",
                 )
             } else {
-                val fd = establishTun(excludedApps, dohUrl, mtu = settingsStore.mtu) ?: error("Failed to establish TUN interface")
-                tunFd = fd
-                tunnelInterfaceActive = true
+                val tunnelSetupStartedAtNanos = System.nanoTime()
+                try {
+                    val fd = establishTun(excludedApps, dohUrl, mtu = settingsStore.mtu)
+                        ?: error("Failed to establish TUN interface")
+                    tunFd = fd
+                    tunnelInterfaceActive = true
 
-                reportedUnderlying = null
-                runCatching {
+                    reportedUnderlying = null
+                    runCatching {
+                        firstUsableNetwork()?.let { underlying -> reportUnderlyingNetwork(underlying) }
+                    }
 
-                    firstUsableNetwork()?.let { underlying -> reportUnderlyingNetwork(underlying) }
+                    val tunnelConfigPath = HevSocks5TunnelConfig.write(
+                        applicationContext.filesDir,
+                        socksPort,
+                        useMapDns = mapdnsActive,
+                        mtu = settingsStore.mtu,
+                        // One connection moves at most buffer / round-trip time; 64 KB capped downloads near 0.8 MB/s.
+                        tcpBufferSize = ANDROID_TCP_BUFFER_BYTES,
+                    )
+                    val tunnelStarted = HevSocks5Tunnel.start(tunnelConfigPath, fd.fd)
+                    if (!tunnelStarted) error("Failed to start the tun2socks tunnel (hev-socks5-tunnel)")
+                    AppLogger.i(TAG, "connect: TUN interface up, hev-socks5-tunnel started")
+                    delay(POST_TUN_SETTLE_MS)
+                } finally {
+                    AppLogger.i(TAG, "connect: TUN setup stage took ${elapsedMsSince(tunnelSetupStartedAtNanos)} ms")
                 }
-
-                val tunnelConfigPath = HevSocks5TunnelConfig.write(
-                    applicationContext.filesDir,
-                    socksPort,
-                    useMapDns = mapdnsActive,
-                    mtu = settingsStore.mtu,
-                    // One connection moves at most buffer / round-trip time; 64 KB capped downloads near 0.8 MB/s.
-                    tcpBufferSize = ANDROID_TCP_BUFFER_BYTES,
-                )
-                val tunnelStarted = HevSocks5Tunnel.start(tunnelConfigPath, fd.fd)
-                if (!tunnelStarted) error("Failed to start the tun2socks tunnel (hev-socks5-tunnel)")
-                AppLogger.i(TAG, "connect: TUN interface up, hev-socks5-tunnel started")
-                delay(POST_TUN_SETTLE_MS)
             }
             ensureGenerationCurrent(myGeneration)
 
@@ -699,7 +713,12 @@ class EmberVpnService : VpnService() {
 
             suspend fun dialUpstream(): Pair<H2UpstreamSession, Long?> {
                 val target = activeCandidate()
-                val pass = mintProxyPass()
+                val passStartedAtNanos = System.nanoTime()
+                val pass = try {
+                    mintProxyPass()
+                } finally {
+                    AppLogger.i(TAG, "connect: account and Guardian pass stage took ${elapsedMsSince(passStartedAtNanos)} ms")
+                }
                 currentPassExpiry = pass.expiresAtEpochSeconds
                 val lifetimeNote = pass.expiresAtEpochSeconds?.let { expiresAt ->
                     val seconds = (expiresAt * 1_000L - System.currentTimeMillis()) / 1_000L
@@ -707,8 +726,12 @@ class EmberVpnService : VpnService() {
                 } ?: " (lifetime not stated)"
                 AppLogger.i(TAG, "connect: acquired Guardian proxy pass$lifetimeNote")
 
-                val edgeAddress = customEdgeAddress
-                    ?: resolveEdgeAddress(target.host, upstreamProxyConfig, dohEndpointAddresses)
+                val addressResolutionStartedAtNanos = System.nanoTime()
+                val edgeAddress = try {
+                    customEdgeAddress ?: resolveEdgeAddress(target.host, upstreamProxyConfig, dohEndpointAddresses)
+                } finally {
+                    AppLogger.i(TAG, "connect: edge address resolution stage took ${elapsedMsSince(addressResolutionStartedAtNanos)} ms")
+                }
 
                 val session = H2UpstreamSession(
                     target.host,
@@ -719,7 +742,12 @@ class EmberVpnService : VpnService() {
                     tlsSplitMode = settingsStore.tlsSplitMode,
                 )
                 try {
-                    session.connect()
+                    val upstreamStartedAtNanos = System.nanoTime()
+                    try {
+                        session.connect()
+                    } finally {
+                        AppLogger.i(TAG, "connect: upstream HTTP/2 stage took ${elapsedMsSince(upstreamStartedAtNanos)} ms")
+                    }
                 } catch (failure: Throwable) {
 
                     runCatching { session.close() }
@@ -814,7 +842,10 @@ class EmberVpnService : VpnService() {
             _state.value = ConnectionState.CONNECTED
             statusLabel = connectedText
             updateNotification(connectedText)
-            AppLogger.i(TAG, "connect: CONNECTED via ${establishedCandidate.authority}")
+            AppLogger.i(
+                TAG,
+                "connect: CONNECTED via ${establishedCandidate.authority} after ${elapsedMsSince(connectStartedAtNanos)} ms",
+            )
 
             _connectedEndpoint.value = establishedCandidate.host to establishedCandidate.port
             scope.launch {
@@ -953,7 +984,7 @@ class EmberVpnService : VpnService() {
         }.onFailure { failure ->
 
             if (failure is CancellationException) {
-                AppLogger.i(TAG, "connect: aborted because the connection was cancelled")
+                AppLogger.i(TAG, "connect: aborted after ${elapsedMsSince(connectStartedAtNanos)} ms because the connection was cancelled")
                 releaseResources(detachResources(), stopNativeTunnel = true)
                 return@onFailure
             }
@@ -962,7 +993,7 @@ class EmberVpnService : VpnService() {
             } else {
                 friendlyErrorMessage(failure)
             }
-            AppLogger.e(TAG, "connect failed", failure)
+            AppLogger.e(TAG, "connect failed after ${elapsedMsSince(connectStartedAtNanos)} ms", failure)
             _lastError.value = message
             teardown()
             exitForeground()
