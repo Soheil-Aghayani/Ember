@@ -53,6 +53,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -1024,7 +1025,11 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
                 Text(strings.appearance, style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (choice in listOf("Light", "Dark", "System")) {
-                        FilterChip(selected = theme == choice, onClick = { onThemeChange(choice) }, label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) })
+                        EmberFilterChip(
+                            selected = theme == choice,
+                            onClick = { onThemeChange(choice) },
+                            label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) },
+                        )
                     }
                 }
             }
@@ -1033,7 +1038,7 @@ private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (
                 Text(strings.language, style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for ((code, label) in listOf("en" to strings.englishLanguage, "fa" to strings.persianLanguage)) {
-                        FilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
+                        EmberFilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
                     }
                 }
             }
@@ -1099,7 +1104,11 @@ private fun LogsPage() {
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         for (choice in LogFilter.entries) {
-            FilterChip(selected = filter == choice, onClick = { filter = choice }, label = { Text(when (choice) { LogFilter.All -> strings.allLogs; LogFilter.Info -> strings.infoLogs; LogFilter.Problems -> strings.problemLogs }) })
+            EmberFilterChip(
+                selected = filter == choice,
+                onClick = { filter = choice },
+                label = { Text(when (choice) { LogFilter.All -> strings.allLogs; LogFilter.Info -> strings.infoLogs; LogFilter.Problems -> strings.problemLogs }) },
+            )
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1119,6 +1128,21 @@ private fun LogsPage() {
             }
         }
     }
+}
+
+// Keep desktop chips visually stable on hover; selection remains the only chip fill state.
+@Composable
+private fun EmberFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = label,
+        elevation = FilterChipDefaults.filterChipElevation(hoveredElevation = 0.dp),
+    )
 }
 
 private fun localizedCountry(code: String, fallback: String, strings: Strings): String =
