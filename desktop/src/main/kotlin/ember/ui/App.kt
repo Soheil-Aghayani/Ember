@@ -1223,11 +1223,16 @@ private fun AdvancedSettings(engine: EmberEngine) {
     var mode by remember { mutableStateOf(engine.settings.tlsSplitMode) }
     var mtuText by remember { mutableStateOf(engine.settings.mtu.toString()) }
     var expanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
     val validMtu = parseMtu(mtuText) != null
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand)
-                .clickable(role = Role.Button) { expanded = !expanded }.padding(vertical = 4.dp),
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button,
+                ) { expanded = !expanded }.padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Text(strings.advanced, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

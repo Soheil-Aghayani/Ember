@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ember.engine.EmberEngine
 import ember.engine.SpeedResult
+import java.net.IDN
+import java.net.URI
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +114,10 @@ internal fun SkipVpnSettings(engine: EmberEngine, enabled: Boolean) {
                             input = it
                             invalid = false
                             atLimit = false
-                        }, enabled = enabled, singleLine = true, isError = invalid || atLimit,
+                        }, enabled = enabled, singleLine = true, isError = invalid,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                errorBorderColor = MaterialTheme.colorScheme.outline,
+                            ),
                             placeholder = { Text(strings.addressPlaceholder) },
                             textStyle = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
                             modifier = Modifier.weight(1f))
@@ -144,7 +149,9 @@ internal fun SkipVpnSettings(engine: EmberEngine, enabled: Boolean) {
 }
 
 internal fun normalizeExcludedAddress(value: String): String? {
-    val address = value.trim().lowercase(Locale.ROOT)
+    val input = value.trim()
+    if (input.isEmpty()) return null
+    val address = input.lowercase(Locale.ROOT)
     fun ipv4(ip: String): Boolean {
         val parts = ip.split('.')
         return parts.size == 4 && parts.all { part ->
@@ -152,7 +159,8 @@ internal fun normalizeExcludedAddress(value: String): String? {
                 part.toIntOrNull()?.let { it in 0..255 } == true
         }
     }
-    if ('/' in address) {
+    // Keep malformed numeric CIDRs from being mistaken for URL paths.
+    if ('/' in address && "://" !in address && address.substringBefore('/').all { it in '0'..'9' || it == '.' }) {
         val parts = address.split('/')
         return address.takeIf {
             parts.size == 2 && ipv4(parts[0]) && parts[1].isNotEmpty() &&
@@ -162,11 +170,41 @@ internal fun normalizeExcludedAddress(value: String): String? {
     if (ipv4(address)) return address
     // A malformed numeric IPv4 address must not fall through as a domain.
     if (address.all { it in '0'..'9' || it == '.' }) return null
-    val labels = address.split('.')
-    return address.takeIf {
-        address.length <= 253 && labels.size >= 2 && labels.all { label ->
-            label.length in 1..63 && label.first() != '-' && label.last() != '-' &&
-                label.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }
+
+    val hasUrlParts = "://" in address || '/' in address || '?' in address || '#' in address || ':' in address
+    val hostname = if (hasUrlParts) websiteHostname(input) ?: return null else input
+    val asciiHostname = runCatching {
+        IDN.toASCII(hostname.removeSuffix("."), IDN.USE_STD3_ASCII_RULES).lowercase(Locale.ROOT)
+    }.getOrNull() ?: return null
+    if (ipv4(asciiHostname)) return asciiHostname
+    // A malformed numeric IPv4 host must not fall through as a domain.
+    if (asciiHostname.all { it in '0'..'9' || it == '.' }) return null
+    val labels = asciiHostname.split('.')
+    val validHostname = asciiHostname.length <= 253 && labels.size >= 2 && labels.all { label ->
+        label.length in 1..63 && label.first() != '-' && label.last() != '-' &&
+            label.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }
+    }
+    return asciiHostname.takeIf { validHostname }
+}
+
+private fun websiteHostname(input: String): String? {
+    val hasScheme = "://" in input
+    if (hasScheme && !input.startsWith("http://", ignoreCase = true) &&
+        !input.startsWith("https://", ignoreCase = true)
+    ) return null
+    val uri = runCatching { URI(if (hasScheme) input else "https://$input") }.getOrNull() ?: return null
+    if (uri.scheme?.lowercase(Locale.ROOT) !in setOf("http", "https") || uri.rawUserInfo != null) return null
+    if (uri.port != -1 && uri.port !in 1..65535) return null
+
+    val authority = uri.rawAuthority ?: return null
+    if ('@' in authority || authority.startsWith('[')) return null // IPv6 exclusions are not supported.
+    val host = uri.host ?: run {
+        // URI.host is null for valid internationalized domain names; parse their authority for IDN conversion.
+        val colon = authority.lastIndexOf(':')
+        if (colon < 0) authority else {
+            val port = authority.substring(colon + 1).toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
+            authority.substring(0, colon).takeIf { port > 0 } ?: return null
         }
     }
+    return host.takeIf { it.isNotBlank() }
 }

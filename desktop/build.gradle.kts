@@ -26,6 +26,8 @@ dependencies {
     // Windows DPAPI for the stored sign-in session.
     implementation("net.java.dev.jna:jna-platform:5.14.0")
     implementation("com.google.zxing:core:3.5.3")
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 // Whole-device mode on Windows needs a tun2socks engine and the Wintun driver library. They are downloaded
