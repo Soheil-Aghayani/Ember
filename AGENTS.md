@@ -2,6 +2,16 @@
 
 Ember is a free, open-source VPN client (MIT) that signs in with a Firefox account and tunnels traffic through Mozilla's VPN edge. It is a fork of FoxyVPN with a new design. Read this file before changing anything.
 
+## Product targets
+
+| Target | Status | Compatibility rule |
+|---|---|---|
+| Windows PC | Current target | Windows desktop app; whole-device mode is experimental and must not be run by an agent. |
+| Android phone | Current target | Android app is phone-oriented and uses touch-first layouts. |
+| Sony Smart TV | Planned; model and OS not identified | Do not claim the phone app supports TV. Record the exact TV model and OS, then decide whether Android/Google TV can be supported or a separate client is required. A TV client needs remote-first focus/D-pad navigation and real-device validation. |
+
+Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A successful phone build is not evidence of Sony TV support.
+
 ## Layout
 
 | Folder | What it is |
@@ -10,6 +20,12 @@ Ember is a free, open-source VPN client (MIT) that signs in with a Firefox accou
 | `core/` | JVM-only engine shared by Android and desktop: Firefox sign-in, Mozilla proxy pass, server list, HTTP/2 tunnel, local SOCKS5/HTTP proxies. No Android APIs allowed here. |
 | `desktop/` | Compose Desktop app, Windows first. `desktop/appResources/windows-x64/ember-tunnel.ps1` is the elevated tunnel helper. |
 | `design/` | Design tokens (`tokens.json`), brand assets, store graphics. |
+| `docs/` | Project map, platform status, and contributor-facing architecture notes. |
+| `helper/` | Native Rust helper for Windows whole-device tunnel setup. Do not run it. |
+| `tools/` | Repository utilities and asset-conversion scripts. |
+| `.github/` | Repository metadata and workflow definitions; local policy forbids running GitHub Actions. |
+
+Root Gradle files coordinate builds. `.gradle/`, `.kotlin/`, and module `build/` folders are generated caches/artifacts, not maintained source.
 
 ## Rules
 

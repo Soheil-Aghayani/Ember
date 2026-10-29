@@ -4,7 +4,7 @@
 
 # Ember
 
-**A free, open-source VPN client for Windows and Android that signs in with your Firefox account.**
+**A free, open-source VPN client for Windows PCs and Android phones that signs in with your Firefox account. Sony Smart TV support is planned.**
 
 ![Android](https://img.shields.io/badge/Android-212121?style=for-the-badge&logo=android&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-212121?style=for-the-badge&logo=windows&logoColor=white)
@@ -24,6 +24,14 @@
 ## What it does
 
 Ember signs in with your Firefox account, asks Mozilla's Guardian service for a proxy pass, and carries your traffic to Mozilla's VPN servers over an encrypted HTTP/2 tunnel.
+
+### Target devices
+
+| Device | Status | Notes |
+|---|---|---|
+| Windows PC | Current target | Windows 10/11, 64-bit. Whole-device mode is experimental. |
+| Android phone | Current target | Android 8.0 or newer. |
+| Sony Smart TV | Planned; compatibility not established | No TV build exists yet. The exact TV model and operating system must be identified before choosing an implementation. |
 
 | | Windows | Android |
 |---|---|---|
@@ -70,11 +78,17 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 | Folder | Contents |
 |---|---|
-| `android/` | Android app (Kotlin, Jetpack Compose, Material 3) |
-| `desktop/` | Windows app (Kotlin, Compose Desktop) and the elevated network helper |
-| `core/` | Shared engine: Firefox sign-in, Mozilla proxy pass, server list, HTTP/2 tunnel, local proxies |
-| `design/` | Design tokens, brand assets, store graphics, third-party notices |
-| `tools/` | Scripts, for example the SVG to Android vector converter |
+| `android/` | Android phone app: Kotlin, Jetpack Compose, VPN service, resources, and Android build configuration |
+| `desktop/` | Windows desktop app: Kotlin/Compose UI, resources, and installer packaging |
+| `core/` | Platform-neutral JVM logic: Firefox sign-in, session transfer, proxy pass, server list, HTTP/2 tunnel, local proxies |
+| `helper/` | Native Rust helper for Windows whole-device tunnel setup |
+| `design/` | Design tokens, brand assets, store graphics, and third-party notices |
+| `tools/` | Repository utilities, including asset converters |
+| `docs/` | Architecture map, platform status, and contributor documentation |
+| `.github/` | Repository metadata and workflow definitions |
+| Root Gradle files | Shared build configuration and module inclusion |
+
+Generated `.gradle/`, `.kotlin/`, and module `build/` folders are build output/cache areas, not source. Read [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) for ownership boundaries and the Sony TV compatibility gate.
 
 Design: warm neutrals with Firefox orange and violet accents, Inter typeface, Solar icons, round country flags. Source of truth: [`design/tokens.json`](design/tokens.json).
 
@@ -84,12 +98,17 @@ Design: warm neutrals with Firefox orange and violet accents, Inter typeface, So
 
 Windows (on a Windows PC): JDK 17 or newer, Gradle 8.10, Rust (`cargo`) and [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
-```bash
-# 1. the app folder (also builds the native helper in helper/ and fetches the checksum-verified tunnel engine)
-EMBER_VERSION=1.0.40 gradle -p desktop createDistributable
+```powershell
+# 1. Build the Windows app folder.
+$env:EMBER_VERSION = '1.0.51'
+gradle -p desktop createDistributable
 
-# 2. the installer
-ISCC.exe /DVersion=1.0.40 /DSourceDir=desktop/build/compose/binaries/main/app/Ember /DOutputDir=desktop/build/compose/binaries/main/exe desktop/packaging/ember.iss
+# 2. Build the installer from the desktop/ directory.
+Set-Location desktop
+& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=1.0.51 `
+  "/DSourceDir=$PWD\build\compose\binaries\main\app\Ember" `
+  "/DOutputDir=$PWD\build\installer" `
+  packaging\ember.iss
 ```
 
 Android needs Android SDK 35 with NDK `26.1.10909125`:
@@ -97,6 +116,8 @@ Android needs Android SDK 35 with NDK `26.1.10909125`:
 ```bash
 gradle :android:assembleDebug
 ```
+
+The Android debug APK is written to `android/build/outputs/apk/debug/android-debug.apk`.
 
 The helper's unit tests run with `cargo test --manifest-path helper/Cargo.toml`.
 

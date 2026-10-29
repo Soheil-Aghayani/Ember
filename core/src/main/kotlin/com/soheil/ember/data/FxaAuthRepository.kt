@@ -97,7 +97,8 @@ class FxaAuthRepository(
 
     /** Signs in with a refresh token from [SessionTransfer.open]; it is kept only when FxA accepts it. */
     suspend fun signInWithRefreshToken(refreshToken: String): Result<Unit> = runCatching {
-        tokenStore.saveAuth(RuntimeAuth(accessToken = "", refreshToken = refreshToken, expiresAtEpochSeconds = 0))
+        // The stores ignore a blank access token; this placeholder is expired, so the next call renews it.
+        tokenStore.saveAuth(RuntimeAuth(accessToken = "pending", refreshToken = refreshToken, expiresAtEpochSeconds = 0))
         try {
             ensureFreshAccessToken(force = true)
         } catch (failure: Throwable) {

@@ -150,6 +150,7 @@ dependencies {
     implementation("io.netty:netty-handler-proxy:4.1.115.Final")
 
     implementation("org.conscrypt:conscrypt-android:2.5.2")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

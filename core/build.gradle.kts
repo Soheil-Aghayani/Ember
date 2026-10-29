@@ -28,4 +28,6 @@ dependencies {
     implementation("io.netty:netty-codec-http2:4.1.115.Final")
     implementation("io.netty:netty-transport:4.1.115.Final")
     implementation("io.netty:netty-handler-proxy:4.1.115.Final")
+
+    testImplementation("junit:junit:4.13.2")
 }

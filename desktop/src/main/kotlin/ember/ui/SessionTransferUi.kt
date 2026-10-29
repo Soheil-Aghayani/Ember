@@ -1,5 +1,6 @@
 package ember.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
@@ -22,13 +24,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.FxaAuthRepository
 import com.soheil.ember.data.SessionTransfer
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import java.awt.image.BufferedImage
 import kotlinx.coroutines.launch
+
+private fun qrBitmap(text: String): ImageBitmap {
+    val matrix = QRCodeWriter().encode(
+        text, BarcodeFormat.QR_CODE, 0, 0,
+        mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.MARGIN to 2),
+    )
+    val scale = 6
+    val image = BufferedImage(matrix.width * scale, matrix.height * scale, BufferedImage.TYPE_INT_RGB)
+    for (y in 0 until image.height) for (x in 0 until image.width) {
+        image.setRGB(x, y, if (matrix[x / scale, y / scale]) 0x1F1A17 else 0xFFFFFF)
+    }
+    return image.toComposeImageBitmap()
+}
 
 /** Settings card: shows a one-time code that signs another device in without the account password. */
 @Composable
@@ -54,6 +77,14 @@ internal fun SessionTransferCard(auth: FxaAuthRepository) {
                 SelectionContainer {
                     Text(pair.passphrase, style = MaterialTheme.typography.headlineSmall, fontFamily = FontFamily.Monospace)
                 }
+                Spacer(Modifier.height(8.dp))
+                Text(strings.transferQr, style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(4.dp))
+                Image(
+                    remember(pair.qrPayload) { qrBitmap(pair.qrPayload) },
+                    contentDescription = strings.transferQr,
+                    modifier = Modifier.size(220.dp).clip(RoundedCornerShape(8.dp)),
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(strings.transferCode, style = MaterialTheme.typography.labelMedium)
                 SelectionContainer {

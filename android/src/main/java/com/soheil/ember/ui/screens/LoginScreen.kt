@@ -1,6 +1,7 @@
 package com.soheil.ember.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,8 @@ import com.soheil.ember.data.FXA_SIGN_UP_URL
 import com.soheil.ember.data.FxaAuthRepository
 import com.soheil.ember.data.SessionTransfer
 import com.soheil.ember.data.isBlockedByMozilla
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
 
 @Composable
@@ -100,17 +103,37 @@ fun LoginScreen(
         }
     }
 
-    fun doSubmitTransfer() {
-        if (transferCode.isBlank() || transferPassphrase.isBlank() || isLoading) return
+    fun doTransfer(open: () -> Result<String>) {
+        if (isLoading) return
         errorMessage = null
         isLoading = true
         scope.launch {
-            val opened = SessionTransfer.open(transferCode, transferPassphrase)
+            val opened = open()
             val failure = opened.exceptionOrNull()
                 ?: authRepository.signInWithRefreshToken(opened.getOrThrow()).exceptionOrNull()
             isLoading = false
             if (failure == null) onSignedIn() else errorMessage = failure.message ?: "Sign-in failed"
         }
+    }
+
+    fun doSubmitTransfer() {
+        if (transferCode.isBlank() || transferPassphrase.isBlank()) return
+        doTransfer { SessionTransfer.open(transferCode, transferPassphrase) }
+    }
+
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val text = result.contents
+        if (text != null) doTransfer { SessionTransfer.openPayload(text) }
+    }
+
+    fun scanTransferQr() {
+        scanner.launch(
+            ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt("Point the camera at the QR code in Ember on your other device")
+                .setBeepEnabled(false)
+                .setOrientationLocked(true),
+        )
     }
 
     fun doSubmitTwoFactor() {
@@ -166,6 +189,19 @@ fun LoginScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.padding(top = 12.dp))
+                Button(
+                    onClick = { scanTransferQr() },
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text("Scan QR code") }
+                Spacer(Modifier.padding(top = 16.dp))
+                Text(
+                    "Or enter the code by hand",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.padding(top = 8.dp))
                 OutlinedTextField(
                     value = transferCode,
                     onValueChange = { transferCode = it },

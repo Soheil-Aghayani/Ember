@@ -24,7 +24,16 @@ object SessionTransfer {
     private const val NONCE_BYTES = 12
     private const val TAG_BITS = 128
 
-    class Created(val code: String, val passphrase: String)
+    class Created(val code: String, val passphrase: String) {
+        /** What the QR code holds: scanning it hands over the code and the passphrase together. */
+        val qrPayload: String get() = "$code#$passphrase"
+    }
+
+    /** Like [open], for text scanned from a QR code (`code#passphrase`). */
+    fun openPayload(payload: String, nowMillis: Long = System.currentTimeMillis()): Result<String> {
+        val (code, passphrase) = payload.trim().split('#', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        return open(code, passphrase, nowMillis)
+    }
 
     private val random = SecureRandom()
 
