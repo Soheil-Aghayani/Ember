@@ -1,6 +1,9 @@
 package ember
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -10,11 +13,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberWindowState
@@ -23,6 +28,7 @@ import ember.engine.EmberEngine
 import ember.engine.UpdateCheck
 import ember.engine.appDataDir
 import ember.ui.EmberApp
+import ember.ui.EmberMacWindowTitleBar
 import ember.ui.EmberTheme
 import ember.ui.EnglishStrings
 import ember.ui.LocalStrings
@@ -37,9 +43,13 @@ fun main(args: Array<String>) = application {
     var update by remember { mutableStateOf<String?>(null) }
     val state by engine.state.collectAsState()
     val windowState = rememberWindowState(width = 960.dp, height = 680.dp)
+    val useMacStyleChrome = System.getProperty("os.name").startsWith("Windows")
     val quit = {
         engine.shutdown()
         exitApplication()
+    }
+    val closeWindow = {
+        if (isTraySupported && engine.settings.keepInTray) visible = false else quit()
     }
     LaunchedEffect(Unit) { update = UpdateCheck.latestVersion() }
     if (isTraySupported) {
@@ -56,13 +66,13 @@ fun main(args: Array<String>) = application {
         }
     }
     Window(
-        onCloseRequest = {
-            if (isTraySupported && engine.settings.keepInTray) visible = false else quit()
-        },
+        onCloseRequest = closeWindow,
         title = "Ember",
         icon = painterResource("ember_logo.png"),
         state = windowState,
         visible = visible,
+        undecorated = useMacStyleChrome,
+        resizable = true,
     ) {
         val density = LocalDensity.current
         LaunchedEffect(density) {
@@ -76,12 +86,33 @@ fun main(args: Array<String>) = application {
             "Dark" -> true
             else -> isSystemInDarkTheme()
         }) {
-            CompositionLocalProvider(
-                LocalStrings provides strings,
-                LocalLayoutDirection provides if (language == "fa") LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                EmberApp(engine, theme, { theme = it; engine.settings.theme = it },
-                    language, { language = it; engine.settings.language = it }, update, { update = null })
+            CompositionLocalProvider(LocalStrings provides strings) {
+                Column(Modifier.fillMaxSize()) {
+                    if (useMacStyleChrome) {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            EmberMacWindowTitleBar(
+                                isMaximized = windowState.placement == WindowPlacement.Maximized,
+                                onClose = closeWindow,
+                                onMinimize = { windowState.isMinimized = true },
+                                onZoom = {
+                                    windowState.placement = if (windowState.placement == WindowPlacement.Maximized) {
+                                        WindowPlacement.Floating
+                                    } else {
+                                        WindowPlacement.Maximized
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    Box(Modifier.weight(1f).fillMaxSize()) {
+                        CompositionLocalProvider(
+                            LocalLayoutDirection provides if (language == "fa") LayoutDirection.Rtl else LayoutDirection.Ltr,
+                        ) {
+                            EmberApp(engine, theme, { theme = it; engine.settings.theme = it },
+                                language, { language = it; engine.settings.language = it }, update, { update = null })
+                        }
+                    }
+                }
             }
         }
     }

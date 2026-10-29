@@ -1,11 +1,13 @@
 package ember.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
@@ -33,7 +35,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -86,8 +87,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.AppLogger
@@ -377,12 +376,12 @@ private fun MainShell(
         }
     }
 
-    Row(Modifier.fillMaxSize()) {
-        Sidebar(page) { page = it }
-        Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        MacTabBar(page) { page = it }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         AnimatedContent(
             targetState = page,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentAlignment = Alignment.TopCenter,
             transitionSpec = {
                 // The new page rises or sinks in from the side of the sidebar item it came from, while the old one fades out.
@@ -395,7 +394,7 @@ private fun MainShell(
             label = "page",
         ) { current ->
             Column(
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(32.dp),
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
                 when (current) {
                     Page.Home -> HomePage(engine, selected, countries, countriesLoading, countriesFailure,
@@ -411,48 +410,73 @@ private fun MainShell(
 }
 
 @Composable
-private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
+private fun MacTabBar(selected: Page, onSelect: (Page) -> Unit) {
     val strings = LocalStrings.current
-    Column(
-        Modifier.width(220.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        Modifier.fillMaxWidth().height(EmberDesktopMetrics.tabBarHeight),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(start = 8.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource("ember_logo.png"), contentDescription = null, modifier = Modifier.size(36.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Ember", style = MaterialTheme.typography.headlineSmall)
-        }
-        for (p in Page.entries) {
-            val active = p == selected
-            val interaction = remember { MutableInteractionSource() }
-            val hovered by interaction.collectIsHoveredAsState()
-            // The highlight fades from the old item to the new one instead of jumping.
-            val background by animateColorAsState(
-                when {
-                    active -> MaterialTheme.colorScheme.primaryContainer
-                    hovered -> MaterialTheme.colorScheme.surfaceVariant
-                    else -> MaterialTheme.colorScheme.surface
-                },
-                tween(220),
-            )
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(background)
-                    .hoverable(interaction)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .clickable(role = Role.Button) { onSelect(p) }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            ) {
-                val contentColor by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                    tween(220),
+        Row(
+            Modifier.widthIn(max = EmberDesktopMetrics.tabGroupMaxWidth).fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(EmberDesktopMetrics.tabGroupInset)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(EmberDesktopMetrics.tabGap),
+        ) {
+            for (p in Page.entries) {
+                val active = p == selected
+                val interaction = remember { MutableInteractionSource() }
+                val hovered by interaction.collectIsHoveredAsState()
+                val background by animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.surface
+                    else if (hovered) MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    tween(150),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    EmberIcon(p.icon, 20.dp, contentColor)
-                    Spacer(Modifier.width(12.dp))
-                    Text(when (p) { Page.Home -> strings.home; Page.Locations -> strings.locations; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
+                val contentColor by animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tween(150),
+                )
+                Box(
+                    Modifier.weight(1f).height(EmberDesktopMetrics.tabHeight)
+                        .clip(RoundedCornerShape(EmberDesktopMetrics.tabSegmentRadius))
+                        .background(background)
+                        .then(
+                            if (active) Modifier.border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(EmberDesktopMetrics.tabSegmentRadius),
+                            ) else Modifier,
+                        )
+                        .hoverable(interaction)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .selectable(
+                            selected = active,
+                            interactionSource = interaction,
+                            indication = null,
+                            role = Role.Tab,
+                        ) { onSelect(p) }
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EmberIcon(p.icon, 18.dp, contentColor)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            when (p) {
+                                Page.Home -> strings.home
+                                Page.Locations -> strings.locations
+                                Page.Settings -> strings.settings
+                                Page.Logs -> strings.logs
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = contentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -484,6 +508,12 @@ private fun HomePage(
     val quota by engine.quota.collectAsState()
     LaunchedEffect(Unit) { engine.refreshQuota() }
     var menuOpen by remember { mutableStateOf(false) }
+    var countryQuery by remember { mutableStateOf("") }
+    LaunchedEffect(menuOpen) { if (!menuOpen) countryQuery = "" }
+    val availableCountries = remember(countries, strings.languageCode) {
+        countries.filter { it.code.isNotBlank() && it.code != RECOMMENDED_COUNTRY_CODE }
+            .sortedBy { localizedCountry(it.code, it.name, strings) }
+    }
     val canPick = state == ConnectionState.DISCONNECTED
     LaunchedEffect(canPick) { if (!canPick) menuOpen = false }
     val interaction = remember { MutableInteractionSource() }
@@ -600,9 +630,7 @@ private fun HomePage(
         val shownName = if (shownCode.length == 2) {
             localizedCountry(shownCode, location?.countryName.orEmpty(), strings)
         } else strings.recommended
-        val density = LocalDensity.current
-        var pillWidthPx by remember { mutableStateOf(0) }
-        Box(Modifier.fillMaxWidth().onSizeChanged { pillWidthPx = it.width }) {
+        Box(Modifier.fillMaxWidth()) {
             Card {
                 Row(
                     Modifier.fillMaxWidth().background(
@@ -626,39 +654,104 @@ private fun HomePage(
                 expanded = menuOpen && canPick,
                 onDismissRequest = { menuOpen = false },
                 modifier = Modifier
-                    .width(with(density) { pillWidthPx.toDp() })
-                    .heightIn(max = 280.dp),
+                    .width(EmberDesktopMetrics.countryPickerWidth)
+                    .heightIn(max = EmberDesktopMetrics.countryPickerMaxHeight),
                 offset = DpOffset(0.dp, 6.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(EmberDesktopMetrics.countryPopoverRadius),
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 shadowElevation = 6.dp,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
-                DropdownMenuItem(
-                    text = { Text(strings.recommended) },
-                    leadingIcon = { EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
-                    trailingIcon = { if (isRecommended) Text(strings.selected, color = MaterialTheme.colorScheme.primary) },
-                    onClick = { onPick(null, "", ""); menuOpen = false },
-                )
-                for (country in countries.filter { it.code.isNotBlank() && it.code != RECOMMENDED_COUNTRY_CODE }
-                    .sortedBy { localizedCountry(it.code, it.name, strings) }) {
-                    DropdownMenuItem(
-                        text = { Text(localizedCountry(country.code, country.name, strings)) },
-                        leadingIcon = { FlagIcon(country.code) },
-                        trailingIcon = { if (selected?.countryCode == country.code) Text(strings.selected, color = MaterialTheme.colorScheme.primary) },
-                        onClick = {
-                            onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
-                            menuOpen = false
-                        },
-                    )
+                AnimatedVisibility(
+                    visible = menuOpen && canPick,
+                    enter = fadeIn(tween(220)) +
+                        slideInVertically(tween(220, easing = FastOutSlowInEasing)) { -it / 28 } +
+                        scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.95f),
+                    exit = fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.98f),
+                ) {
+                    Column(Modifier.width(EmberDesktopMetrics.countryPickerWidth)) {
+                        OutlinedTextField(
+                            value = countryQuery,
+                            onValueChange = { countryQuery = it },
+                            modifier = Modifier.fillMaxWidth().padding(
+                                horizontal = EmberDesktopMetrics.countrySearchHorizontalInset,
+                                vertical = EmberDesktopMetrics.countrySearchVerticalInset,
+                            ),
+                            placeholder = { Text(strings.searchCountries) },
+                            leadingIcon = {
+                                EmberIcon("magnifier", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                            },
+                            trailingIcon = {
+                                if (countryQuery.isNotEmpty()) {
+                                    androidx.compose.material3.IconButton(onClick = { countryQuery = "" }) {
+                                        EmberIcon("close", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant,
+                                            contentDescription = strings.clearSearch)
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(EmberDesktopMetrics.countrySearchRadius),
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                        )
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = EmberDesktopMetrics.countryListMaxHeight)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(strings.recommended) },
+                                leadingIcon = { EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                                trailingIcon = {
+                                    if (isRecommended) EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary,
+                                        contentDescription = strings.selected)
+                                },
+                                onClick = { onPick(null, "", ""); menuOpen = false },
+                            )
+                            val query = countryQuery.trim()
+                            val matchingCountries = availableCountries.filter { country ->
+                                val name = localizedCountry(country.code, country.name, strings)
+                                query.isEmpty() || name.contains(query, ignoreCase = true) || country.code.contains(query, ignoreCase = true)
+                            }
+                            for (country in matchingCountries) {
+                                DropdownMenuItem(
+                                    text = { Text(localizedCountry(country.code, country.name, strings)) },
+                                    leadingIcon = { FlagIcon(country.code) },
+                                    trailingIcon = {
+                                        if (selected?.countryCode.equals(country.code, ignoreCase = true)) {
+                                            EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary,
+                                                contentDescription = strings.selected)
+                                        }
+                                    },
+                                    onClick = {
+                                        onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
+                                        menuOpen = false
+                                    },
+                                )
+                            }
+                            if (matchingCountries.isEmpty() && !countriesLoading) {
+                                Text(
+                                    strings.noCountriesFound,
+                                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                            if (countriesLoading && countries.isEmpty()) {
+                                CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp), strokeWidth = 2.dp)
+                            }
+                            countriesFailure?.let {
+                                Text(it, Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        DropdownMenuItem(
+                            text = { Text(strings.moreLocations) },
+                            onClick = { menuOpen = false; onOpenLocations() },
+                        )
+                    }
                 }
-                if (countriesLoading && countries.isEmpty()) {
-                    CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp), strokeWidth = 2.dp)
-                }
-                countriesFailure?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                DropdownMenuItem(text = { Text(strings.moreLocations) }, onClick = { menuOpen = false; onOpenLocations() })
             }
         }
         quota?.remaining?.let { remaining ->

@@ -13,6 +13,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // Values mirror design/tokens.json. Edit the tokens first, then mirror here.
@@ -72,6 +74,46 @@ data class EmberStatusColors(val connected: Color, val connecting: Color)
 
 val LocalEmberStatusColors = staticCompositionLocalOf { EmberStatusColors(Color(0xFF1E7A3C), Color(0xFF8A5A00)) }
 
+data class EmberWindowControlColors(
+    val close: Color,
+    val minimize: Color,
+    val zoom: Color,
+    val glyph: Color,
+)
+
+private val WindowControlColors = EmberWindowControlColors(
+    close = Color(0xFFFF5F57),
+    minimize = Color(0xFFFEBC2E),
+    zoom = Color(0xFF28C840),
+    glyph = Color(0xFF4B4139),
+)
+
+val LocalEmberWindowControlColors = staticCompositionLocalOf { WindowControlColors }
+
+object EmberDesktopMetrics {
+    val titleBarHeight: Dp = 38.dp
+    val windowControlTarget: Dp = 32.dp
+    val windowControlDot: Dp = 12.dp
+    val windowControlGlyph: Dp = 8.dp
+    val windowControlGap: Dp = 4.dp
+    val windowControlInset: Dp = 8.dp
+    val brandMark: Dp = 20.dp
+    val brandGap: Dp = 8.dp
+    val tabBarHeight: Dp = 58.dp
+    val tabGroupMaxWidth: Dp = 540.dp
+    val tabHeight: Dp = 42.dp
+    val tabGroupInset: Dp = 4.dp
+    val tabGap: Dp = 4.dp
+    val tabSegmentRadius: Dp = 8.dp
+    val countryPickerWidth: Dp = 360.dp
+    val countryPickerMaxHeight: Dp = 420.dp
+    val countryListMaxHeight: Dp = 300.dp
+    val countryPopoverRadius: Dp = 16.dp
+    val countrySearchRadius: Dp = 12.dp
+    val countrySearchHorizontalInset: Dp = 12.dp
+    val countrySearchVerticalInset: Dp = 8.dp
+}
+
 @Composable
 fun statusColors(): EmberStatusColors = LocalEmberStatusColors.current
 
@@ -79,7 +121,10 @@ fun statusColors(): EmberStatusColors = LocalEmberStatusColors.current
 fun EmberTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val status = if (darkTheme) EmberStatusColors(Color(0xFF5FD17F), Color(0xFFFFC46B))
     else EmberStatusColors(Color(0xFF1E7A3C), Color(0xFF8A5A00))
-    CompositionLocalProvider(LocalEmberStatusColors provides status) {
+    CompositionLocalProvider(
+        LocalEmberStatusColors provides status,
+        LocalEmberWindowControlColors provides WindowControlColors,
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
             typography = EmberTypography,
