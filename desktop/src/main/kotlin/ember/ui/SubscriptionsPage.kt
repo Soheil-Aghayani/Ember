@@ -51,7 +51,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val results by engine.subscriptions.results.collectAsState()
     val testing by engine.testProgress.collectAsState()
     val state by engine.state.collectAsState()
-    var selectedId by remember { mutableStateOf(if (engine.settings.useSubscription) engine.settings.selectedNodeId else "") }
+    var selectedId by remember { mutableStateOf(engine.settings.selectedNodeId) }
     var showAdd by remember { mutableStateOf(false) }
     var busyId by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -92,7 +92,6 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             onSelect = { node ->
                 selectedId = node.id
                 engine.settings.selectedNodeId = node.id
-                engine.settings.useSubscription = true
             },
             onTest = { engine.testNodes(subscription.nodes) },
             onRefresh = {
@@ -106,7 +105,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             onRemove = {
                 if (subscription.nodes.any { it.id == selectedId }) {
                     selectedId = ""
-                    engine.settings.useSubscription = false
+                    engine.settings.selectedNodeId = ""
                 }
                 engine.subscriptions.remove(subscription.id)
             },
@@ -189,8 +188,12 @@ private fun SubscriptionCard(
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    node.flagCode?.let {
+                        FlagIcon(it, 24.dp)
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Column(Modifier.weight(1f)) {
-                        Text(node.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(node.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(node.protocol.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (result != null) {

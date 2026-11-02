@@ -78,7 +78,7 @@ fun main(args: Array<String>) = application {
         }) {
             Item(strings.openEmber, onClick = { windowState.isMinimized = false; visible = true })
             Item(if (state == ConnectionState.DISCONNECTED) strings.connect else strings.disconnect, onClick = {
-                if (state == ConnectionState.DISCONNECTED) engine.connect(null) else engine.disconnect()
+                if (state == ConnectionState.DISCONNECTED) engine.connectSelected() else engine.disconnect()
             })
             Separator()
             Item(strings.quit, onClick = quit)

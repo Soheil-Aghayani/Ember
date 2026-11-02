@@ -19,7 +19,23 @@ data class ProxyNode(
 ) {
     /** Placeholder rows panels add to show traffic left or expiry ("99 GB left"); they cannot be connected to. */
     val isInfo: Boolean get() = host.lowercase() in INFO_HOSTS || port <= 1
+
+    /** Two-letter country code from a flag emoji at the start of the name, which panels put there ("🇹🇷 Turkey 1"). */
+    val flagCode: String?
+        get() {
+            val points = name.codePoints().limit(2).toArray()
+            if (points.size < 2 || points.any { it !in REGIONAL_A..REGIONAL_Z }) return null
+            return points.map { ('a' + (it - REGIONAL_A)) }.joinToString("")
+        }
+
+    /** The name without the leading flag emoji (the app draws the flag itself). */
+    val title: String
+        get() = if (flagCode == null) name else name.codePoints().skip(2).toArray()
+            .let { String(it, 0, it.size) }.trim().ifBlank { name }
 }
+
+private const val REGIONAL_A = 0x1F1E6
+private const val REGIONAL_Z = 0x1F1FF
 
 /** Reads `vless://`, `vmess://`, `trojan://` and `ss://` share links and turns them into Xray outbounds. */
 object ShareLinks {

@@ -4,9 +4,8 @@
 
 # Ember
 
-**A free, open-source VPN client for Windows PCs and Android devices that signs in with your Firefox account. An initial Android TV experience targets the Sony BRAVIA BF1; real-TV validation is pending.**
+**A free, open-source VPN client for Windows that connects through the servers of your own subscription link, tests them and picks the fastest.**
 
-![Android](https://img.shields.io/badge/Android-212121?style=for-the-badge&logo=android&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-212121?style=for-the-badge&logo=windows&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-212121?style=for-the-badge&logo=kotlin&logoColor=white)
 ![License](https://img.shields.io/badge/License_MIT-212121?style=for-the-badge)
@@ -17,40 +16,33 @@
 > **Ember is an early, experimental project.** The Windows whole-device mode changes your routes and firewall rules and has only been tested by its author. Builds are not code-signed yet. Do not rely on it where your safety depends on it.
 
 > [!NOTE]
-> Ember is **not affiliated with or endorsed by Mozilla**. It talks to the same service the Firefox browser's built-in VPN uses and runs on the free **50 GB of monthly traffic Mozilla includes with a Firefox account**. When the allowance is used up, connections stop until it resets. Mozilla's terms apply to that service.
+> Ember does not provide servers. You bring a subscription link from a provider you trust; Ember reads it and connects through its servers. Your provider's terms apply.
 
 <br>
 
 ## What it does
 
-Ember signs in with your Firefox account, asks Mozilla's Guardian service for a proxy pass, and carries your traffic to Mozilla's VPN servers over an encrypted HTTP/2 tunnel.
+You paste a subscription link (`https://…/sub/…`). Ember downloads the server list, shows your data use and days left when the panel reports them, measures the delay and download speed of every server, sorts the list from fastest to slowest and connects through the server you pick. The servers run in [Xray-core](https://github.com/XTLS/Xray-core): VLESS (including REALITY), VMess, Trojan and Shadowsocks links.
 
 ### Target devices
 
 | Device | Status | Notes |
 |---|---|---|
 | Windows PC | Current target | Windows 10/11, 64-bit. Whole-device mode is experimental. |
-| Android phone | Current target | Android 8.0 or newer. |
-| Sony Smart TV | Initial Android TV experience implemented; device validation pending | Sony BRAVIA BF1, Android TV OS 12. The Android package has a TV launcher entry and remote-first screens; physical-TV behavior is not yet verified. |
+| Android phone and Android TV | Not converted yet | The Android app in this repository still belongs to an earlier version of the project and does not use subscription links. |
 
-| | Windows | Android |
-|---|---|---|
-| Sign in with a Firefox account (including email code) | yes | yes |
-| Choose a country or city, flags, live exit check | yes | yes |
-| Monthly data left | yes | yes |
-| Days until the allowance resets | yes | not yet |
-| Protect the whole device | yes, experimental | yes |
-| Kill switch (block traffic if the tunnel drops) | yes (whole-device mode) | use Android's "Block connections without VPN" setting |
-| Proxy-only mode (SOCKS5 and HTTP on your computer) | yes | yes |
-| Reconnect after sleep or network change | yes | yes |
-| Tray icon, start with Windows, auto-connect | yes | n/a |
-| Split tunneling, DNS over HTTPS, upstream proxy | no | yes |
-| Addresses that skip the VPN (websites or IP ranges) | yes (whole-device mode) | not yet |
-| Pick the fastest server automatically | yes | not yet |
-| Speed test through the tunnel | yes | not yet |
-| TLS fragmentation, custom MTU | yes | yes |
-| English and Persian (right-to-left) | yes (Windows) | not yet |
-| Light, dark and system theme | yes | yes |
+| Windows | |
+|---|---|
+| Add subscription links, refresh them, see usage and days left | yes |
+| Servers sorted by measured speed, with delay and speed per server | yes |
+| Protect the whole device (Wintun adapter) | yes, experimental |
+| Kill switch (block traffic if the tunnel drops) | yes |
+| Proxy-only mode (SOCKS5 and HTTP on your computer) | yes |
+| Reconnect after sleep or network change | yes |
+| Connect automatically on networks you do not trust | yes |
+| Addresses that skip the VPN (websites or IP ranges) | yes |
+| Tray icon, start with Windows, speed test through the tunnel | yes |
+| English and Persian (right-to-left), light and dark theme | yes |
 
 <br>
 
@@ -68,10 +60,10 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 ## How to use
 
-1. Get a Firefox account (free): [accounts.firefox.com](https://accounts.firefox.com/signup).
-2. Install Ember and **sign in** with that account.
-3. Pick a location (or keep "Recommended") and press **Connect**.
-4. On Windows, turn on **whole-device mode** in Settings to protect every app. Windows asks for administrator permission when you connect.
+1. Get a subscription link from your VPN provider.
+2. Install Ember, open **Servers**, press **Add link** and paste it.
+3. Press **Test speed**, click the fastest server and press **Connect** on Home.
+4. Whole-device mode is on by default and protects every app. Windows asks for administrator permission when you connect.
 
 <br>
 
@@ -81,7 +73,7 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 |---|---|
 | `android/` | Android phone and TV app: Kotlin, Jetpack Compose, VPN service, platform-aware screens, resources, and Android build configuration |
 | `desktop/` | Windows desktop app: Kotlin/Compose UI, resources, and installer packaging |
-| `core/` | Platform-neutral JVM logic: Firefox sign-in, session transfer, proxy pass, server list, HTTP/2 tunnel, local proxies |
+| `core/` | Platform-neutral JVM logic. The Windows app uses only its logging and connection-check helpers; the rest belongs to the older Android version |
 | `helper/` | Native Rust helper for Windows whole-device tunnel setup |
 | `design/` | Design tokens, brand assets, store graphics, and third-party notices |
 | `tools/` | Repository utilities, including asset converters |
@@ -91,7 +83,7 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 Generated `.gradle/`, `.kotlin/`, and module `build/` folders are build output/cache areas, not source. Read [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) for ownership boundaries and the Sony TV compatibility gate.
 
-Design: warm neutrals with Firefox orange and violet accents, Inter typeface, Solar icons, round country flags. Source of truth: [`design/tokens.json`](design/tokens.json).
+Design: warm neutrals with orange and violet accents, Inter typeface, Solar icons, round country flags. Source of truth: [`design/tokens.json`](design/tokens.json).
 
 <br>
 
@@ -134,7 +126,6 @@ Issues and pull requests are welcome. Coding agents and new contributors should 
 
 Ember is a fork of [FoxyVPN](https://github.com/Vauth/FoxyVPN) by Vauth, redesigned and extended with a shared core, a Windows app and a new look. It is released under the **MIT** licence; see [LICENSE](LICENSE).
 
-- [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client): the Go reference client the engine is ported from
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel): tun2socks engine
 - [Wintun](https://www.wintun.net/): Windows virtual network adapter
 - [Xray-core](https://github.com/XTLS/Xray-core) (MPL 2.0): runs the servers of a subscription link on Windows; downloaded at build time and checked against a pinned SHA-256

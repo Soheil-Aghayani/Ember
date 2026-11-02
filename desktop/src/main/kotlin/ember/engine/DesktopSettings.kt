@@ -1,6 +1,5 @@
 package ember.engine
 
-import com.soheil.ember.data.TlsSplitMode
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
 import java.io.File
 import java.util.Properties
@@ -8,8 +7,6 @@ import java.util.Properties
 val MTU_RANGE = 1200..1500
 val TCP_BUFFER_RANGE = 65_536..4_194_304
 const val DEFAULT_TCP_BUFFER_BYTES = 524_288
-
-data class QuotaInfo(val remaining: Long?, val max: Long?, val resetEpochSeconds: Long?)
 
 /** Small per-user settings file. */
 class DesktopSettings(private val file: File) {
@@ -35,22 +32,10 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("theme", "System")
         set(value) = put("theme", value)
 
-    var lastCountry: String
-        get() = props.getProperty("lastCountry", "")
-        set(value) = put("lastCountry", value)
-
-    var lastCity: String
-        get() = props.getProperty("lastCity", "")
-        set(value) = put("lastCity", value)
-
+    /** Sends the whole computer through the server (a Wintun adapter); off means only programs that use the local proxy. */
     var wholeDevice: Boolean
-        get() = props.getProperty("wholeDevice", "false").toBoolean()
+        get() = props.getProperty("wholeDevice", "true").toBoolean()
         set(value) = put("wholeDevice", value.toString())
-
-    /** Splits the TLS handshake to Mozilla's server into pieces, which can get past networks that block the VPN. */
-    var tlsSplitMode: TlsSplitMode
-        get() = runCatching { TlsSplitMode.valueOf(props.getProperty("tlsSplitMode", "OFF")) }.getOrDefault(TlsSplitMode.OFF)
-        set(value) = put("tlsSplitMode", value.name)
 
     /** Largest packet the whole-device tunnel sends. Lower it if some sites hang or load partially. */
     var mtu: Int
@@ -64,11 +49,6 @@ class DesktopSettings(private val file: File) {
     var tcpBufferBytes: Int
         get() = props.getProperty("tcpBufferBytes")?.toIntOrNull()?.coerceIn(TCP_BUFFER_RANGE) ?: DEFAULT_TCP_BUFFER_BYTES
         set(value) = put("tcpBufferBytes", value.coerceIn(TCP_BUFFER_RANGE).toString())
-
-    /** Picks the quickest of a few recommended servers instead of a random one. */
-    var fastestServer: Boolean
-        get() = props.getProperty("fastestServer", "true").toBoolean()
-        set(value) = put("fastestServer", value.toString())
 
     /**
      * Addresses that skip the VPN in whole-device mode: IPv4 addresses, IPv4 ranges (10.1.0.0/16) or domain names
@@ -88,16 +68,7 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("trustedNetworks", "").split('\n').map { it.trim() }.filter { it.isNotEmpty() }
         set(value) = put("trustedNetworks", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains('\n') }.distinct().joinToString("\n"))
 
-    /** True when the app runs on subscription links alone, without a Firefox account (the sign-in screen was skipped). */
-    var subscriptionOnly: Boolean
-        get() = props.getProperty("subscriptionOnly", "false").toBoolean()
-        set(value) = put("subscriptionOnly", value.toString())
-
-    /** True when Connect uses the server picked from a subscription link instead of Mozilla's free service. */
-    var useSubscription: Boolean
-        get() = props.getProperty("useSubscription", "false").toBoolean()
-        set(value) = put("useSubscription", value.toString())
-
+    /** The server (see [ember.subs.ProxyNode.id]) that Connect uses. */
     var selectedNodeId: String
         get() = props.getProperty("selectedNodeId", "")
         set(value) = put("selectedNodeId", value)
@@ -109,22 +80,6 @@ class DesktopSettings(private val file: File) {
     var killSwitch: Boolean
         get() = props.getProperty("killSwitch", "true").toBoolean()
         set(value) = put("killSwitch", value.toString())
-
-    /** Last quota the service reported, so the Home screen can show it before connecting. */
-    var quota: QuotaInfo?
-        get() {
-            val remaining = props.getProperty("quotaRemaining")?.toLongOrNull()
-            val max = props.getProperty("quotaMax")?.toLongOrNull()
-            val reset = props.getProperty("quotaReset")?.toLongOrNull()
-            return if (remaining == null && max == null && reset == null) null else QuotaInfo(remaining, max, reset)
-        }
-        set(value) {
-            if (value == null) return
-            value.remaining?.let { props.setProperty("quotaRemaining", it.toString()) }
-            value.max?.let { props.setProperty("quotaMax", it.toString()) }
-            value.resetEpochSeconds?.let { props.setProperty("quotaReset", it.toString()) }
-            runCatching { file.outputStream().use { props.store(it, null) } }
-        }
 
     private fun put(key: String, value: String) {
         props.setProperty(key, value)

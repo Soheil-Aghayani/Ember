@@ -1,23 +1,9 @@
 package ember.engine
 
 import com.soheil.ember.data.AppLogger
-import com.soheil.ember.data.AuthTokenStore
-import com.soheil.ember.data.FxaAuthRepository
-import com.soheil.ember.data.GUARDIAN_ENDPOINT_DEFAULT
-import com.soheil.ember.data.GuardianClient
-import com.soheil.ember.data.ProxyPass
-import com.soheil.ember.data.RECOMMENDED_COUNTRY_CODE
-import com.soheil.ember.data.ServerListClient
-import com.soheil.ember.data.TokenInvalidError
 import com.soheil.ember.data.model.ConnectionState
-import com.soheil.ember.data.model.ProxyCandidate
 import com.soheil.ember.vpn.ExitCheck
 import com.soheil.ember.vpn.IpLocationInfo
-import com.soheil.ember.vpn.socks.LocalHttpProxyServer
-import com.soheil.ember.vpn.socks.LocalSocks5Server
-import com.soheil.ember.vpn.upstream.H2UpstreamSession
-import com.soheil.ember.vpn.upstream.NettyLoggingBridge
-import com.soheil.ember.vpn.upstream.UpstreamTrust
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
 import ember.subs.SubscriptionStore
@@ -33,19 +19,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
-import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "EmberEngine"
-private const val DIAL_TIMEOUT_MS = 30_000L
-private const val SERVER_LIST_TIMEOUT_MS = 10_000L
-private const val FALLBACK_PASS_RENEW_MS = 20 * 60_000L
-private const val RENEW_MARGIN_SECONDS = 120L
-private const val MAX_REDIAL_ATTEMPTS = 8
 
 private fun elapsedMsSince(startedAtNanos: Long): Long =
     (System.nanoTime() - startedAtNanos) / 1_000_000L
@@ -54,17 +33,13 @@ const val SOCKS_PORT = 10808
 const val HTTP_PORT = 10809
 const val LOCAL_BIND = "127.0.0.1"
 
-/** Owns the account session, the server list and the tunnel to Mozilla's edge for the desktop app. */
+/** Owns the subscription servers, the Xray connection and the whole-device tunnel for the desktop app. */
 class EmberEngine(private val dataDir: File) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val tokenStore: AuthTokenStore = DesktopTokenStore(File(dataDir, "session.bin"))
-    val auth = FxaAuthRepository(tokenStore)
-    val servers = ServerListClient(dataDir)
     val settings = DesktopSettings(File(dataDir, "settings.properties"))
     val tunnel = WindowsTunnel(dataDir)
-    private val guardian = GuardianClient()
     val subscriptions = SubscriptionStore(File(dataDir, "subscriptions.json"))
     private val xray = XrayRunner(dataDir)
     private val nodeTester = NodeTester(xray)
@@ -101,19 +76,13 @@ class EmberEngine(private val dataDir: File) {
     private val _progress = MutableStateFlow<String?>(null)
     val progress: StateFlow<String?> = _progress
 
-    /** The subscription server that is connected (or being connected to), when Mozilla's service is not used. */
+    /** The server that is connected (or being connected to). */
     private val _connectedNode = MutableStateFlow<ProxyNode?>(null)
     val connectedNode: StateFlow<ProxyNode?> = _connectedNode
 
     /** Plain-language step of a running server test, or null when none runs. */
     private val _testProgress = MutableStateFlow<String?>(null)
     val testProgress: StateFlow<String?> = _testProgress
-
-    private val _connectedTarget = MutableStateFlow<ProxyCandidate?>(null)
-    val connectedTarget: StateFlow<ProxyCandidate?> = _connectedTarget
-
-    private val _quota = MutableStateFlow(settings.quota)
-    val quota: StateFlow<QuotaInfo?> = _quota
 
     /** Result of asking a public service which IP and country the tunnel exits from. */
     data class ExitStatus(val info: IpLocationInfo? = null, val error: String? = null, val checking: Boolean = false)
@@ -125,22 +94,13 @@ class EmberEngine(private val dataDir: File) {
     private val _wholeDevice = MutableStateFlow(false)
     val wholeDevice: StateFlow<Boolean> = _wholeDevice
 
-    @Volatile private var session: H2UpstreamSession? = null
-    @Volatile private var target: ProxyCandidate? = null
-    @Volatile private var edgeIp: String? = null
-    @Volatile private var lastPass: ProxyPass? = null
-    private var socks: LocalSocks5Server? = null
-    private var http: LocalHttpProxyServer? = null
     private var connectJob: Job? = null
-    private var renewJob: Job? = null
+    private var xrayWatchJob: Job? = null
     private var watchJob: Job? = null
     private var netWatchJob: Job? = null
-    private val redialing = AtomicBoolean(false)
 
     init {
         AppLogger.sink = FileLogSink(File(dataDir, "ember.log"))
-        NettyLoggingBridge.install()
-        UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
         startNetworkTrustWatch()
         runCatching { xray.killStale() }
         if (tunnel.isBlocked()) {
@@ -150,114 +110,21 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
-    fun connect(candidate: ProxyCandidate?) {
-        if (_state.value != ConnectionState.DISCONNECTED) return
-        val wholeDevice = settings.wholeDevice
-        if (wholeDevice && !tunnel.isAvailable) {
-            _lastError.value = "Whole-device mode is not available in this build. Turn it off in Settings to use proxy mode."
+    /** The server the user picked on the Servers page, if it is still in one of the subscriptions. */
+    fun selectedNode(): ProxyNode? = subscriptions.nodeById(settings.selectedNodeId)
+
+    /** Connects to the picked server. */
+    fun connectSelected() {
+        val node = selectedNode()
+        if (node == null) {
+            _lastError.value = "Choose a server first."
             return
         }
-        _state.value = ConnectionState.CONNECTING
-        _wholeDevice.value = wholeDevice
-        _lastError.value = null
-        _progress.value = "Choosing a server..."
-
-        connectJob = scope.launch {
-            val connectStartedAtNanos = System.nanoTime()
-            try {
-                val selectionStartedAtNanos = System.nanoTime()
-                val chosen = try {
-                    candidate ?: recommendedCandidate()
-                } finally {
-                    AppLogger.i(TAG, "connect: server selection stage took ${elapsedMsSince(selectionStartedAtNanos)} ms")
-                }
-                target = chosen
-                _progress.value = "Connecting to " + chosen.countryName.ifBlank { chosen.countryCode } + "..."
-                val passStartedAtNanos = System.nanoTime()
-                val pass = try {
-                    mintPass()
-                } finally {
-                    AppLogger.i(TAG, "connect: account and Guardian pass stage took ${elapsedMsSince(passStartedAtNanos)} ms")
-                }
-                edgeIp = if (wholeDevice) {
-                    val resolutionStartedAtNanos = System.nanoTime()
-                    try {
-                        resolveIpv4(chosen.host)
-                    } finally {
-                        AppLogger.i(TAG, "connect: edge address resolution stage took ${elapsedMsSince(resolutionStartedAtNanos)} ms")
-                    }
-                } else {
-                    null
-                }
-                val upstreamStartedAtNanos = System.nanoTime()
-                session = try {
-                    dial(chosen, pass)
-                } finally {
-                    AppLogger.i(TAG, "connect: upstream HTTP/2 stage took ${elapsedMsSince(upstreamStartedAtNanos)} ms")
-                }
-                if (wholeDevice) {
-                    val setupStartedAtNanos = System.nanoTime()
-                    try {
-                        val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, true, null, { session }) { onUnhealthy() }
-                        s.start()
-                        socks = s
-                        val exclusionsStartedAtNanos = System.nanoTime()
-                        val exclusions = try {
-                            resolveExclusions()
-                        } finally {
-                            AppLogger.i(TAG, "connect: skip-list DNS resolution stage took ${elapsedMsSince(exclusionsStartedAtNanos)} ms")
-                        }
-                        tunnel.start(
-                            socksPort = SOCKS_PORT,
-                            edgeIps = listOf(checkNotNull(edgeIp)),
-                            killSwitch = settings.killSwitch,
-                            mtu = settings.mtu,
-                            tcpBufferSize = settings.tcpBufferBytes,
-                            excludeCidrs = exclusions,
-                            onProgress = { _progress.value = it },
-                        )
-                        startWatchingTunnel()
-                    } finally {
-                        AppLogger.i(TAG, "connect: Windows tunnel setup stage took ${elapsedMsSince(setupStartedAtNanos)} ms")
-                    }
-                } else {
-                    val setupStartedAtNanos = System.nanoTime()
-                    try {
-                        startLocalProxies()
-                    } finally {
-                        AppLogger.i(TAG, "connect: local proxy setup stage took ${elapsedMsSince(setupStartedAtNanos)} ms")
-                    }
-                }
-                _connectedAtMs.value = System.currentTimeMillis()
-                _connectedTarget.value = chosen
-                _progress.value = null
-                _state.value = ConnectionState.CONNECTED
-                checkExit()
-                AppLogger.i(
-                    TAG,
-                    "connected via ${chosen.authority} (wholeDevice=$wholeDevice) after ${elapsedMsSince(connectStartedAtNanos)} ms",
-                )
-                scheduleRenewal(pass)
-                startNetworkWatch()
-            } catch (cancel: CancellationException) {
-                AppLogger.i(TAG, "connect aborted after ${elapsedMsSince(connectStartedAtNanos)} ms")
-                throw cancel
-            } catch (failure: Throwable) {
-                AppLogger.e(TAG, "connect failed after ${elapsedMsSince(connectStartedAtNanos)} ms", failure)
-                _lastError.value = failure.message ?: failure.javaClass.simpleName
-                teardown()
-            }
-        }
+        connect(node)
     }
 
-    /** Connects to the subscription server the user picked, or to Mozilla's service when no subscription is in use. */
-    fun connectSelected(candidate: ProxyCandidate?) {
-        val node = if (settings.useSubscription) subscriptions.nodeById(settings.selectedNodeId) else null
-        if (node != null) connectNode(node) else connect(candidate)
-    }
-
-    /** Connects through one server of a subscription link: Xray runs it as a local SOCKS5 proxy under the same tunnel. */
-    fun connectNode(node: ProxyNode) {
+    /** Connects through one server: Xray runs it as a local SOCKS5 proxy, and the whole-device tunnel (when on) sends everything into it. */
+    fun connect(node: ProxyNode) {
         if (_state.value != ConnectionState.DISCONNECTED) return
         val wholeDevice = settings.wholeDevice
         if (wholeDevice && !tunnel.isAvailable) {
@@ -272,13 +139,12 @@ class EmberEngine(private val dataDir: File) {
         _wholeDevice.value = wholeDevice
         _lastError.value = null
         _connectedNode.value = node
-        _progress.value = "Connecting to " + node.name + "..."
+        _progress.value = "Connecting to " + node.title + "..."
 
         connectJob = scope.launch {
             val startedAtNanos = System.nanoTime()
             try {
                 val address = resolveIpv4(node.host)
-                edgeIp = address
                 xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile))
                 xray.awaitListening(SOCKS_PORT)
                 if (wholeDevice) {
@@ -297,31 +163,15 @@ class EmberEngine(private val dataDir: File) {
                 _progress.value = null
                 _state.value = ConnectionState.CONNECTED
                 checkExit()
-                AppLogger.i(TAG, "connected via a subscription server (${node.protocol}, wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
+                AppLogger.i(TAG, "connected via a ${node.protocol} server (wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
                 watchXray()
                 startNetworkWatch()
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (failure: Throwable) {
-                AppLogger.e(TAG, "connecting to a subscription server failed after ${elapsedMsSince(startedAtNanos)} ms", failure)
+                AppLogger.e(TAG, "connecting failed after ${elapsedMsSince(startedAtNanos)} ms", failure)
                 _lastError.value = failure.message ?: failure.javaClass.simpleName
                 teardown()
-            }
-        }
-    }
-
-    /** Ends the connection if the Xray process dies. */
-    private fun watchXray() {
-        renewJob?.cancel()
-        renewJob = scope.launch {
-            while (true) {
-                delay(2_000)
-                if (!xray.isRunning()) {
-                    AppLogger.e(TAG, "Xray stopped; closing the connection")
-                    _lastError.value = "The connection program stopped unexpectedly."
-                    teardown()
-                    return@launch
-                }
             }
         }
     }
@@ -369,22 +219,6 @@ class EmberEngine(private val dataDir: File) {
         runBlocking { teardown() }
     }
 
-    private suspend fun recommendedCandidate(): ProxyCandidate {
-        val countries = runCatching { withTimeout(SERVER_LIST_TIMEOUT_MS) { servers.fetchCountries() } }
-            .getOrElse { servers.loadCachedCountries() }
-        val recommended = ServerListClient.candidatesForCountry(countries, RECOMMENDED_COUNTRY_CODE)
-        val best = if (settings.fastestServer) {
-            _progress.value = "Finding the fastest server..."
-            ServerPicker.fastest(recommended)
-        } else {
-            recommended.randomOrNull()
-        }
-        return best
-            ?: countries.firstOrNull { it.code.isNotBlank() }
-                ?.let { ServerListClient.candidatesForCountry(countries, it.code).randomOrNull() }
-            ?: error("No servers are available. Check your connection and try again.")
-    }
-
     /** Turns the user's "skip the VPN" list into IPv4 addresses and ranges (domains are looked up now, on the real network). */
     private fun resolveExclusions(): List<String> {
         val cidr = Regex("""^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$""")
@@ -410,34 +244,7 @@ class EmberEngine(private val dataDir: File) {
 
     private fun resolveIpv4(host: String): String =
         InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
-            ?: error("$host has no IPv4 address, which whole-device mode needs.")
-
-    private suspend fun mintPass(): ProxyPass {
-        val account = auth.ensureFreshAccessToken()
-        val pass = try {
-            guardian.fetchProxyPass(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
-        } catch (invalid: TokenInvalidError) {
-            AppLogger.w(TAG, "proxy pass rejected; activating the VPN entitlement and retrying", invalid)
-            guardian.activateGuardian(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
-            guardian.fetchProxyPass(GUARDIAN_ENDPOINT_DEFAULT, account.accessToken)
-        }
-        lastPass = pass
-        recordQuota(pass)
-        return pass
-    }
-
-    private fun recordQuota(pass: ProxyPass) {
-        if (pass.quotaRemaining == null && pass.quotaMax == null && pass.quotaReset == null) return
-        val info = QuotaInfo(pass.quotaRemaining, pass.quotaMax, pass.quotaReset)
-        settings.quota = info
-        _quota.value = settings.quota
-    }
-
-    /** Fetches fresh quota numbers from the service (also used when the app is disconnected). */
-    fun refreshQuota() {
-        if (settings.subscriptionOnly) return
-        scope.launch { runCatching { mintPass() }.onFailure { AppLogger.w(TAG, "quota refresh failed", it) } }
-    }
+            ?: error("$host has no IPv4 address, which this connection needs.")
 
     private fun checkExit() {
         _exit.value = ExitStatus(checking = true)
@@ -451,32 +258,20 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
-    /** The last pass if it is still comfortably valid, so a redial does not need the (tunnelled) network. */
-    private suspend fun passForRedial(): ProxyPass {
-        val cached = lastPass
-        val expiry = cached?.expiresAtEpochSeconds
-        if (cached != null && expiry != null && expiry - System.currentTimeMillis() / 1000 > 30) return cached
-        return mintPass()
-    }
-
-    private suspend fun dial(candidate: ProxyCandidate, pass: ProxyPass): H2UpstreamSession {
-        val upstream = H2UpstreamSession(candidate.host, candidate.port, pass.token, null, edgeIp, settings.tlsSplitMode)
-        try {
-            withTimeout(DIAL_TIMEOUT_MS) { upstream.connect() }
-        } catch (failure: Throwable) {
-            runCatching { upstream.close() }
-            throw failure
+    /** Ends the connection if the Xray process dies. */
+    private fun watchXray() {
+        xrayWatchJob?.cancel()
+        xrayWatchJob = scope.launch {
+            while (true) {
+                delay(2_000)
+                if (!xray.isRunning()) {
+                    AppLogger.e(TAG, "Xray stopped; closing the connection")
+                    _lastError.value = "The connection program stopped unexpectedly."
+                    teardown()
+                    return@launch
+                }
+            }
         }
-        return upstream
-    }
-
-    private fun startLocalProxies() {
-        val s = LocalSocks5Server(LOCAL_BIND, SOCKS_PORT, false, null, { session }) { onUnhealthy() }
-        s.start()
-        socks = s
-        val h = LocalHttpProxyServer(LOCAL_BIND, HTTP_PORT, { session }) { onUnhealthy() }
-        h.start()
-        http = h
     }
 
     private fun startWatchingTunnel() {
@@ -497,10 +292,6 @@ class EmberEngine(private val dataDir: File) {
     }
 
     /**
-     * Reconnects the tunnel to Mozilla after the computer wakes from sleep or the physical network changes
-     * (Wi-Fi switched, cable plugged in). In whole-device mode the helper re-points its own routes.
-     */
-    /**
      * Watches which network the computer is on. When it joins a network that is not trusted (and the user turned on
      * "connect on untrusted networks"), Ember connects once; it never reconnects on a network the user left on purpose.
      */
@@ -515,16 +306,20 @@ class EmberEngine(private val dataDir: File) {
                 if (joinedNew && settings.autoConnectUntrusted &&
                     id !in settings.trustedNetworks &&
                     _state.value == ConnectionState.DISCONNECTED &&
-                    (tokenStore.loadAuth() != null || settings.subscriptionOnly)
+                    selectedNode() != null
                 ) {
                     AppLogger.i(TAG, "joined an untrusted network (${NetworkIdentity.displayName(id!!)}); connecting")
-                    connectSelected(null)
+                    connectSelected()
                 }
                 delay(5_000)
             }
         }
     }
 
+    /**
+     * After the computer wakes from sleep or the physical network changes (Wi-Fi switched, cable plugged in) the
+     * helper re-points its route to the server; Xray reconnects by itself.
+     */
     private fun startNetworkWatch() {
         netWatchJob?.cancel()
         netWatchJob = scope.launch {
@@ -539,9 +334,9 @@ class EmberEngine(private val dataDir: File) {
                 val changed = signature.isNotEmpty() && signature != lastSignature
                 if (signature.isNotEmpty()) lastSignature = signature
                 if (resumed || changed) {
-                    AppLogger.i(TAG, if (resumed) "resumed from sleep; re-establishing the tunnel" else "network changed; re-establishing the tunnel")
+                    AppLogger.i(TAG, if (resumed) "resumed from sleep; refreshing the route" else "network changed; refreshing the route")
                     delay(3_000) // let Windows and the helper settle
-                    onUnhealthy()
+                    if (_state.value == ConnectionState.CONNECTED && _wholeDevice.value) tunnel.requestRefresh()
                 }
             }
         }
@@ -558,75 +353,9 @@ class EmberEngine(private val dataDir: File) {
             .joinToString(";") { (name, addresses) -> name + "=" + addresses.sorted().joinToString(",") }
     }.getOrDefault("")
 
-    private fun scheduleRenewal(initial: ProxyPass) {
-        renewJob?.cancel()
-        renewJob = scope.launch {
-            var expiry = initial.expiresAtEpochSeconds
-            while (true) {
-                val waitMs = expiry?.let { (it - RENEW_MARGIN_SECONDS) * 1000L - System.currentTimeMillis() }
-                    ?: FALLBACK_PASS_RENEW_MS
-                delay(waitMs.coerceAtLeast(30_000L))
-                val pass = try {
-                    mintPass()
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (failure: Throwable) {
-                    AppLogger.w(TAG, "could not renew the proxy pass", failure)
-                    delay(30_000L)
-                    continue
-                }
-                session?.updateBearerToken(pass.token)
-                expiry = pass.expiresAtEpochSeconds
-            }
-        }
-    }
-
-    private fun onUnhealthy() {
-        if (_state.value != ConnectionState.CONNECTED) return
-        if (_connectedNode.value != null) {
-            // Xray reconnects by itself; the helper only has to point its route at the server through the new network.
-            if (_wholeDevice.value) scope.launch { tunnel.requestRefresh() }
-            return
-        }
-        if (!redialing.compareAndSet(false, true)) return
-        scope.launch {
-            try {
-                val chosen = target ?: return@launch
-                repeat(MAX_REDIAL_ATTEMPTS) { attempt ->
-                    runCatching { session?.close() }
-                    if (_wholeDevice.value) {
-                        // Make sure the connection to Mozilla leaves through the real network, not through the tunnel itself.
-                        tunnel.requestRefresh()
-                        delay(1_500)
-                    }
-                    val result = runCatching {
-                        val pass = if (attempt >= 2) {
-                            runCatching { withTimeout(8_000) { mintPass() } }.getOrElse { passForRedial() }
-                        } else {
-                            passForRedial()
-                        }
-                        dial(chosen, pass)
-                    }
-                    val fresh = result.getOrNull()
-                    if (fresh != null) {
-                        session = fresh
-                        AppLogger.i(TAG, "re-established the upstream tunnel")
-                        return@launch
-                    }
-                    AppLogger.w(TAG, "redial attempt ${attempt + 1} failed", result.exceptionOrNull())
-                    delay(minOf(15_000L, 1_500L * (attempt + 1)))
-                }
-                _lastError.value = "The VPN connection was lost and could not be restored."
-                teardown()
-            } finally {
-                redialing.set(false)
-            }
-        }
-    }
-
     private suspend fun teardown(helperAlreadyBlocked: Boolean = false) {
-        renewJob?.cancel()
-        renewJob = null
+        xrayWatchJob?.cancel()
+        xrayWatchJob = null
         watchJob?.cancel()
         watchJob = null
         netWatchJob?.cancel()
@@ -634,17 +363,9 @@ class EmberEngine(private val dataDir: File) {
         if (_wholeDevice.value && !helperAlreadyBlocked) {
             runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
         }
-        runCatching { socks?.stop() }
-        runCatching { http?.stop() }
-        socks = null
-        http = null
-        runCatching { session?.close() }
-        session = null
         runCatching { xray.stop() }
-        _connectedNode.value = null
-        edgeIp = null
         _connectedAtMs.value = null
-        _connectedTarget.value = null
+        _connectedNode.value = null
         _progress.value = null
         _exit.value = ExitStatus()
         _wholeDevice.value = false

@@ -52,7 +52,7 @@ class WindowsTunnel(dataDir: File) {
         get() = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true) &&
             (nativeHelper != null || script != null) && hevPresent
 
-    /** Asks the running helper to re-assert the route to Mozilla's server (used before redialing). */
+    /** Asks the running helper to re-assert the route to the server (used after the network changes). */
     fun requestRefresh() {
         runCatching { File(stateDir, "refresh").writeText("1") }
     }
@@ -80,7 +80,7 @@ class WindowsTunnel(dataDir: File) {
 
     /**
      * Starts the helper and waits for it to report UP. Windows shows an administrator prompt unless the optional
-     * one-time setup was done. [edgeIps] are the Mozilla edge addresses that must stay on the physical network.
+     * one-time setup was done. [edgeIps] are the server addresses that must stay on the physical network.
      * [onProgress] receives plain-language steps for the UI.
      */
     suspend fun start(
