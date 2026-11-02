@@ -151,6 +151,10 @@ fun EmberApp(
     var session by remember { mutableStateOf(Session.Checking) }
 
     LaunchedEffect(Unit) {
+        if (engine.settings.subscriptionOnly) {
+            session = Session.SignedIn
+            return@LaunchedEffect
+        }
         val status = withContext(Dispatchers.IO) { runCatching { engine.auth.restoreSession() }.getOrNull() }
         session = if (status == SessionStatus.NEEDS_LOGIN || status == null) Session.SignedOut else Session.SignedIn
     }
@@ -160,6 +164,10 @@ fun EmberApp(
     var countriesFailure by remember { mutableStateOf<String?>(null) }
     val strings = LocalStrings.current
     LaunchedEffect(engine) {
+        if (engine.settings.subscriptionOnly) {
+            countriesLoading = false
+            return@LaunchedEffect
+        }
         try {
             countries = withContext(Dispatchers.IO) { engine.servers.loadCachedCountries() }
             countries = withContext(Dispatchers.IO) {
@@ -201,7 +209,14 @@ fun EmberApp(
             Session.Checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
             }
-            Session.SignedOut -> LoginPage(engine.auth) { session = Session.SignedIn }
+            Session.SignedOut -> LoginPage(
+                engine.auth,
+                onUseSubscriptions = {
+                    engine.settings.subscriptionOnly = true
+                    engine.settings.useSubscription = true
+                    session = Session.SignedIn
+                },
+            ) { session = Session.SignedIn }
             Session.SignedIn -> if (!locationReady) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
@@ -209,6 +224,7 @@ fun EmberApp(
             } else MainShell(engine, countries, countriesLoading, countriesFailure, restoredLocation, theme, onThemeChange, language, onLanguageChange, update, onDismissUpdate) {
                 engine.disconnect()
                 engine.tokenStore.clear()
+                engine.settings.subscriptionOnly = false
                 session = Session.SignedOut
             }
         }
@@ -227,7 +243,7 @@ internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit
 }
 
 @Composable
-private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
+private fun LoginPage(auth: FxaAuthRepository, onUseSubscriptions: () -> Unit, onSignedIn: () -> Unit) {
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     var email by remember { mutableStateOf("") }
@@ -291,17 +307,16 @@ private fun LoginPage(auth: FxaAuthRepository, onSignedIn: () -> Unit) {
                 ) { Text(if (busy) strings.signingIn else strings.continueLabel) }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = {},
-                    enabled = false,
+                    onClick = onUseSubscriptions,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text(strings.browserSignIn) }
+                ) { Text(strings.useSubscriptionsInstead) }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Top) {
                     EmberIcon("info-circle", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        strings.browserSignInUnavailable,
+                        strings.useSubscriptionsHint,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -365,7 +380,10 @@ private fun MainShell(
     onDismissUpdate: () -> Unit,
     onSwitchAccount: () -> Unit,
 ) {
-    var page by remember { mutableStateOf(Page.Home) }
+    val subscriptionOnly = engine.settings.subscriptionOnly
+    var page by remember {
+        mutableStateOf(if (subscriptionOnly && engine.subscriptions.nodeById(engine.settings.selectedNodeId) == null) Page.Subscriptions else Page.Home)
+    }
     var selected by remember(restoredLocation) { mutableStateOf(restoredLocation) }
 
     val state by engine.state.collectAsState()
@@ -379,7 +397,7 @@ private fun MainShell(
     }
 
     Row(Modifier.fillMaxSize()) {
-        Sidebar(page) { page = it }
+        Sidebar(page, hidden = if (subscriptionOnly) setOf(Page.Locations) else emptySet()) { page = it }
         Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
         AnimatedContent(
             targetState = page,
@@ -400,7 +418,7 @@ private fun MainShell(
             ) {
                 when (current) {
                     Page.Home -> HomePage(engine, selected, countries, countriesLoading, countriesFailure,
-                        pickLocation, update, onDismissUpdate) { page = Page.Locations }
+                        pickLocation, update, onDismissUpdate) { page = if (subscriptionOnly) Page.Subscriptions else Page.Locations }
                     Page.Locations -> LocationsPage(countries, countriesLoading, countriesFailure,
                         state == ConnectionState.DISCONNECTED, selected, engine.settings.lastCity, pickLocation)
                     Page.Subscriptions -> SubscriptionsPage(engine)
@@ -413,7 +431,7 @@ private fun MainShell(
 }
 
 @Composable
-private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
+private fun Sidebar(selected: Page, hidden: Set<Page>, onSelect: (Page) -> Unit) {
     val strings = LocalStrings.current
     Column(
         Modifier.width(220.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(16.dp),
@@ -424,7 +442,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
             Spacer(Modifier.width(10.dp))
             Text("Ember", style = MaterialTheme.typography.headlineSmall)
         }
-        for (p in Page.entries) {
+        for (p in Page.entries.filterNot { it in hidden }) {
             val active = p == selected
             val interaction = remember { MutableInteractionSource() }
             val hovered by interaction.collectIsHoveredAsState()
@@ -490,6 +508,7 @@ private fun HomePage(
     }
     val exit by engine.exit.collectAsState()
     val quota by engine.quota.collectAsState()
+    val subscriptionOnly = engine.settings.subscriptionOnly
     LaunchedEffect(Unit) { engine.refreshQuota() }
     var menuOpen by remember { mutableStateOf(false) }
     var countryQuery by remember { mutableStateOf("") }
@@ -558,6 +577,7 @@ private fun HomePage(
                 when {
                     state != ConnectionState.DISCONNECTED -> engine.disconnect()
                     wholeSetting && engine.tunnel.isAvailable && !engine.settings.adminNoticeSeen -> showAdminNotice = true
+                    subscriptionOnly && engine.subscriptions.nodeById(engine.settings.selectedNodeId) == null -> onOpenLocations()
                     else -> engine.connectSelected(selected)
                 }
             },
@@ -622,15 +642,15 @@ private fun HomePage(
                         if (hovered && canPick) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                     ).hoverable(interaction, enabled = canPick)
                         .pointerHoverIcon(if (canPick) PointerIcon.Hand else PointerIcon.Default)
-                        .clickable(enabled = canPick, role = Role.Button) { menuOpen = !menuOpen }
+                        .clickable(enabled = canPick, role = Role.Button) { if (subscriptionOnly) onOpenLocations() else menuOpen = !menuOpen }
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (nodeShown != null) EmberIcon("subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (nodeShown != null || subscriptionOnly) EmberIcon("subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     else if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(12.dp))
-                    Text(nodeShown?.name ?: shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (canPick) {
+                    Text(nodeShown?.name ?: (if (subscriptionOnly) strings.chooseServer else shownName), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (canPick && !subscriptionOnly) {
                         Spacer(Modifier.width(12.dp))
                         EmberIcon(if (menuOpen) "chevron-up" else "chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -740,7 +760,7 @@ private fun HomePage(
                 }
             }
         }
-        quota?.remaining?.let { remaining ->
+        quota?.takeIf { !subscriptionOnly }?.remaining?.let { remaining ->
             Spacer(Modifier.height(12.dp))
             val reset = quota?.resetEpochSeconds?.let { resetLabel(it, strings) }
             Text(
@@ -1004,14 +1024,17 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
         }
     }
     Spacer(Modifier.height(16.dp))
-    SessionTransferCard(engine.auth)
-    Spacer(Modifier.height(16.dp))
+    if (!engine.settings.subscriptionOnly) {
+        SessionTransferCard(engine.auth)
+        Spacer(Modifier.height(16.dp))
+    }
     Card {
         Column(Modifier.padding(16.dp)) {
             Text(strings.account, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
+            val subscriptionOnly = engine.settings.subscriptionOnly
             Text(
-                strings.switchAccountHelp,
+                if (subscriptionOnly) strings.subscriptionOnlyHelp else strings.switchAccountHelp,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1019,7 +1042,7 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             OutlinedButton(onClick = onSwitchAccount, shape = RoundedCornerShape(12.dp)) {
                 EmberIcon("logout", 18.dp, MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.width(8.dp))
-                Text(strings.switchAccount)
+                Text(if (subscriptionOnly) strings.useFirefoxAccount else strings.switchAccount)
             }
         }
     }

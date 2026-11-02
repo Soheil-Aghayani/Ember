@@ -88,6 +88,11 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("trustedNetworks", "").split('\n').map { it.trim() }.filter { it.isNotEmpty() }
         set(value) = put("trustedNetworks", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains('\n') }.distinct().joinToString("\n"))
 
+    /** True when the app runs on subscription links alone, without a Firefox account (the sign-in screen was skipped). */
+    var subscriptionOnly: Boolean
+        get() = props.getProperty("subscriptionOnly", "false").toBoolean()
+        set(value) = put("subscriptionOnly", value.toString())
+
     /** True when Connect uses the server picked from a subscription link instead of Mozilla's free service. */
     var useSubscription: Boolean
         get() = props.getProperty("useSubscription", "false").toBoolean()

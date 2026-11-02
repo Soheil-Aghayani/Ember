@@ -435,6 +435,7 @@ class EmberEngine(private val dataDir: File) {
 
     /** Fetches fresh quota numbers from the service (also used when the app is disconnected). */
     fun refreshQuota() {
+        if (settings.subscriptionOnly) return
         scope.launch { runCatching { mintPass() }.onFailure { AppLogger.w(TAG, "quota refresh failed", it) } }
     }
 
@@ -514,7 +515,7 @@ class EmberEngine(private val dataDir: File) {
                 if (joinedNew && settings.autoConnectUntrusted &&
                     id !in settings.trustedNetworks &&
                     _state.value == ConnectionState.DISCONNECTED &&
-                    tokenStore.loadAuth() != null
+                    (tokenStore.loadAuth() != null || settings.subscriptionOnly)
                 ) {
                     AppLogger.i(TAG, "joined an untrusted network (${NetworkIdentity.displayName(id!!)}); connecting")
                     connectSelected(null)
