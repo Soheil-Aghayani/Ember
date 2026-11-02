@@ -164,8 +164,10 @@ function Add-Route([string]$prefix, [int]$ifIndex, [string]$nextHop, [int]$metri
 
 # The physical (non-tunnel) default route.
 function Get-PhysicalDefault {
+    # Only adapters that are up: a disconnected Wi-Fi card can keep its default route, and a route pinned to it is ignored.
+    $up = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { $_.ifIndex })
     return Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
-        Where-Object { $_.NextHop -ne '0.0.0.0' -and $_.InterfaceAlias -ne $adapterName } |
+        Where-Object { $_.NextHop -ne '0.0.0.0' -and $_.InterfaceAlias -ne $adapterName -and $up -contains $_.InterfaceIndex } |
         Sort-Object RouteMetric |
         Select-Object -First 1
 }
@@ -235,10 +237,7 @@ Write-Log "up requested (killSwitch=$killSwitch)"
 $proc = $null
 try {
     # The physical default route, found before anything is changed.
-    $def = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
-        Where-Object { $_.NextHop -ne '0.0.0.0' } |
-        Sort-Object RouteMetric |
-        Select-Object -First 1
+    $def = Get-PhysicalDefault
     if (-not $def) { throw 'no default IPv4 route found' }
 
     # Kill switch first: if anything after this fails or the tunnel dies, traffic is dropped, not leaked.

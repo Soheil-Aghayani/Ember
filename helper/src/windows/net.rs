@@ -178,7 +178,11 @@ pub fn physical_default(tunnel: &str, adapters: &[Adapter]) -> Result<Option<Def
         let Some(adapter) = adapters.iter().find(|a| a.index == row.InterfaceIndex) else {
             continue;
         };
-        if adapter.name.eq_ignore_ascii_case(tunnel) || ipv4_address(&row.NextHop).is_unspecified()
+        // A default route can outlive its adapter (a disconnected Wi-Fi card keeps its route); a bypass route
+        // pinned to such an adapter is ignored by Windows and the traffic falls into the tunnel.
+        if !adapter.up
+            || adapter.name.eq_ignore_ascii_case(tunnel)
+            || ipv4_address(&row.NextHop).is_unspecified()
         {
             continue;
         }
@@ -230,15 +234,15 @@ fn ensure_address(index: u32, ip: Ipv4Addr) -> Result<()> {
 }
 
 pub fn configure(adapter: &Adapter, ip: Ipv4Addr, dns: Ipv4Addr) -> Result<()> {
-    ensure_address(adapter.index, ip)?;
-    let mut row = interface(adapter.index)?;
+    ensure_address(adapter.index, ip).map_err(|e| format!("address: {e}"))?;
+    let mut row = interface(adapter.index).map_err(|e| format!("interface entry: {e}"))?;
     row.UseAutomaticMetric = false;
     row.Metric = 1;
     // Get can return an IPv4 SitePrefixLength which Set rejects. Preserve all other fields.
     row.SitePrefixLength = 0;
     // SAFETY: a queried row with only metric settings and the required IPv4 field changed.
-    check(unsafe { SetIpInterfaceEntry(&mut row) })?;
-    set_dns(adapter, dns)
+    check(unsafe { SetIpInterfaceEntry(&mut row) }).map_err(|e| format!("interface metric: {e}"))?;
+    set_dns(adapter, dns).map_err(|e| format!("dns: {e}"))
 }
 
 fn set_dns(adapter: &Adapter, dns: Ipv4Addr) -> Result<()> {
