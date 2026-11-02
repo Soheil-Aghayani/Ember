@@ -18,6 +18,11 @@ import com.soheil.ember.vpn.socks.LocalSocks5Server
 import com.soheil.ember.vpn.upstream.H2UpstreamSession
 import com.soheil.ember.vpn.upstream.NettyLoggingBridge
 import com.soheil.ember.vpn.upstream.UpstreamTrust
+import ember.subs.NodeTester
+import ember.subs.ProxyNode
+import ember.subs.SubscriptionStore
+import ember.subs.XrayConfig
+import ember.subs.XrayRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +65,9 @@ class EmberEngine(private val dataDir: File) {
     val settings = DesktopSettings(File(dataDir, "settings.properties"))
     val tunnel = WindowsTunnel(dataDir)
     private val guardian = GuardianClient()
+    val subscriptions = SubscriptionStore(File(dataDir, "subscriptions.json"))
+    private val xray = XrayRunner(dataDir)
+    private val nodeTester = NodeTester(xray)
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
     val state: StateFlow<ConnectionState> = _state
@@ -92,6 +100,14 @@ class EmberEngine(private val dataDir: File) {
     /** Plain-language step shown on Home while connecting. */
     private val _progress = MutableStateFlow<String?>(null)
     val progress: StateFlow<String?> = _progress
+
+    /** The subscription server that is connected (or being connected to), when Mozilla's service is not used. */
+    private val _connectedNode = MutableStateFlow<ProxyNode?>(null)
+    val connectedNode: StateFlow<ProxyNode?> = _connectedNode
+
+    /** Plain-language step of a running server test, or null when none runs. */
+    private val _testProgress = MutableStateFlow<String?>(null)
+    val testProgress: StateFlow<String?> = _testProgress
 
     private val _connectedTarget = MutableStateFlow<ProxyCandidate?>(null)
     val connectedTarget: StateFlow<ProxyCandidate?> = _connectedTarget
@@ -126,6 +142,7 @@ class EmberEngine(private val dataDir: File) {
         NettyLoggingBridge.install()
         UpstreamTrust.init { EmberEngine::class.java.getResourceAsStream("/globalsign_roots.pem") }
         startNetworkTrustWatch()
+        runCatching { xray.killStale() }
         if (tunnel.isBlocked()) {
             _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
         } else if (tunnel.isStale()) {
@@ -229,6 +246,103 @@ class EmberEngine(private val dataDir: File) {
                 AppLogger.e(TAG, "connect failed after ${elapsedMsSince(connectStartedAtNanos)} ms", failure)
                 _lastError.value = failure.message ?: failure.javaClass.simpleName
                 teardown()
+            }
+        }
+    }
+
+    /** Connects to the subscription server the user picked, or to Mozilla's service when no subscription is in use. */
+    fun connectSelected(candidate: ProxyCandidate?) {
+        val node = if (settings.useSubscription) subscriptions.nodeById(settings.selectedNodeId) else null
+        if (node != null) connectNode(node) else connect(candidate)
+    }
+
+    /** Connects through one server of a subscription link: Xray runs it as a local SOCKS5 proxy under the same tunnel. */
+    fun connectNode(node: ProxyNode) {
+        if (_state.value != ConnectionState.DISCONNECTED) return
+        val wholeDevice = settings.wholeDevice
+        if (wholeDevice && !tunnel.isAvailable) {
+            _lastError.value = "Whole-device mode is not available in this build. Turn it off in Settings to use proxy mode."
+            return
+        }
+        if (!xray.isAvailable) {
+            _lastError.value = "The Xray program is missing from this installation."
+            return
+        }
+        _state.value = ConnectionState.CONNECTING
+        _wholeDevice.value = wholeDevice
+        _lastError.value = null
+        _connectedNode.value = node
+        _progress.value = "Connecting to " + node.name + "..."
+
+        connectJob = scope.launch {
+            val startedAtNanos = System.nanoTime()
+            try {
+                val address = resolveIpv4(node.host)
+                edgeIp = address
+                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile))
+                xray.awaitListening(SOCKS_PORT)
+                if (wholeDevice) {
+                    tunnel.start(
+                        socksPort = SOCKS_PORT,
+                        edgeIps = listOf(address),
+                        killSwitch = settings.killSwitch,
+                        mtu = settings.mtu,
+                        tcpBufferSize = settings.tcpBufferBytes,
+                        excludeCidrs = resolveExclusions(),
+                        onProgress = { _progress.value = it },
+                    )
+                    startWatchingTunnel()
+                }
+                _connectedAtMs.value = System.currentTimeMillis()
+                _progress.value = null
+                _state.value = ConnectionState.CONNECTED
+                checkExit()
+                AppLogger.i(TAG, "connected via a subscription server (${node.protocol}, wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
+                watchXray()
+                startNetworkWatch()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Throwable) {
+                AppLogger.e(TAG, "connecting to a subscription server failed after ${elapsedMsSince(startedAtNanos)} ms", failure)
+                _lastError.value = failure.message ?: failure.javaClass.simpleName
+                teardown()
+            }
+        }
+    }
+
+    /** Ends the connection if the Xray process dies. */
+    private fun watchXray() {
+        renewJob?.cancel()
+        renewJob = scope.launch {
+            while (true) {
+                delay(2_000)
+                if (!xray.isRunning()) {
+                    AppLogger.e(TAG, "Xray stopped; closing the connection")
+                    _lastError.value = "The connection program stopped unexpectedly."
+                    teardown()
+                    return@launch
+                }
+            }
+        }
+    }
+
+    /** Measures delay and download speed of the servers in [nodes]. Only while disconnected, or the test would use the tunnel. */
+    fun testNodes(nodes: List<ProxyNode>) {
+        if (_state.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
+        if (!xray.isAvailable) {
+            _lastError.value = "The Xray program is missing from this installation."
+            return
+        }
+        _testProgress.value = "Starting…"
+        scope.launch {
+            try {
+                nodeTester.run(nodes, { _testProgress.value = it }, { node, result -> subscriptions.recordResult(node, result) })
+            } catch (failure: Throwable) {
+                AppLogger.w(TAG, "the server test failed", failure)
+                _lastError.value = failure.message ?: failure.javaClass.simpleName
+            } finally {
+                _testProgress.value = null
+                subscriptions.saveResults()
             }
         }
     }
@@ -403,7 +517,7 @@ class EmberEngine(private val dataDir: File) {
                     tokenStore.loadAuth() != null
                 ) {
                     AppLogger.i(TAG, "joined an untrusted network (${NetworkIdentity.displayName(id!!)}); connecting")
-                    connect(null)
+                    connectSelected(null)
                 }
                 delay(5_000)
             }
@@ -468,6 +582,11 @@ class EmberEngine(private val dataDir: File) {
 
     private fun onUnhealthy() {
         if (_state.value != ConnectionState.CONNECTED) return
+        if (_connectedNode.value != null) {
+            // Xray reconnects by itself; the helper only has to point its route at the server through the new network.
+            if (_wholeDevice.value) scope.launch { tunnel.requestRefresh() }
+            return
+        }
         if (!redialing.compareAndSet(false, true)) return
         scope.launch {
             try {
@@ -520,6 +639,8 @@ class EmberEngine(private val dataDir: File) {
         http = null
         runCatching { session?.close() }
         session = null
+        runCatching { xray.stop() }
+        _connectedNode.value = null
         edgeIp = null
         _connectedAtMs.value = null
         _connectedTarget.value = null

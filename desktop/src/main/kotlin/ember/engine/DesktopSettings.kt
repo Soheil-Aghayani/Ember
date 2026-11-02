@@ -88,6 +88,15 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("trustedNetworks", "").split('\n').map { it.trim() }.filter { it.isNotEmpty() }
         set(value) = put("trustedNetworks", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains('\n') }.distinct().joinToString("\n"))
 
+    /** True when Connect uses the server picked from a subscription link instead of Mozilla's free service. */
+    var useSubscription: Boolean
+        get() = props.getProperty("useSubscription", "false").toBoolean()
+        set(value) = put("useSubscription", value.toString())
+
+    var selectedNodeId: String
+        get() = props.getProperty("selectedNodeId", "")
+        set(value) = put("selectedNodeId", value)
+
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
         set(value) = put("adminNoticeSeen", value.toString())

@@ -137,6 +137,7 @@ Ember is a fork of [FoxyVPN](https://github.com/Vauth/FoxyVPN) by Vauth, redesig
 - [firefox-vpn-client](https://github.com/UjuiUjuMandan/firefox-vpn-client): the Go reference client the engine is ported from
 - [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel): tun2socks engine
 - [Wintun](https://www.wintun.net/): Windows virtual network adapter
+- [Xray-core](https://github.com/XTLS/Xray-core) (MPL 2.0): runs the servers of a subscription link on Windows; downloaded at build time and checked against a pinned SHA-256
 - [Conscrypt](https://github.com/google/conscrypt): TLS with ALPN on Android
 - [Solar icon set](https://www.figma.com/community/file/1166831539721848736) by 480 Design (CC BY 4.0): icons
 - [circle-flags](https://github.com/HatScripts/circle-flags) (MIT): country flags

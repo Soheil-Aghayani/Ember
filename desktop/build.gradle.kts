@@ -45,6 +45,12 @@ val tunnelAssets = listOf(
         "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51",
         "wintun-0.14.1.zip",
     ),
+    // Runs the VLESS / VMess / Trojan / Shadowsocks servers of the user's subscription links.
+    TunnelAsset(
+        "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-windows-64.zip",
+        "2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a",
+        "Xray-windows-64.zip",
+    ),
 )
 
 val tunnelDir = layout.projectDirectory.dir("appResources/windows-x64/tunnel").asFile
@@ -69,6 +75,8 @@ val fetchTunnelBinaries = tasks.register("fetchTunnelBinaries") {
         }
         // hev loads wintun.dll from its own folder.
         val hevExe = tunnelDir.walkTopDown().first { it.name == "hev-socks5-tunnel.exe" }
+        // Ember does not use Xray's routing data files; leaving them out saves about 10 MB.
+        tunnelDir.walkTopDown().filter { it.name == "geoip.dat" || it.name == "geosite.dat" }.forEach { it.delete() }
         val wintun = tunnelDir.walkTopDown().first { it.name == "wintun.dll" && it.parentFile.name == "amd64" }
         wintun.copyTo(File(hevExe.parentFile, "wintun.dll"), overwrite = true)
         marker.writeText("ok")

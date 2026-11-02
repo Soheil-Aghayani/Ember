@@ -129,6 +129,7 @@ import kotlinx.coroutines.withContext
 private enum class Page(val icon: String) {
     Home("home"),
     Locations("locations"),
+    Subscriptions("subscriptions"),
     Settings("settings"),
     Logs("logs"),
 }
@@ -191,7 +192,7 @@ fun EmberApp(
         }
         locationReady = true
         if (engine.settings.autoConnect && engine.state.value == ConnectionState.DISCONNECTED) {
-            engine.connect(restoredLocation)
+            engine.connectSelected(restoredLocation)
         }
     }
 
@@ -402,6 +403,7 @@ private fun MainShell(
                         pickLocation, update, onDismissUpdate) { page = Page.Locations }
                     Page.Locations -> LocationsPage(countries, countriesLoading, countriesFailure,
                         state == ConnectionState.DISCONNECTED, selected, engine.settings.lastCity, pickLocation)
+                    Page.Subscriptions -> SubscriptionsPage(engine)
                     Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange, onSwitchAccount)
                     Page.Logs -> LogsPage()
                 }
@@ -451,7 +453,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EmberIcon(p.icon, 20.dp, contentColor)
                     Spacer(Modifier.width(12.dp))
-                    Text(when (p) { Page.Home -> strings.home; Page.Locations -> strings.locations; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
+                    Text(when (p) { Page.Home -> strings.home; Page.Locations -> strings.locations; Page.Subscriptions -> strings.subscriptions; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
                 }
             }
         }
@@ -479,6 +481,13 @@ private fun HomePage(
     val progress by engine.progress.collectAsState()
     var showAdminNotice by remember { mutableStateOf(false) }
     val target by engine.connectedTarget.collectAsState()
+    val connectedNode by engine.connectedNode.collectAsState()
+    var useSubscription by remember { mutableStateOf(engine.settings.useSubscription) }
+    val pick: (ProxyCandidate?, String, String) -> Unit = { candidate, country, city ->
+        engine.settings.useSubscription = false
+        useSubscription = false
+        onPick(candidate, country, city)
+    }
     val exit by engine.exit.collectAsState()
     val quota by engine.quota.collectAsState()
     LaunchedEffect(Unit) { engine.refreshQuota() }
@@ -533,7 +542,7 @@ private fun HomePage(
                 Button(onClick = {
                     engine.settings.adminNoticeSeen = true
                     showAdminNotice = false
-                    engine.connect(selected)
+                    engine.connectSelected(selected)
                 }) { Text(strings.continueLabel) }
             },
             dismissButton = { TextButton(onClick = { showAdminNotice = false }) { Text(strings.cancel) } },
@@ -549,7 +558,7 @@ private fun HomePage(
                 when {
                     state != ConnectionState.DISCONNECTED -> engine.disconnect()
                     wholeSetting && engine.tunnel.isAvailable && !engine.settings.adminNoticeSeen -> showAdminNotice = true
-                    else -> engine.connect(selected)
+                    else -> engine.connectSelected(selected)
                 }
             },
             contentAlignment = Alignment.Center,
@@ -602,6 +611,7 @@ private fun HomePage(
             isRecommended -> ""
             else -> location?.countryCode.orEmpty()
         }
+        val nodeShown = if (connected) connectedNode else if (useSubscription) engine.subscriptions.nodeById(engine.settings.selectedNodeId) else null
         val shownName = if (shownCode.length == 2) {
             localizedCountry(shownCode, location?.countryName.orEmpty(), strings)
         } else strings.recommended
@@ -616,9 +626,10 @@ private fun HomePage(
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (nodeShown != null) EmberIcon("subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    else if (shownCode.length == 2) FlagIcon(shownCode, 24.dp) else EmberIcon("locations", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(12.dp))
-                    Text(shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Text(nodeShown?.name ?: shownName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (canPick) {
                         Spacer(Modifier.width(12.dp))
                         EmberIcon(if (menuOpen) "chevron-up" else "chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
@@ -680,7 +691,7 @@ private fun HomePage(
                                     if (isRecommended) EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary,
                                         contentDescription = strings.selected)
                                 },
-                                onClick = { onPick(null, "", ""); menuOpen = false },
+                                onClick = { pick(null, "", ""); menuOpen = false },
                             )
                             val query = countryQuery.trim()
                             val matchingCountries = availableCountries.filter { country ->
@@ -698,7 +709,7 @@ private fun HomePage(
                                         }
                                     },
                                     onClick = {
-                                        onPick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
+                                        pick(ServerListClient.candidatesForCountry(countries, country.code).randomOrNull(), country.code, "")
                                         menuOpen = false
                                     },
                                 )
