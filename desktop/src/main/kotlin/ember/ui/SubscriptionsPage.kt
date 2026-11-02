@@ -53,10 +53,12 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val state by engine.state.collectAsState()
     var selectedId by remember { mutableStateOf(engine.settings.selectedNodeId) }
     var showAdd by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Subscription?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    if (showAdd) AddSubscriptionDialog(engine, onClose = { showAdd = false })
+    if (showAdd) AddSubscriptionDialog(engine, null, onClose = { showAdd = false })
+    editing?.let { current -> AddSubscriptionDialog(engine, current, onClose = { editing = null }) }
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
@@ -102,6 +104,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                     busyId = null
                 }
             },
+            onEdit = { editing = subscription },
             onRemove = {
                 if (subscription.nodes.any { it.id == selectedId }) {
                     selectedId = ""
@@ -126,8 +129,10 @@ private fun SubscriptionCard(
     onTest: () -> Unit,
     onRefresh: () -> Unit,
     onRemove: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
     val servers = subscription.nodes.filterNot { it.isInfo }
     val info = subscription.nodes.filter { it.isInfo }
     val sorted = servers.sortedWith(
@@ -135,9 +140,23 @@ private fun SubscriptionCard(
     )
     Card {
         Column(Modifier.padding(vertical = 8.dp)) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(subscription.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                Modifier.fillMaxWidth()
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(subscription.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                EmberIcon(
+                    if (expanded) "chevron-up" else "chevron-down", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant,
+                    contentDescription = if (expanded) strings.collapse else strings.expand,
+                )
+            }
+            Column(Modifier.padding(horizontal = 16.dp)) {
                 subscription.usage?.takeIf { it.total > 0 }?.let { usage ->
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(
@@ -157,26 +176,27 @@ private fun SubscriptionCard(
                 for (row in info) {
                     Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (expanded) Spacer(Modifier.height(8.dp))
+                if (expanded) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onTest, enabled = canTest && servers.isNotEmpty(), shape = RoundedCornerShape(12.dp)) {
                         EmberIcon("bolt", 18.dp, MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(6.dp))
                         Text(strings.testSpeed)
                     }
                     TextButton(onClick = onRefresh, enabled = !refreshing) { Text(if (refreshing) strings.refreshing else strings.refresh) }
+                    TextButton(onClick = onEdit) { Text(strings.editSubscription) }
                     TextButton(onClick = onRemove) { Text(strings.removeSubscription) }
                 }
-                if (testing != null) {
+                if (expanded && testing != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(testing, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else if (!canTest) {
+                } else if (expanded && !canTest) {
                     Spacer(Modifier.height(4.dp))
                     Text(strings.testNeedsDisconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            sorted.forEachIndexed { index, node ->
+            if (expanded) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (expanded) sorted.forEachIndexed { index, node ->
                 if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val selected = node.id == selectedId
                 val result = results[node.id]
@@ -221,16 +241,16 @@ private fun SubscriptionCard(
 }
 
 @Composable
-private fun AddSubscriptionDialog(engine: EmberEngine, onClose: () -> Unit) {
+private fun AddSubscriptionDialog(engine: EmberEngine, existing: Subscription?, onClose: () -> Unit) {
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
-    var url by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf(existing?.url ?: "") }
+    var name by remember { mutableStateOf(existing?.name ?: "") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = { if (!busy) onClose() },
-        title = { Text(strings.addSubscription) },
+        title = { Text(if (existing == null) strings.addSubscription else strings.editSubscription) },
         text = {
             Column {
                 OutlinedTextField(
@@ -255,13 +275,15 @@ private fun AddSubscriptionDialog(engine: EmberEngine, onClose: () -> Unit) {
                     error = null
                     busy = true
                     scope.launch {
-                        runCatching { engine.subscriptions.add(url, name) }
+                        runCatching {
+                            if (existing == null) engine.subscriptions.add(url, name) else engine.subscriptions.update(existing.id, name, url)
+                        }
                             .onSuccess { onClose() }
                             .onFailure { error = it.message ?: strings.signInFailed }
                         busy = false
                     }
                 },
-            ) { Text(if (busy) strings.adding else strings.addSubscription) }
+            ) { Text(if (busy) (if (existing == null) strings.adding else strings.saving) else (if (existing == null) strings.addSubscription else strings.save)) }
         },
         dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text(strings.cancel) } },
     )

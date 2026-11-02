@@ -4,6 +4,7 @@ import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.vpn.ExitCheck
 import com.soheil.ember.vpn.IpLocationInfo
+import ember.subs.AUTO_NODE
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
 import ember.subs.SubscriptionStore
@@ -110,8 +111,9 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
-    /** The server the user picked on the Servers page, if it is still in one of the subscriptions. */
-    fun selectedNode(): ProxyNode? = subscriptions.nodeById(settings.selectedNodeId)
+    /** The server Connect would use: the one picked on the Servers page, or the fastest tested one in "fastest" mode. */
+    fun selectedNode(): ProxyNode? =
+        if (settings.selectedNodeId == AUTO_NODE) subscriptions.bestNode() else subscriptions.nodeById(settings.selectedNodeId)
 
     /** Connects to the picked server. */
     fun connectSelected() {
@@ -163,6 +165,7 @@ class EmberEngine(private val dataDir: File) {
                 _progress.value = null
                 _state.value = ConnectionState.CONNECTED
                 checkExit()
+                probeConnection()
                 AppLogger.i(TAG, "connected via a ${node.protocol} server (wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
                 watchXray()
                 startNetworkWatch()
@@ -257,6 +260,44 @@ class EmberEngine(private val dataDir: File) {
             )
         }
     }
+
+    /**
+     * Asks Cloudflare for a tiny page twice: through Xray's local port, and the way any program on the computer would
+     * (through the tunnel). The two answers say where a broken connection breaks, and are written to the log.
+     */
+    private fun probeConnection() {
+        scope.launch {
+            delay(2_500)
+            val viaXray = probe(proxied = true)
+            val viaTunnel = if (_wholeDevice.value) probe(proxied = false) else null
+            AppLogger.i(TAG, "connection check: through Xray=${viaXray ?: "failed"}, through the tunnel=${if (_wholeDevice.value) (viaTunnel ?: "failed") else "not used"}")
+            if (_state.value != ConnectionState.CONNECTED) return@launch
+            when {
+                viaXray == null -> _lastError.value = "Connected, but this server did not pass any traffic. Try another server."
+                _wholeDevice.value && viaTunnel == null ->
+                    _lastError.value = "The server works, but your computer's traffic is not getting through the tunnel. See the Logs page."
+            }
+        }
+    }
+
+    /** Milliseconds a small request took, or null when it failed. */
+    private fun probe(proxied: Boolean): Long? = runCatching {
+        val client = okhttp3.OkHttpClient.Builder()
+            .proxy(
+                if (proxied) java.net.Proxy(java.net.Proxy.Type.SOCKS, java.net.InetSocketAddress(LOCAL_BIND, SOCKS_PORT))
+                else java.net.Proxy.NO_PROXY,
+            )
+            .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+            .build()
+        val start = System.nanoTime()
+        client.newCall(okhttp3.Request.Builder().url("http://cp.cloudflare.com/generate_204").build()).execute().use { response ->
+            check(response.code in 200..399) { "HTTP ${response.code}" }
+        }
+        client.dispatcher.executorService.shutdown()
+        (System.nanoTime() - start) / 1_000_000L
+    }.onFailure { AppLogger.w(TAG, "connection check (proxied=$proxied) failed: ${it.javaClass.simpleName} ${it.message}") }.getOrNull()
 
     /** Ends the connection if the Xray process dies. */
     private fun watchXray() {

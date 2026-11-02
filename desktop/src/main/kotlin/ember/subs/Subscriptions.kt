@@ -24,6 +24,9 @@ data class SubscriptionUsage(val uploaded: Long, val downloaded: Long, val total
 /** What the last speed test measured for one server. [pingMs] null means the server did not answer. */
 data class NodeResult(val pingMs: Int?, val mbps: Double?, val testedAtMs: Long)
 
+/** Stored as the selected server when Connect should pick the fastest tested one. */
+const val AUTO_NODE = "auto"
+
 data class Subscription(
     val id: String,
     val name: String,
@@ -116,6 +119,29 @@ class SubscriptionStore(private val file: File) {
         val current = _subscriptions.value.firstOrNull { it.id == id } ?: return
         val fetched = fetch(current.url)
         replace(current.copy(nodes = fetched.nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
+    }
+
+    /** Renames a subscription and, when [url] changed, reads the new link (the old one stays if the new one fails). */
+    suspend fun update(id: String, name: String, url: String) {
+        val current = _subscriptions.value.firstOrNull { it.id == id } ?: return
+        val cleanUrl = url.trim()
+        val cleanName = name.trim().ifBlank { current.name }
+        if (cleanUrl == current.url) {
+            replace(current.copy(name = cleanName))
+            return
+        }
+        require(cleanUrl.startsWith("https://") || cleanUrl.startsWith("http://")) { "A subscription link starts with https://" }
+        val fetched = fetch(cleanUrl)
+        replace(current.copy(name = cleanName, url = cleanUrl, nodes = fetched.nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
+    }
+
+    /** The tested server with the best speed (or, failing that, the lowest delay) across all subscriptions. */
+    fun bestNode(): ProxyNode? {
+        val candidates = _subscriptions.value.flatMap { it.nodes }.filterNot { it.isInfo }
+        val results = _results.value
+        return candidates.filter { results[it.id]?.pingMs != null }.maxWithOrNull(
+            compareBy<ProxyNode> { results[it.id]?.mbps ?: -1.0 }.thenBy { -(results[it.id]?.pingMs ?: Int.MAX_VALUE) },
+        ) ?: candidates.firstOrNull()
     }
 
     fun remove(id: String) {

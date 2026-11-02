@@ -153,7 +153,11 @@ impl Session<'_> {
             return Ok(());
         }
         let start = Instant::now();
-        let names = net::active_names(adapters, &self.config.adapter_name);
+        let wanted = net::active_names(adapters, &self.config.adapter_name);
+        let names = self.firewall.usable_interfaces(&wanted);
+        for skipped in wanted.iter().filter(|n| !names.contains(n)) {
+            self.state.log(&format!("kill switch: the firewall does not manage '{skipped}'; skipped"));
+        }
         if names.is_empty() {
             return Err("no active network adapter was found for the kill switch".into());
         }

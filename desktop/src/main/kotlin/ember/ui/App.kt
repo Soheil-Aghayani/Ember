@@ -98,6 +98,8 @@ import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
 import ember.engine.Autostart
 import ember.engine.EmberEngine
+import ember.subs.AUTO_NODE
+import ember.subs.ProxyNode
 import ember.engine.HTTP_PORT
 import ember.engine.LOCAL_BIND
 import ember.engine.MTU_RANGE
@@ -267,7 +269,12 @@ private fun HomePage(
     val connectedNode by engine.connectedNode.collectAsState()
     val exit by engine.exit.collectAsState()
     val results by engine.subscriptions.results.collectAsState()
+    val subscriptions by engine.subscriptions.subscriptions.collectAsState()
+    val testing by engine.testProgress.collectAsState()
+    var selectedId by remember { mutableStateOf(engine.settings.selectedNodeId) }
+    var menuOpen by remember { mutableStateOf(false) }
     val canPick = state == ConnectionState.DISCONNECTED
+    LaunchedEffect(canPick) { if (!canPick) menuOpen = false }
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var elapsed by remember { mutableStateOf(0L) }
@@ -369,42 +376,116 @@ private fun HomePage(
 
         val connected = state == ConnectionState.CONNECTED
         val node = connectedNode ?: engine.selectedNode()
+        val autoMode = selectedId == AUTO_NODE
         val exitCode = if (connected) exit.info?.countryCode.orEmpty() else ""
         val shownCode = if (exitCode.length == 2) exitCode else node?.flagCode.orEmpty()
         val result = node?.let { results[it.id] }
-        Card {
-            Row(
-                Modifier.fillMaxWidth().background(
-                    if (hovered && canPick) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                ).hoverable(interaction, enabled = canPick)
-                    .pointerHoverIcon(if (canPick) PointerIcon.Hand else PointerIcon.Default)
-                    .clickable(enabled = canPick, role = Role.Button) { onOpenServers() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (shownCode.length == 2) FlagIcon(shownCode, 24.dp)
-                else EmberIcon("subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    node?.title ?: strings.chooseServer,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!connected) {
-                    val speed = result?.mbps?.let { String.format(java.util.Locale.US, "%.1f Mbps", it) }
-                    val ping = result?.pingMs?.let { "$it ms" }
-                    (speed ?: ping)?.let {
+        val choices = remember(subscriptions, results) {
+            subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }.sortedWith(
+                compareByDescending<ProxyNode> { results[it.id]?.mbps ?: -1.0 }.thenBy { results[it.id]?.pingMs ?: Int.MAX_VALUE },
+            )
+        }
+        val choose: (String) -> Unit = {
+            selectedId = it
+            engine.settings.selectedNodeId = it
+            menuOpen = false
+        }
+        Box(Modifier.fillMaxWidth()) {
+            Card {
+                Row(
+                    Modifier.fillMaxWidth().background(
+                        if (hovered && canPick) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                    ).hoverable(interaction, enabled = canPick)
+                        .pointerHoverIcon(if (canPick) PointerIcon.Hand else PointerIcon.Default)
+                        .clickable(enabled = canPick, role = Role.Button) { if (choices.isEmpty()) onOpenServers() else menuOpen = !menuOpen }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (shownCode.length == 2) FlagIcon(shownCode, 24.dp)
+                    else EmberIcon(if (autoMode) "bolt" else "subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        when {
+                            autoMode && !connected -> strings.fastestServer + (node?.let { " · " + it.title } ?: "")
+                            else -> node?.title ?: strings.chooseServer
+                        },
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!connected) {
+                        val speed = result?.mbps?.let { String.format(java.util.Locale.US, "%.1f Mbps", it) }
+                        val ping = result?.pingMs?.let { "$it ms" }
+                        (speed ?: ping)?.let {
+                            Spacer(Modifier.width(12.dp))
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (canPick) {
                         Spacer(Modifier.width(12.dp))
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EmberIcon(if (menuOpen) "chevron-up" else "chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (canPick) {
-                    Spacer(Modifier.width(12.dp))
-                    EmberIcon("chevron-down", 16.dp, MaterialTheme.colorScheme.onSurfaceVariant)
-                }
             }
+            DropdownMenu(
+                expanded = menuOpen && canPick,
+                onDismissRequest = { menuOpen = false },
+                modifier = Modifier
+                    .width(EmberDesktopMetrics.countryPickerWidth)
+                    .heightIn(max = EmberDesktopMetrics.countryPickerMaxHeight),
+                offset = DpOffset(0.dp, 6.dp),
+                shape = RoundedCornerShape(EmberDesktopMetrics.countryPopoverRadius),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                DropdownMenuItem(
+                    text = { Text(strings.fastestServer) },
+                    leadingIcon = { EmberIcon("bolt", 24.dp, MaterialTheme.colorScheme.primary) },
+                    trailingIcon = { if (autoMode) EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary, contentDescription = strings.selected) },
+                    onClick = { choose(AUTO_NODE) },
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                for (choice in choices) {
+                    val r = results[choice.id]
+                    val label = r?.mbps?.let { String.format(java.util.Locale.US, "%.0f Mbps", it) } ?: r?.pingMs?.let { "$it ms" }
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(choice.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                label?.let {
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        },
+                        leadingIcon = {
+                            val code = choice.flagCode
+                            if (code != null) FlagIcon(code) else EmberIcon("subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                        trailingIcon = { if (!autoMode && choice.id == selectedId) EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary, contentDescription = strings.selected) },
+                        onClick = { choose(choice.id) },
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                DropdownMenuItem(
+                    text = { Text(strings.manageServers) },
+                    onClick = { menuOpen = false; onOpenServers() },
+                )
+            }
+        }
+        if (canPick && choices.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { engine.testNodes(choices) }, enabled = testing == null) {
+                EmberIcon("bolt", 18.dp, MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(6.dp))
+                Text(strings.testSpeed)
+            }
+        }
+        testing?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (connected && !whole) {
             Spacer(Modifier.height(12.dp))

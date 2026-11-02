@@ -38,9 +38,11 @@ pub struct Firewall {
 }
 
 fn interfaces(names: &[String]) -> windows::core::Result<VARIANT> {
-    // SAFETY: a vector of BSTR elements. Ownership transfers immediately to the VARIANT,
+    // INetFwRule::Interfaces takes a SAFEARRAY of VARIANTs that each hold a BSTR (what scripting hosts send);
+    // a SAFEARRAY of plain BSTRs is rejected with E_INVALIDARG ("The parameter is incorrect").
+    // SAFETY: a vector of VARIANT elements. Ownership transfers immediately to the VARIANT,
     // whose Drop calls VariantClear on every success/error path, destroying the SAFEARRAY.
-    let array = unsafe { SafeArrayCreateVector(VT_BSTR, 0, names.len() as u32) };
+    let array = unsafe { SafeArrayCreateVector(VT_VARIANT, 0, names.len() as u32) };
     if array.is_null() {
         return Err(windows::core::Error::from_hresult(
             windows::Win32::Foundation::E_OUTOFMEMORY,
@@ -49,7 +51,7 @@ fn interfaces(names: &[String]) -> windows::core::Result<VARIANT> {
     let variant = VARIANT {
         Anonymous: VARIANT_0 {
             Anonymous: ManuallyDrop::new(VARIANT_0_0 {
-                vt: VARENUM(VT_ARRAY.0 | VT_BSTR.0),
+                vt: VARENUM(VT_ARRAY.0 | VT_VARIANT.0),
                 wReserved1: 0,
                 wReserved2: 0,
                 wReserved3: 0,
@@ -58,12 +60,30 @@ fn interfaces(names: &[String]) -> windows::core::Result<VARIANT> {
         },
     };
     for (index, name) in names.iter().enumerate() {
-        let text = BSTR::from(name.as_str());
-        // SAFETY: index is in bounds. For VT_BSTR this API takes the BSTR itself,
-        // not a pointer to it, and makes its own copy before text is dropped.
-        unsafe { SafeArrayPutElement(array, &(index as i32), text.as_ptr().cast()) }?;
+        let element = VARIANT::from(BSTR::from(name.as_str()));
+        // SAFETY: index is in bounds. For VT_VARIANT this API takes a pointer to the VARIANT and copies it
+        // (including the BSTR), so `element` can be dropped afterwards.
+        unsafe {
+            SafeArrayPutElement(array, &(index as i32), (&element as *const VARIANT).cast())
+        }?;
     }
     Ok(variant)
+}
+
+/// Whether the firewall accepts `name` as a rule interface. It rejects adapters it does not manage (for example the
+/// Hyper-V / WSL virtual switch) with "Element not found", and one such name fails a whole list, so names are
+/// checked one at a time.
+fn accepts_interface(name: &str) -> bool {
+    // SAFETY: COM is initialized by Firewall::new; the rule is a throwaway object that is never added.
+    unsafe {
+        let Ok(rule) = CoCreateInstance::<_, INetFwRule>(&NetFwRule, None, CLSCTX_INPROC_SERVER) else {
+            return false;
+        };
+        let Ok(list) = interfaces(&[name.to_string()]) else {
+            return false;
+        };
+        rule.SetInterfaces(&list).is_ok()
+    }
 }
 
 fn next_rule(enumerator: &IEnumVARIANT) -> windows::core::Result<Option<INetFwRule>> {
@@ -108,6 +128,11 @@ impl Firewall {
             rules,
             _apartment: apartment,
         })
+    }
+
+    /// The subset of `names` the firewall accepts as rule interfaces, in the same order.
+    pub fn usable_interfaces(&self, names: &[String]) -> Vec<String> {
+        names.iter().filter(|name| accepts_interface(name)).cloned().collect()
     }
 
     pub fn remove_ember(&self, mut log: impl FnMut(&str)) -> Result<()> {
@@ -199,5 +224,30 @@ fn build_rule(
         }
         rule.SetEnabled(VARIANT_TRUE)?;
         Ok(rule)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rules_build_without_an_interface_list() {
+        let _apartment = Apartment::new().unwrap();
+        let rule = build_rule("Ember test (never added)", "0.0.0.0-9.255.255.255", 256, None, None);
+        assert!(rule.is_ok(), "{:?}", rule.err());
+    }
+
+    #[test]
+    fn unknown_adapters_are_not_usable_but_the_list_format_is_accepted() {
+        let _apartment = Apartment::new().unwrap();
+        // The firewall answers "Element not found" for a name it does not know (not "The parameter is incorrect",
+        // which is what a malformed list gets).
+        assert!(!accepts_interface("Ember test adapter that does not exist"));
+        let rule: INetFwRule =
+            unsafe { CoCreateInstance(&NetFwRule, None, CLSCTX_INPROC_SERVER) }.unwrap();
+        let list = interfaces(&["Ember test adapter that does not exist".to_string()]).unwrap();
+        let error = unsafe { rule.SetInterfaces(&list) }.unwrap_err();
+        assert_eq!(error.code().0 as u32, 0x8007_0490, "{error:?}");
     }
 }
