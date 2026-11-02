@@ -149,6 +149,13 @@ class EmberEngine(private val dataDir: File) {
                 val address = resolveIpv4(node.host)
                 xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile))
                 xray.awaitListening(SOCKS_PORT)
+                // Before anything on the computer is changed: does this server pass traffic at all?
+                _progress.value = "Checking the server..."
+                val serverCheck = probe(proxied = true)
+                AppLogger.i(TAG, "server check before the tunnel: " + (serverCheck?.let { "$it ms" } ?: "failed"))
+                if (serverCheck == null) {
+                    error("This server did not answer. Try another server.")
+                }
                 if (wholeDevice) {
                     tunnel.start(
                         socksPort = SOCKS_PORT,
@@ -165,7 +172,7 @@ class EmberEngine(private val dataDir: File) {
                 _progress.value = null
                 _state.value = ConnectionState.CONNECTED
                 checkExit()
-                probeConnection()
+                probeConnection(address, node.port)
                 AppLogger.i(TAG, "connected via a ${node.protocol} server (wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
                 watchXray()
                 startNetworkWatch()
@@ -265,12 +272,17 @@ class EmberEngine(private val dataDir: File) {
      * Asks Cloudflare for a tiny page twice: through Xray's local port, and the way any program on the computer would
      * (through the tunnel). The two answers say where a broken connection breaks, and are written to the log.
      */
-    private fun probeConnection() {
+    private fun probeConnection(address: String, port: Int) {
         scope.launch {
             delay(2_500)
             val viaXray = probe(proxied = true)
             val viaTunnel = if (_wholeDevice.value) probe(proxied = false) else null
             AppLogger.i(TAG, "connection check: through Xray=${viaXray ?: "failed"}, through the tunnel=${if (_wholeDevice.value) (viaTunnel ?: "failed") else "not used"}")
+            if (viaXray == null) {
+                val direct = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress(address, port), 4_000) } }
+                AppLogger.w(TAG, "plain connection from Ember to the server: " + (direct.exceptionOrNull()?.let { it.javaClass.simpleName + " " + it.message } ?: "reachable"))
+                AppLogger.w(TAG, "Xray reported: " + runCatching { xray.logFile.readLines().takeLast(6).joinToString(" | ") }.getOrDefault("(no log)").take(900))
+            }
             if (_state.value != ConnectionState.CONNECTED) return@launch
             when {
                 viaXray == null -> _lastError.value = "Connected, but this server did not pass any traffic. Try another server."

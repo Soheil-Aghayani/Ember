@@ -19,7 +19,8 @@ private const val CREATE_NO_WINDOW = 0x08000000
 /** Builds Xray configurations for one connection or for testing many servers at once. */
 object XrayConfig {
 
-    private fun base(logFile: File) = JSONObject().put("log", JSONObject().put("loglevel", "warning").put("error", logFile.absolutePath))
+    // "info" while connection problems are being tracked down: it records why an outbound connection failed.
+    private fun base(logFile: File) = JSONObject().put("log", JSONObject().put("loglevel", "info").put("error", logFile.absolutePath))
 
     private fun socksInbound(tag: String, port: Int) = JSONObject()
         .put("tag", tag).put("listen", "127.0.0.1").put("port", port).put("protocol", "socks")

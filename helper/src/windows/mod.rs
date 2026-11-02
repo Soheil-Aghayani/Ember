@@ -275,10 +275,22 @@ impl Session<'_> {
         };
         self.state.elapsed("tunnel adapter appeared", start);
         let start = Instant::now();
-        step(
-            "configuring the tunnel adapter",
-            net::configure(&adapter, self.config.tun_address, self.config.mapdns_address),
-        )?;
+        // A new Wintun adapter exists a moment before Windows has made its IPv4 interface; until then the
+        // calls answer "Element not found" (0x80070490).
+        let configure_deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let current = net::adapters()?
+                .into_iter()
+                .find(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
+                .unwrap_or_else(|| adapter.clone());
+            match net::configure(&current, self.config.tun_address, self.config.mapdns_address) {
+                Ok(()) => break,
+                Err(e) if e.contains("0x80070490") && Instant::now() < configure_deadline => {
+                    sleep(Duration::from_millis(150));
+                }
+                Err(e) => return Err(format!("configuring the tunnel adapter: {e}")),
+            }
+        }
         for text in ["0.0.0.0/1", "128.0.0.0/1"] {
             step(
                 "adding the tunnel routes",
