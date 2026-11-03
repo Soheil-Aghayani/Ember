@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -28,6 +29,8 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 
 private const val TAG = "EmberEngine"
+private const val REFRESH_AFTER_MS = 12 * 60 * 60 * 1000L
+private const val REFRESH_CHECK_MS = 3 * 60 * 60 * 1000L
 
 private fun elapsedMsSince(startedAtNanos: Long): Long =
     (System.nanoTime() - startedAtNanos) / 1_000_000L
@@ -98,6 +101,7 @@ class EmberEngine(private val dataDir: File) {
     val wholeDevice: StateFlow<Boolean> = _wholeDevice
 
     private var connectJob: Job? = null
+    private var testJob: Job? = null
     private var xrayWatchJob: Job? = null
     private var watchJob: Job? = null
     private var netWatchJob: Job? = null
@@ -106,10 +110,41 @@ class EmberEngine(private val dataDir: File) {
         AppLogger.sink = FileLogSink(File(dataDir, "ember.log"))
         startNetworkTrustWatch()
         runCatching { xray.killStale() }
+        startSubscriptionUpkeep()
         if (tunnel.isBlocked()) {
             _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
         } else if (tunnel.isStale()) {
             _blockedNotice.value = "Ember was closed while the tunnel was on (or Windows restarted). Leftover network rules may still block or redirect traffic."
+        }
+    }
+
+    /**
+     * Keeps the subscription links fresh (usage, new or removed servers) and, in "fastest server" mode, measures the
+     * servers once at start so the choice is based on real numbers. Runs quietly; failures only go to the log.
+     */
+    private fun startSubscriptionUpkeep() {
+        scope.launch {
+            delay(4_000)
+            var first = true
+            while (true) {
+                val now = System.currentTimeMillis()
+                for (subscription in subscriptions.subscriptions.value.filter { now - it.updatedAtMs > REFRESH_AFTER_MS }) {
+                    runCatching { subscriptions.refresh(subscription.id) }
+                        .onFailure { AppLogger.w(TAG, "could not refresh a subscription (${it.javaClass.simpleName})") }
+                }
+                if (first) {
+                    first = false
+                    val all = subscriptions.subscriptions.value.flatMap { it.nodes }.filterNot { it.isInfo }
+                    val newest = all.mapNotNull { subscriptions.results.value[it.id]?.testedAtMs }.maxOrNull() ?: 0L
+                    if (settings.selectedNodeId == AUTO_NODE && all.isNotEmpty() && now - newest > REFRESH_AFTER_MS / 2 &&
+                        _state.value == ConnectionState.DISCONNECTED
+                    ) {
+                        AppLogger.i(TAG, "measuring the servers in the background (fastest-server mode)")
+                        testNodes(all)
+                    }
+                }
+                delay(REFRESH_CHECK_MS)
+            }
         }
     }
 
@@ -148,6 +183,8 @@ class EmberEngine(private val dataDir: File) {
         connectJob = scope.launch {
             val startedAtNanos = System.nanoTime()
             try {
+                // A running speed test owns the Xray process; stop it first.
+                testJob?.cancelAndJoin()
                 val address = runCatching { resolveIpv4(node.host) }
                     .onSuccess { subscriptions.rememberAddress(node, it) }
                     .getOrElse { failure ->
@@ -202,7 +239,7 @@ class EmberEngine(private val dataDir: File) {
             return
         }
         _testProgress.value = "Starting…"
-        scope.launch {
+        testJob = scope.launch {
             try {
                 nodeTester.run(
                     nodes,
@@ -261,9 +298,17 @@ class EmberEngine(private val dataDir: File) {
     }
 
     /** Measures download speed and delay through the running tunnel. */
-    suspend fun runSpeedTest(): Result<SpeedResult> =
-        if (_state.value == ConnectionState.CONNECTED) SpeedTest.run(SOCKS_PORT)
-        else Result.failure(IllegalStateException("Connect first, then test the speed."))
+    suspend fun runSpeedTest(): Result<SpeedResult> {
+        if (_state.value != ConnectionState.CONNECTED) return Result.failure(IllegalStateException("Connect first, then test the speed."))
+        val viaXray = SpeedTest.run(SOCKS_PORT)
+        if (!_wholeDevice.value) return viaXray
+        // In whole-device mode the number that matters is what a program on the computer gets (through the tunnel);
+        // the Xray-alone number next to it shows whether the server or the tunnel is the limit.
+        val viaTunnel = SpeedTest.run(null)
+        AppLogger.i(TAG, "speed test: through Xray=${viaXray.getOrNull()?.let { "${it.downloadBitsPerSecond / 1_000_000} Mbit/s" } ?: "failed"}, " +
+            "through the tunnel=${viaTunnel.getOrNull()?.let { "${it.downloadBitsPerSecond / 1_000_000} Mbit/s" } ?: "failed"}")
+        return viaTunnel.map { it.copy(serverBitsPerSecond = viaXray.getOrNull()?.downloadBitsPerSecond) }
+    }
 
     private fun resolveIpv4(host: String): String =
         InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress

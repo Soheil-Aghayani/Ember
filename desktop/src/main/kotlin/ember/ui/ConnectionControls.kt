@@ -58,6 +58,10 @@ internal fun SpeedTestControl(engine: EmberEngine) {
                     if (gigabits) "Gbit/s" else "Mbit/s")
                 Text(strings.speedSummary(speed, it.pingMs), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                it.serverBitsPerSecond?.let { server ->
+                    Text(strings.serverAlone(String.format(Locale.US, "%.1f Mbit/s", server / 1_000_000.0)),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             failure?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -9,7 +9,8 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
-data class SpeedResult(val downloadBitsPerSecond: Long, val pingMs: Long)
+/** [serverBitsPerSecond] is the same download through Xray alone, when it was measured, to compare with the tunnel. */
+data class SpeedResult(val downloadBitsPerSecond: Long, val pingMs: Long, val serverBitsPerSecond: Long? = null)
 
 private const val TAG = "SpeedTest"
 private const val DOWNLOAD_BYTES = 12_000_000L
@@ -28,9 +29,10 @@ private val SOURCES = listOf(
 /** Measures the tunnel by downloading a test file through Ember's local SOCKS5 proxy (which uses the same upstream connection). */
 object SpeedTest {
 
-    suspend fun run(socksPort: Int): Result<SpeedResult> = withContext(Dispatchers.IO) {
+    /** [socksPort] null means no proxy: the request leaves the way any program on the computer would (through the tunnel). */
+    suspend fun run(socksPort: Int?): Result<SpeedResult> = withContext(Dispatchers.IO) {
         val client = OkHttpClient.Builder()
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(LOCAL_BIND, socksPort)))
+            .proxy(if (socksPort == null) Proxy.NO_PROXY else Proxy(Proxy.Type.SOCKS, InetSocketAddress(LOCAL_BIND, socksPort)))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .callTimeout(60, TimeUnit.SECONDS)

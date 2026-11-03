@@ -32,8 +32,16 @@ object XrayConfig {
         if (httpPort != null) {
             inbounds.put(JSONObject().put("tag", "http").put("listen", "127.0.0.1").put("port", httpPort).put("protocol", "http"))
         }
-        return base(logFile).put("inbounds", inbounds)
-            .put("outbounds", JSONArray().put(ShareLinks.outbound(node.raw, address, "proxy")))
+        // QUIC (UDP 443) is dropped here: many servers carry no UDP, and a browser then waits for a QUIC attempt that
+        // never answers before it falls back to TCP. Dropping it makes sites use TCP straight away.
+        val outbounds = JSONArray()
+            .put(ShareLinks.outbound(node.raw, address, "proxy"))
+            .put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
+        val rules = JSONArray().put(
+            JSONObject().put("type", "field").put("network", "udp").put("port", "443").put("outboundTag", "block"),
+        )
+        return base(logFile).put("inbounds", inbounds).put("outbounds", outbounds)
+            .put("routing", JSONObject().put("domainStrategy", "AsIs").put("rules", rules))
     }
 
     /** Each server gets its own local SOCKS5 port, so all of them can be tested at the same time. */

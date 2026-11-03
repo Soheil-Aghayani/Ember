@@ -5,6 +5,7 @@ import com.soheil.ember.data.TlsSplitMode
 
 data class Strings(
     val testSpeed: String,
+    val serverAlone: (String) -> String,
     val subscriptions: String,
     val servers: String,
     val fastestServer: String,
@@ -125,6 +126,7 @@ data class Strings(
 
 val EnglishStrings = Strings(
     testSpeed = "Test speed",
+    serverAlone = { "Server alone: $it" },
     subscriptions = "Subscriptions",
     servers = "Servers",
     fastestServer = "Fastest server",
@@ -245,6 +247,7 @@ val EnglishStrings = Strings(
 
 val PersianStrings = Strings(
     testSpeed = "تست سرعت",
+    serverAlone = { "سرور به‌تنهایی: $it" },
     subscriptions = "اشتراک‌ها",
     servers = "سرورها",
     fastestServer = "سریع‌ترین سرور",
