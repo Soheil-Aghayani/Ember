@@ -274,6 +274,7 @@ impl Session<'_> {
             sleep(Duration::from_millis(100));
         };
         self.state.elapsed("tunnel adapter appeared", start);
+        self.state.log(&format!("tunnel adapter index {}", adapter.index));
         let start = Instant::now();
         // A new Wintun adapter exists a moment before Windows has made its IPv4 interface; until then the
         // calls answer "Element not found" (0x80070490).

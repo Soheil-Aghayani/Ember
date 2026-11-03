@@ -146,7 +146,13 @@ class EmberEngine(private val dataDir: File) {
         connectJob = scope.launch {
             val startedAtNanos = System.nanoTime()
             try {
-                val address = resolveIpv4(node.host)
+                val address = runCatching { resolveIpv4(node.host) }
+                    .onSuccess { subscriptions.rememberAddress(node, it) }
+                    .getOrElse { failure ->
+                        val remembered = subscriptions.rememberedAddress(node) ?: throw failure
+                        AppLogger.w(TAG, "could not look up the server's name (${failure.javaClass.simpleName}); using its last known address")
+                        remembered
+                    }
                 xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile))
                 xray.awaitListening(SOCKS_PORT)
                 // Before anything on the computer is changed: does this server pass traffic at all?
@@ -196,7 +202,12 @@ class EmberEngine(private val dataDir: File) {
         _testProgress.value = "Starting…"
         scope.launch {
             try {
-                nodeTester.run(nodes, { _testProgress.value = it }, { node, result -> subscriptions.recordResult(node, result) })
+                nodeTester.run(
+                    nodes,
+                    { _testProgress.value = it },
+                    { node, result -> subscriptions.recordResult(node, result) },
+                    { node, ip -> subscriptions.rememberAddress(node, ip) },
+                )
             } catch (failure: Throwable) {
                 AppLogger.w(TAG, "the server test failed", failure)
                 _lastError.value = failure.message ?: failure.javaClass.simpleName

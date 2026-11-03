@@ -90,6 +90,15 @@ class SubscriptionStore(private val file: File) {
     private val _results = MutableStateFlow<Map<String, NodeResult>>(emptyMap())
     val results: StateFlow<Map<String, NodeResult>> = _results
 
+    /** The last IPv4 address each server's name resolved to, used when a later lookup fails. */
+    private val addresses = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    fun rememberAddress(node: ProxyNode, ip: String) {
+        if (addresses.put(node.id, ip) != ip) save()
+    }
+
+    fun rememberedAddress(node: ProxyNode): String? = addresses[node.id]
+
     init {
         load()
     }
@@ -198,7 +207,8 @@ class SubscriptionStore(private val file: File) {
             for ((id, r) in _results.value) {
                 results.put(id, JSONObject().put("ping", r.pingMs ?: JSONObject.NULL).put("mbps", r.mbps ?: JSONObject.NULL).put("at", r.testedAtMs))
             }
-            file.writeText(JSONObject().put("subscriptions", array).put("results", results).toString())
+            val remembered = JSONObject().apply { addresses.forEach { (id, ip) -> put(id, ip) } }
+            file.writeText(JSONObject().put("subscriptions", array).put("results", results).put("addresses", remembered).toString())
         }.onFailure { AppLogger.w(TAG, "could not save the subscriptions", it) }
     }
 
@@ -218,6 +228,7 @@ class SubscriptionStore(private val file: File) {
                     updatedAtMs = o.optLong("updatedAt"),
                 )
             }
+            root.optJSONObject("addresses")?.let { a -> a.keys().forEach { id -> addresses[id] = a.getString(id) } }
             val results = root.optJSONObject("results")
             if (results != null) {
                 _results.value = results.keys().asSequence().associateWith { id ->

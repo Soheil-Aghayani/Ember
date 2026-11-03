@@ -40,6 +40,7 @@ class NodeTester(private val xray: XrayRunner) {
         nodes: List<ProxyNode>,
         onProgress: (String) -> Unit,
         onResult: (ProxyNode, NodeResult) -> Unit,
+        onAddress: (ProxyNode, String) -> Unit = { _, _ -> },
     ) = withContext(Dispatchers.IO) {
         val candidates = nodes.filterNot { it.isInfo }
         onProgress("Looking up the servers…")
@@ -48,6 +49,7 @@ class NodeTester(private val xray: XrayRunner) {
                 async { withTimeoutOrNull(6_000) { node to resolveIpv4(node.host) } ?: (node to null) }
             }.awaitAll()
         }
+        resolved.forEach { (node, ip) -> if (ip != null) onAddress(node, ip) }
         val reachable = resolved.mapNotNull { (node, ip) -> ip?.let { Triple(node, it, 0) } }
         resolved.filter { it.second == null }.forEach { (node, _) -> onResult(node, NodeResult(null, null, System.currentTimeMillis())) }
         if (reachable.isEmpty()) return@withContext

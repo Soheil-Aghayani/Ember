@@ -57,8 +57,17 @@ pub fn adapters() -> Result<Vec<Adapter>> {
         unsafe {
             while !cursor.is_null() {
                 let a = &*cursor;
+                // IfIndex is 0 while the adapter's IPv4 side is not ready, which makes every IPv4 call on it fail
+                // with "Element not found"; the LUID always maps to the real interface index.
+                let mut index = a.Anonymous1.Anonymous.IfIndex;
+                if index == 0 {
+                    let mut from_luid = 0u32;
+                    if ConvertInterfaceLuidToIndex(&a.Luid, &mut from_luid) == WIN32_ERROR(0) {
+                        index = from_luid;
+                    }
+                }
                 result.push(Adapter {
-                    index: a.Anonymous1.Anonymous.IfIndex,
+                    index,
                     name: if a.FriendlyName.is_null() {
                         String::new()
                     } else {
@@ -214,13 +223,14 @@ pub fn bypass_present(edges: &[Ipv4Addr]) -> Result<bool> {
     }))
 }
 
-fn ensure_address(index: u32, ip: Ipv4Addr) -> Result<()> {
+fn ensure_address(adapter: &Adapter, ip: Ipv4Addr) -> Result<()> {
     let mut row = MIB_UNICASTIPADDRESS_ROW::default();
     // SAFETY: initializes valid default values in a writable row.
     unsafe {
         InitializeUnicastIpAddressEntry(&mut row);
     }
-    row.InterfaceIndex = index;
+    row.InterfaceLuid = adapter.luid;
+    row.InterfaceIndex = adapter.index;
     row.Address = address(ip);
     // SAFETY: row identifies the requested address/interface; no system change on this query.
     if unsafe { GetUnicastIpAddressEntry(&mut row) }.is_ok() {
@@ -234,7 +244,7 @@ fn ensure_address(index: u32, ip: Ipv4Addr) -> Result<()> {
 }
 
 pub fn configure(adapter: &Adapter, ip: Ipv4Addr, dns: Ipv4Addr) -> Result<()> {
-    ensure_address(adapter.index, ip).map_err(|e| format!("address: {e}"))?;
+    ensure_address(adapter, ip).map_err(|e| format!("address: {e}"))?;
     let mut row = interface(adapter.index).map_err(|e| format!("interface entry: {e}"))?;
     row.UseAutomaticMetric = false;
     row.Metric = 1;
