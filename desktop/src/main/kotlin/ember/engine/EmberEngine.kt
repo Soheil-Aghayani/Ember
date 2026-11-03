@@ -14,12 +14,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -417,17 +419,21 @@ class EmberEngine(private val dataDir: File) {
             .joinToString(";") { (name, addresses) -> name + "=" + addresses.sorted().joinToString(",") }
     }.getOrDefault("")
 
-    private suspend fun teardown(helperAlreadyBlocked: Boolean = false) {
+    /**
+     * Stops everything. It runs to the end even when the job that called it is cancelled (the Xray watcher calls it
+     * from its own job, and cancelling that job first used to stop the cleanup before the tunnel helper was told to stop).
+     */
+    private suspend fun teardown(helperAlreadyBlocked: Boolean = false) = withContext(NonCancellable) {
+        if (_wholeDevice.value && !helperAlreadyBlocked) {
+            runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
+        }
+        runCatching { xray.stop() }
         xrayWatchJob?.cancel()
         xrayWatchJob = null
         watchJob?.cancel()
         watchJob = null
         netWatchJob?.cancel()
         netWatchJob = null
-        if (_wholeDevice.value && !helperAlreadyBlocked) {
-            runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
-        }
-        runCatching { xray.stop() }
         _connectedAtMs.value = null
         _connectedNode.value = null
         _progress.value = null

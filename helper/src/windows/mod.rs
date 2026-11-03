@@ -232,6 +232,21 @@ impl Session<'_> {
                 self.state.log(&format!("cleanup (edge route): {e}"));
             }
         }
+        // A tunnel adapter left by an earlier run goes away a moment after its process ends. Starting while it still
+        // exists makes the new tunnel process fail or hands this helper the dying adapter, whose address calls answer
+        // "Element not found".
+        process::kill_tunnels(|s| self.state.log(s));
+        let leftover_wait = Instant::now();
+        while net::adapters()?
+            .iter()
+            .any(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
+        {
+            if leftover_wait.elapsed() >= Duration::from_secs(10) {
+                self.state.log("an old tunnel adapter is still there; continuing anyway");
+                break;
+            }
+            sleep(Duration::from_millis(200));
+        }
         self.state.remove("stop");
         self.state.status("STARTING")?;
         self.state.log(&format!(
