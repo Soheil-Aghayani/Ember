@@ -40,6 +40,10 @@ object SubscriptionParser {
 
     fun parseNodes(body: String): List<ProxyNode> {
         val text = body.trim()
+        if (text.startsWith("{") || text.startsWith("[")) {
+            val fromJson = runCatching { ShareLinks.fromXrayJson(text) }.getOrDefault(emptyList()).distinctBy { it.id }
+            if (fromJson.isNotEmpty()) return fromJson
+        }
         val lines = if ("://" in text) {
             text.lines()
         } else {
@@ -48,7 +52,7 @@ object SubscriptionParser {
         val nodes = lines.mapNotNull(ShareLinks::parse).distinctBy { it.id }
         if (nodes.isEmpty()) {
             if (text.startsWith("{") || text.startsWith("[")) {
-                error("This subscription is in a format Ember does not read yet (JSON). Ask the provider for the standard link list.")
+                error("This subscription is in a format Ember does not read (JSON without Xray servers). Ask the provider for the standard link list.")
             }
             error("No servers were found in this subscription.")
         }
@@ -107,8 +111,8 @@ class SubscriptionStore(private val file: File) {
 
     suspend fun add(url: String, name: String): Subscription {
         val clean = url.trim()
+        if (!clean.startsWith("https://") && !clean.startsWith("http://")) return addPasted(clean, name)
         val host = runCatching { URI(clean).host }.getOrNull()
-        require(clean.startsWith("https://") || clean.startsWith("http://")) { "A subscription link starts with https://" }
         require(!host.isNullOrBlank()) { "That does not look like a link." }
         val fetched = fetch(clean)
         val subscription = Subscription(
@@ -124,8 +128,28 @@ class SubscriptionStore(private val file: File) {
         return subscription
     }
 
+    /** Server links pasted directly (one per line): kept as a list without a link to refresh. */
+    private fun addPasted(text: String, name: String): Subscription {
+        val nodes = try {
+            SubscriptionParser.parseNodes(text)
+        } catch (failure: IllegalStateException) {
+            throw IllegalArgumentException("That is neither a subscription link (https://…) nor server links such as vless://…")
+        }
+        val subscription = Subscription(
+            id = java.util.UUID.randomUUID().toString().take(8),
+            name = name.trim().ifBlank { "Pasted servers" },
+            url = "",
+            nodes = nodes,
+            usage = null,
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        _subscriptions.value = _subscriptions.value + subscription
+        save()
+        return subscription
+    }
+
     suspend fun refresh(id: String) {
-        val current = _subscriptions.value.firstOrNull { it.id == id } ?: return
+        val current = _subscriptions.value.firstOrNull { it.id == id }?.takeIf { it.url.isNotBlank() } ?: return
         val fetched = fetch(current.url)
         replace(current.copy(nodes = fetched.nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
     }
@@ -135,7 +159,7 @@ class SubscriptionStore(private val file: File) {
         val current = _subscriptions.value.firstOrNull { it.id == id } ?: return
         val cleanUrl = url.trim()
         val cleanName = name.trim().ifBlank { current.name }
-        if (cleanUrl == current.url) {
+        if (cleanUrl == current.url || current.url.isBlank()) {
             replace(current.copy(name = cleanName))
             return
         }

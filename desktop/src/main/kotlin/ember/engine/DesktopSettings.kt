@@ -73,6 +73,16 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("selectedNodeId", "")
         set(value) = put("selectedNodeId", value)
 
+    /** Servers the user starred; they sit at the top of every list. */
+    var favoriteNodes: Set<String>
+        get() = props.getProperty("favoriteNodes", "").split(';').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        set(value) = put("favoriteNodes", value.filter { it.isNotBlank() && !it.contains(';') }.joinToString(";"))
+
+    /** Writes a detailed Xray log (it names the sites visited): only for tracking down a problem. */
+    var diagnosticLog: Boolean
+        get() = props.getProperty("diagnosticLog", "false").toBoolean()
+        set(value) = put("diagnosticLog", value.toString())
+
     /** Carries IPv6 through the tunnel too; off keeps public IPv6 blocked. */
     var ipv6: Boolean
         get() = props.getProperty("ipv6", "true").toBoolean()

@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,7 @@ import com.soheil.ember.data.model.ConnectionState
 import ember.engine.EmberEngine
 import ember.subs.ProxyNode
 import ember.subs.Subscription
+import ember.subs.sortNodes
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -51,7 +53,9 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val results by engine.subscriptions.results.collectAsState()
     val testing by engine.testProgress.collectAsState()
     val state by engine.state.collectAsState()
-    var selectedId by remember { mutableStateOf(engine.settings.selectedNodeId) }
+    val selectedId by engine.selectedId.collectAsState()
+    val favorites by engine.favorites.collectAsState()
+    val clipboard = LocalClipboardManager.current
     var showAdd by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Subscription?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
@@ -62,6 +66,16 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        IconAction("clipboard", strings.pasteFromClipboard, onClick = {
+            val text = clipboard.getText()?.text.orEmpty().trim()
+            if (text.isEmpty()) {
+                message = strings.clipboardEmpty
+            } else {
+                message = null
+                scope.launch { runCatching { engine.subscriptions.add(text, "") }.onFailure { message = it.message ?: strings.signInFailed } }
+            }
+        })
+        Spacer(Modifier.width(4.dp))
         IconAction("add", strings.addSubscription, onClick = { showAdd = true }, filled = true)
     }
     Spacer(Modifier.height(8.dp))
@@ -87,10 +101,9 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             canTest = testing == null && state == ConnectionState.DISCONNECTED,
             testing = testing,
             refreshing = busyId == subscription.id,
-            onSelect = { node ->
-                selectedId = node.id
-                engine.settings.selectedNodeId = node.id
-            },
+            favorites = favorites,
+            onToggleFavorite = { engine.toggleFavorite(it) },
+            onSelect = { node -> engine.chooseServer(node.id) },
             onTest = { engine.testNodes(subscription.nodes) },
             onStopTest = { engine.cancelTest() },
             onRefresh = {
@@ -103,10 +116,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             },
             onEdit = { editing = subscription },
             onRemove = {
-                if (subscription.nodes.any { it.id == selectedId }) {
-                    selectedId = ""
-                    engine.settings.selectedNodeId = ""
-                }
+                if (subscription.nodes.any { it.id == selectedId }) engine.chooseServer("")
                 engine.subscriptions.remove(subscription.id)
             },
         )
@@ -119,6 +129,8 @@ private fun SubscriptionCard(
     subscription: Subscription,
     results: Map<String, ember.subs.NodeResult>,
     selectedId: String,
+    favorites: Set<String>,
+    onToggleFavorite: (ProxyNode) -> Unit,
     canTest: Boolean,
     testing: String?,
     refreshing: Boolean,
@@ -133,9 +145,7 @@ private fun SubscriptionCard(
     var expanded by remember { mutableStateOf(true) }
     val servers = subscription.nodes.filterNot { it.isInfo }
     val info = subscription.nodes.filter { it.isInfo }
-    val sorted = servers.sortedWith(
-        compareByDescending<ProxyNode> { results[it.id]?.mbps ?: -1.0 }.thenBy { results[it.id]?.pingMs ?: Int.MAX_VALUE },
-    )
+    val sorted = sortNodes(servers, results, favorites)
     Card {
         Column(Modifier.padding(vertical = 8.dp)) {
             Row(
@@ -181,7 +191,7 @@ private fun SubscriptionCard(
                     } else {
                         IconAction("bolt", strings.testSpeed, onTest, enabled = canTest && servers.isNotEmpty(), tint = MaterialTheme.colorScheme.primary)
                     }
-                    IconAction("refresh", if (refreshing) strings.refreshing else strings.refresh, onRefresh, enabled = !refreshing)
+                    IconAction("refresh", if (refreshing) strings.refreshing else strings.refresh, onRefresh, enabled = !refreshing && subscription.url.isNotBlank())
                     IconAction("edit", strings.editSubscription, onEdit)
                     IconAction("trash", strings.removeSubscription, onRemove)
                     testing?.let {
@@ -229,8 +239,13 @@ private fun SubscriptionCard(
                             }
                         }
                     }
+                    val starred = node.id in favorites
+                    IconAction(
+                        if (starred) "star-filled" else "star", strings.favorite, onClick = { onToggleFavorite(node) },
+                        tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (selected) {
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(4.dp))
                         EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary, contentDescription = strings.selected)
                     }
                 }
@@ -254,7 +269,7 @@ private fun AddSubscriptionDialog(engine: EmberEngine, existing: Subscription?, 
             Column {
                 OutlinedTextField(
                     value = url, onValueChange = { url = it }, label = { Text(strings.subscriptionLink) },
-                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
+                    maxLines = 4, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(

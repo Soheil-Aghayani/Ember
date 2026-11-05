@@ -6,8 +6,8 @@ This page is the maintained index for the repository. It labels code by responsi
 
 | Target | Status | Current implementation | Evidence required before calling it supported |
 |---|---|---|---|
-| Windows PC | Current | `desktop/` plus shared `core/`; Windows tunnel support also uses `helper/` and files under `desktop/appResources/windows-x64/`. | Build the app and installer; the owner validates Windows UI and any real network behavior. Never run the tunnel helper or installer as an agent. |
-| Android phone | Current | `android/` plus shared `core/`; phone-first Compose interface and Android VPN service. | Build and install on an emulator or phone; separately verify camera/QR behavior on a device with a camera. |
+| Windows PC | Current | `desktop/` (subscription links, Xray, UI) plus `helper/` and files under `desktop/appResources/windows-x64/` for the tunnel; `core/` only for logging, connection checks and tunnel config. | Build the app and installer; the owner validates Windows UI and any real network behavior. Never run the tunnel helper or installer as an agent. |
+| Android phone | Not converted | `android/` plus `core/`: the older Firefox-account client. It cannot use subscription links until it runs Xray. | Build and install on an emulator or phone; separately verify camera/QR behavior on a device with a camera. |
 | Sony Smart TV | Initial Android TV experience implemented; device validation pending | Same `android/` package with an optional Leanback launcher, remote-first home/login flow, and shared VPN service. Target: Sony BRAVIA BF1, Android TV OS 12. | Debug APK assembly and launcher metadata inspection are complete; verify launcher visibility, D-pad/Select/Back navigation, sign-in, and VPN behavior on the actual BRAVIA BF1. |
 
 Sony uses both Android-based TVs and other TV operating systems. The identified target is Sony BRAVIA BF1 with Android TV OS 12. A successful APK build does not prove TV runtime support; the owner still needs to verify remote input and VPN behavior on the physical TV. See [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) for the device profile and acceptance checklist. References: [Sony's model/OS identification guide](https://www.sony.com/electronics/support/audio-video/articles/00200248), [Android TV navigation](https://developer.android.com/design/ui/tv/guides/foundations/navigation-on-tv), and [Android TV controller requirements](https://developer.android.com/training/tv/get-started/controllers).
@@ -18,7 +18,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 |---|---|---|---|
 | Android client | `android/` | Phone UI, Android lifecycle, permissions, VPN service, app resources, and phone/TV packaging. | Android APIs stay here. TV screens branch on Leanback and must remain D-pad operable. |
 | Windows client | `desktop/` | Desktop UI, Windows-specific resources, distributable and installer packaging. | Do not execute the installer or network-changing helper. |
-| Shared engine | `core/` | Firefox account/session flows, Mozilla proxy pass, server list, HTTP/2 tunnel, local proxies. | JVM only; no Android or Compose dependencies. |
+| Shared code | `core/` | Logging, connection check, tunnel config; and the older Android client's Firefox account flows, Mozilla proxy pass, HTTP/2 tunnel and local proxies. | JVM only; no Android or Compose dependencies. |
 | Windows native support | `helper/`, `desktop/appResources/windows-x64/` | Native helper sources and packaged Windows tunnel resources. | Do not edit or execute the elevated PowerShell tunnel helper unless the task explicitly requires source changes; never run network-altering code. |
 | Design system | `design/` | Brand, tokens, UI assets, and asset attribution. | `design/tokens.json` is the visual source of truth. |
 | Repository tooling | `tools/`, root Gradle files, `.github/` | Asset utilities, build orchestration, and repository metadata. | Keep generated outputs out of source changes; do not run GitHub Actions. |
@@ -33,12 +33,14 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 - Windows tray, installer, native helper integration, and Windows settings belong in `desktop/` or `helper/`, according to ownership in `AGENTS.md`.
 - Brand-wide colors, spacing, typography, and icons belong in `design/` and its platform mirrors.
 
-## Sign-in flow labels
+## Android sign-in flows (older client)
+
+The Windows app has no sign-in: it runs on subscription links (`desktop/src/main/kotlin/ember/subs/`). The flows below exist only in the Android app.
 
 | Flow | Code owner | Status note |
 |---|---|---|
 | Email/password and email confirmation | `core/.../data/FxaAuthRepository.kt`; platform login screens | Existing sign-in path; password login can be rejected by a network security challenge. Do not attempt to bypass that challenge. |
-| Browser sign-in with PKCE | `core/.../data/BrowserSignIn.kt`, platform login screens | Disabled on Windows, Android phone, and Android TV until Mozilla registers Ember's redirect URI for a dedicated Firefox Account OAuth client. The current redirect is rejected as `Incorrect redirect_uri`; see [`FXA_BROWSER_SIGN_IN.md`](FXA_BROWSER_SIGN_IN.md). |
+| Browser sign-in with PKCE | `core/.../data/BrowserSignIn.kt`, platform login screens | Does not work: Mozilla's Firefox-account OAuth rejects Ember's redirect (`Incorrect redirect_uri`), and Mozilla VPN's own login only serves paying subscribers. |
 | One-time sign-in code | `core/.../data/SessionTransfer.kt`, platform session-transfer UI | Encrypted refresh-token transfer with a short expiry; test only with generated fake tokens in local JVM checks. |
 | QR transfer | Desktop QR generation and Android ZXing scanner | QR contains the one-time code and passphrase together. Verify the scanner on a camera-equipped Android device; never use the owner's real credentials during testing. |
 
@@ -53,13 +55,12 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 - [`desktop/README.md`](../desktop/README.md), [`desktop/TUNNEL.md`](../desktop/TUNNEL.md), [`desktop/SIGNING.md`](../desktop/SIGNING.md) — Windows-specific behavior and packaging.
 - [`helper/README.md`](../helper/README.md) — native helper details.
 - [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) — Sony BRAVIA BF1 target profile, TV behavior, and validation status.
-- [`FXA_BROWSER_SIGN_IN.md`](FXA_BROWSER_SIGN_IN.md) — browser OAuth registration blocker and the steps required before enabling the flow.
-- [`WINDOWS_APP_SPLIT_TUNNELING.md`](WINDOWS_APP_SPLIT_TUNNELING.md) — feasibility and safety requirements for Windows app-specific bypass.
+- [`WINDOWS_APP_SPLIT_TUNNELING.md`](WINDOWS_APP_SPLIT_TUNNELING.md) — feasibility, the Xray tunnel option, and safety requirements for Windows per-app routing.
 - [`design/README.md`](../design/README.md) — design assets and attributions.
 - [`history/2026-10-29-ember-sign-in.md`](history/2026-10-29-ember-sign-in.md) — archived sign-in task brief and completion record.
 
 ## Connection diagnostics
 
-Android and Windows log monotonic durations for server selection, account/Guardian proxy-pass acquisition, upstream HTTP/2 setup, and total connect success or failure time. Android also records edge DNS and TUN setup durations; Windows records edge IPv4 resolution in whole-device mode. These stage labels let exported logs distinguish a slow control-plane request, DNS lookup, tunnel handshake, or retry without logging account credentials or tokens.
+On Windows the log records the server check before the tunnel starts, the helper steps with timings, and a connection check through Xray alone and through the tunnel; the helper writes `tunnel-state/helper.log` and `hev.log`, and `xray/xray.log` is detailed only when "Detailed log" is on. Android and Windows (older client) log monotonic durations for server selection, account/Guardian proxy-pass acquisition, upstream HTTP/2 setup, and total connect success or failure time. Android also records edge DNS and TUN setup durations; Windows records edge IPv4 resolution in whole-device mode. These stage labels let exported logs distinguish a slow control-plane request, DNS lookup, tunnel handshake, or retry without logging account credentials or tokens.
 
 Android edge DNS answers remain cached for the resolver's five-minute TTL and are invalidated when an underlying network becomes available or is lost. Android control-plane requests try the configured bootstrap DNS-over-HTTPS resolver only after system DNS returns `UnknownHostException`; choosing System DNS disables that fallback.

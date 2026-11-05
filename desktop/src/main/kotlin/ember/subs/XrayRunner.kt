@@ -19,15 +19,16 @@ private const val CREATE_NO_WINDOW = 0x08000000
 /** Builds Xray configurations for one connection or for testing many servers at once. */
 object XrayConfig {
 
-    // "info" while connection problems are being tracked down: it records why an outbound connection failed.
-    private fun base(logFile: File) = JSONObject().put("log", JSONObject().put("loglevel", "info").put("error", logFile.absolutePath))
+    /** [verbose] logs why connections fail but also names the sites visited, so it is only for hunting a problem. */
+    private fun base(logFile: File, verbose: Boolean = false) =
+        JSONObject().put("log", JSONObject().put("loglevel", if (verbose) "info" else "warning").put("error", logFile.absolutePath))
 
     private fun socksInbound(tag: String, port: Int) = JSONObject()
         .put("tag", tag).put("listen", "127.0.0.1").put("port", port).put("protocol", "socks")
         .put("settings", JSONObject().put("auth", "noauth").put("udp", true).put("ip", "127.0.0.1"))
 
     /** One server behind a local SOCKS5 port (and a local HTTP proxy when [httpPort] is given). */
-    fun single(node: ProxyNode, address: String, socksPort: Int, httpPort: Int?, logFile: File): JSONObject {
+    fun single(node: ProxyNode, address: String, socksPort: Int, httpPort: Int?, logFile: File, verbose: Boolean = false): JSONObject {
         val inbounds = JSONArray().put(socksInbound("in", socksPort))
         if (httpPort != null) {
             inbounds.put(JSONObject().put("tag", "http").put("listen", "127.0.0.1").put("port", httpPort).put("protocol", "http"))
@@ -40,7 +41,7 @@ object XrayConfig {
         val rules = JSONArray().put(
             JSONObject().put("type", "field").put("network", "udp").put("port", "443").put("outboundTag", "block"),
         )
-        return base(logFile).put("inbounds", inbounds).put("outbounds", outbounds)
+        return base(logFile, verbose).put("inbounds", inbounds).put("outbounds", outbounds)
             .put("routing", JSONObject().put("domainStrategy", "AsIs").put("rules", rules))
     }
 

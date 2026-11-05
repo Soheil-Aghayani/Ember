@@ -6,7 +6,7 @@ Rules that matter: work locally only (no GitHub push/Actions/releases); do not t
 Do not write, change or run anything that solves or evades Fastly's bot challenge (`FastlyChallengeSolver.kt` stays as it is).
 
 > **Status: completed on 2026-10-29.** This is a historical task brief and verification record. For current platform status and architecture, use [`../../AGENTS.md`](../../AGENTS.md) and [`../PROJECT_MAP.md`](../PROJECT_MAP.md).
-> Follow-up on 2026-10-29: the owner tried browser sign-in and Mozilla returned `Incorrect redirect_uri`. This supersedes the open question below; see [`../FXA_BROWSER_SIGN_IN.md`](../FXA_BROWSER_SIGN_IN.md) for the current blocker and re-enable requirements.
+> Follow-up on 2026-10-29: the owner tried browser sign-in and Mozilla returned `Incorrect redirect_uri`. This supersedes the open question below; the flow cannot work (Mozilla only accepts its own redirect addresses), and the note about it was removed when the Windows app dropped the Firefox sign-in.
 > Owner-added product target: Sony Smart TV is planned. The model and OS remain unidentified; do not claim the phone app is TV-compatible.
 
 ## Completion record

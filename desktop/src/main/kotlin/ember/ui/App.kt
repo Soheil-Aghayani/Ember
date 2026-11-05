@@ -100,12 +100,12 @@ import ember.engine.Autostart
 import ember.engine.EmberEngine
 import ember.subs.AUTO_NODE
 import ember.subs.ProxyNode
+import ember.subs.sortNodes
 import ember.engine.HTTP_PORT
 import ember.engine.LOCAL_BIND
 import ember.engine.MTU_RANGE
 import ember.engine.SOCKS_PORT
 import ember.engine.TrafficStats
-import ember.engine.UpdateCheck
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -134,8 +134,6 @@ fun EmberApp(
     onThemeChange: (String) -> Unit,
     language: String,
     onLanguageChange: (String) -> Unit,
-    update: String?,
-    onDismissUpdate: () -> Unit,
 ) {
     LaunchedEffect(Unit) {
         if (engine.settings.autoConnect && engine.state.value == ConnectionState.DISCONNECTED && engine.selectedNode() != null) {
@@ -143,7 +141,7 @@ fun EmberApp(
         }
     }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        MainShell(engine, theme, onThemeChange, language, onLanguageChange, update, onDismissUpdate)
+        MainShell(engine, theme, onThemeChange, language, onLanguageChange)
     }
 }
 
@@ -165,8 +163,6 @@ private fun MainShell(
     onThemeChange: (String) -> Unit,
     language: String,
     onLanguageChange: (String) -> Unit,
-    update: String?,
-    onDismissUpdate: () -> Unit,
 ) {
     var page by remember { mutableStateOf(if (engine.selectedNode() == null) Page.Servers else Page.Home) }
 
@@ -191,7 +187,7 @@ private fun MainShell(
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(32.dp),
             ) {
                 when (current) {
-                    Page.Home -> HomePage(engine, update, onDismissUpdate) { page = Page.Servers }
+                    Page.Home -> HomePage(engine) { page = Page.Servers }
                     Page.Servers -> SubscriptionsPage(engine)
                     Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange)
                     Page.Logs -> LogsPage()
@@ -251,7 +247,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
 
 @Composable
 private fun HomePage(
-    engine: EmberEngine, update: String?, onDismissUpdate: () -> Unit, onOpenServers: () -> Unit,
+    engine: EmberEngine, onOpenServers: () -> Unit,
 ) {
     val strings = LocalStrings.current
     val state by engine.state.collectAsState()
@@ -271,7 +267,8 @@ private fun HomePage(
     val results by engine.subscriptions.results.collectAsState()
     val subscriptions by engine.subscriptions.subscriptions.collectAsState()
     val testing by engine.testProgress.collectAsState()
-    var selectedId by remember { mutableStateOf(engine.settings.selectedNodeId) }
+    val selectedId by engine.selectedId.collectAsState()
+    val favoriteIds by engine.favorites.collectAsState()
     var menuOpen by remember { mutableStateOf(false) }
     val canPick = state == ConnectionState.DISCONNECTED
     LaunchedEffect(canPick) { if (!canPick) menuOpen = false }
@@ -380,14 +377,11 @@ private fun HomePage(
         val exitCode = if (connected) exit.info?.countryCode.orEmpty() else ""
         val shownCode = if (exitCode.length == 2) exitCode else node?.flagCode.orEmpty()
         val result = node?.let { results[it.id] }
-        val choices = remember(subscriptions, results) {
-            subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }.sortedWith(
-                compareByDescending<ProxyNode> { results[it.id]?.mbps ?: -1.0 }.thenBy { results[it.id]?.pingMs ?: Int.MAX_VALUE },
-            )
+        val choices = remember(subscriptions, results, favoriteIds) {
+            sortNodes(subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }, results, favoriteIds)
         }
         val choose: (String) -> Unit = {
-            selectedId = it
-            engine.settings.selectedNodeId = it
+            engine.chooseServer(it)
             menuOpen = false
         }
         Box(Modifier.fillMaxWidth()) {
@@ -520,10 +514,6 @@ private fun HomePage(
                     Button(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text(strings.restoreInternet) }
                 }
             }
-        }
-        if (update != null) {
-            Spacer(Modifier.height(16.dp))
-            UpdateBanner(update, onDismissUpdate)
         }
     }
 }
@@ -744,27 +734,6 @@ private fun TrafficCaption(traffic: TrafficStats) {
     }
 }
 
-@Composable
-private fun UpdateBanner(version: String, onDismiss: () -> Unit) {
-    val strings = LocalStrings.current
-    val scope = rememberCoroutineScope()
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            strings.updateAvailable(version), modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
-        TextButton(onClick = {
-            scope.launch(Dispatchers.IO) {
-                runCatching {
-                    if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(UpdateCheck.RELEASES_URL))
-                }
-            }
-        }) { Text(strings.viewUpdate) }
-        TextButton(onClick = onDismiss) { Text(strings.dismiss) }
-    }
-}
-
 private enum class LogFilter { All, Info, Problems }
 
 @Composable
@@ -832,6 +801,7 @@ private fun EmberFilterChip(
 private fun AdvancedSettings(engine: EmberEngine) {
     val strings = LocalStrings.current
     var mtuText by remember { mutableStateOf(engine.settings.mtu.toString()) }
+    var diagnostic by remember { mutableStateOf(engine.settings.diagnosticLog) }
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val validMtu = parseMtu(mtuText) != null
@@ -849,6 +819,11 @@ private fun AdvancedSettings(engine: EmberEngine) {
                 EmberIcon(if (expanded) "chevron-up" else "chevron-down", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (expanded) {
+                SwitchRow(strings.diagnosticLog, strings.diagnosticLogHelp, diagnostic) {
+                    diagnostic = it
+                    engine.settings.diagnosticLog = it
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Text(strings.mtuHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = mtuText,

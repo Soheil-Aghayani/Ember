@@ -53,6 +53,36 @@ class EmberEngine(private val dataDir: File) {
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
     val state: StateFlow<ConnectionState> = _state
 
+    private val _selectedId = MutableStateFlow(settings.selectedNodeId)
+
+    /** The id of the server Connect uses ([AUTO_NODE] for the fastest one). */
+    val selectedId: StateFlow<String> = _selectedId
+
+    private val _favorites = MutableStateFlow(settings.favoriteNodes)
+    val favorites: StateFlow<Set<String>> = _favorites
+
+    fun toggleFavorite(node: ProxyNode) {
+        val updated = if (node.id in _favorites.value) _favorites.value - node.id else _favorites.value + node.id
+        settings.favoriteNodes = updated
+        _favorites.value = updated
+    }
+
+    /**
+     * Picks the server Connect uses. While connected (for example from the tray menu) the connection moves to the new
+     * server straight away.
+     */
+    fun chooseServer(id: String) {
+        settings.selectedNodeId = id
+        _selectedId.value = id
+        if (_state.value == ConnectionState.DISCONNECTED) return
+        val node = selectedNode() ?: return
+        connectJob?.cancel()
+        scope.launch {
+            teardown()
+            connect(node)
+        }
+    }
+
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError
 
@@ -134,7 +164,7 @@ class EmberEngine(private val dataDir: File) {
             var first = true
             while (true) {
                 val now = System.currentTimeMillis()
-                for (subscription in subscriptions.subscriptions.value.filter { now - it.updatedAtMs > REFRESH_AFTER_MS }) {
+                for (subscription in subscriptions.subscriptions.value.filter { it.url.isNotBlank() && now - it.updatedAtMs > REFRESH_AFTER_MS }) {
                     runCatching { subscriptions.refresh(subscription.id) }
                         .onFailure { AppLogger.w(TAG, "could not refresh a subscription (${it.javaClass.simpleName})") }
                 }
@@ -222,7 +252,7 @@ class EmberEngine(private val dataDir: File) {
                         AppLogger.w(TAG, "could not look up the server's name (${failure.javaClass.simpleName}); using its last known address")
                         remembered
                     }
-                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile))
+                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog))
                 xray.awaitListening(SOCKS_PORT)
                 // Before anything on the computer is changed: does this server pass traffic at all?
                 _progress.value = "Checking the server..."

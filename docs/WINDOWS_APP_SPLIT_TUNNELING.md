@@ -26,6 +26,21 @@ Do not add an `.exe` selector to the current route-based implementation. First b
 
 Do not call the feature app-specific until it also has a tested policy for TCP, UDP, IPv4, IPv6, helper/service child processes, DNS, disconnects, crashes, and kill-switch behavior. Keep URL/domain/IP exclusions as the supported desktop method in the meantime.
 
+## Update: what Xray offers (config checks only, not run live)
+
+Ember now runs Xray-core 26.10.31 for every connection. Checked with `xray run -test` (it validates a configuration without starting anything):
+
+- A `tun` inbound (Wintun adapter created by Xray itself) is accepted.
+- A routing rule that matches `process` names (`"process": ["chrome.exe"]`) is accepted.
+
+Today's design cannot use the process rule: traffic reaches Xray through hev-socks5-tunnel and a local SOCKS5 port, so Xray sees hev as the source, never the application. The route to a working per-app feature is to let Xray own the tunnel (its `tun` inbound) and drop hev:
+
+1. The helper (elevated) starts `xray.exe` with a `tun` inbound instead of hev, because creating a Wintun adapter needs administrator rights; everything else the helper does (adapter address, `/1` routes, bypass route to the server, kill switch, guards) stays.
+2. The config gets a `process` rule per selected app (direct for "bypass these apps", proxy for "only these apps"), plus the existing server bypass.
+3. DNS needs an Xray `dns` section instead of hev's mapped DNS.
+
+Open questions that need a real Windows test before any code ships: whether the `process` rule matches on Windows with a `tun` inbound, how child processes and services behave, UDP and IPv6 handling, and the kill switch when Xray dies. A disposable Windows VM is still the right place for that test.
+
 ## Acceptance criteria for a future implementation
 
 - The user can identify an installed desktop app without manually finding its IP addresses.

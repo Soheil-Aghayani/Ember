@@ -30,7 +30,8 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberWindowState
 import com.soheil.ember.data.model.ConnectionState
 import ember.engine.EmberEngine
-import ember.engine.UpdateCheck
+import ember.subs.AUTO_NODE
+import ember.subs.sortNodes
 import ember.engine.appDataDir
 import ember.ui.EmberApp
 import ember.ui.EmberDesktopMetrics
@@ -51,8 +52,11 @@ fun main(args: Array<String>) = application {
     var theme by remember { mutableStateOf(engine.settings.theme) }
     var language by remember { mutableStateOf(engine.settings.language) }
     val strings = if (language == "fa") PersianStrings else EnglishStrings
-    var update by remember { mutableStateOf<String?>(null) }
     val state by engine.state.collectAsState()
+    val subscriptions by engine.subscriptions.subscriptions.collectAsState()
+    val results by engine.subscriptions.results.collectAsState()
+    val favorites by engine.favorites.collectAsState()
+    val selectedId by engine.selectedId.collectAsState()
     val windowState = rememberWindowState(width = 960.dp, height = 680.dp)
     val useMacStyleChrome = System.getProperty("os.name").startsWith("Windows")
     val supportsRoundedWindow = remember(useMacStyleChrome) {
@@ -70,7 +74,6 @@ fun main(args: Array<String>) = application {
     val closeWindow = {
         if (isTraySupported && engine.settings.keepInTray) visible = false else quit()
     }
-    LaunchedEffect(Unit) { update = UpdateCheck.latestVersion() }
     if (isTraySupported) {
         Tray(painterResource("ember_logo.png"), tooltip = "Ember", onAction = {
             windowState.isMinimized = false
@@ -80,6 +83,15 @@ fun main(args: Array<String>) = application {
             Item(if (state == ConnectionState.DISCONNECTED) strings.connect else strings.disconnect, onClick = {
                 if (state == ConnectionState.DISCONNECTED) engine.connectSelected() else engine.disconnect()
             })
+            val servers = sortNodes(subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }, results, favorites).take(10)
+            if (servers.isNotEmpty()) {
+                Separator()
+                CheckboxItem(strings.fastestServer, checked = selectedId == AUTO_NODE, onCheckedChange = { engine.chooseServer(AUTO_NODE) })
+                for (server in servers) {
+                    val speed = results[server.id]?.mbps?.let { String.format(java.util.Locale.US, "  (%.0f Mbps)", it) }.orEmpty()
+                    CheckboxItem(server.title + speed, checked = selectedId == server.id, onCheckedChange = { engine.chooseServer(server.id) })
+                }
+            }
             Separator()
             Item(strings.quit, onClick = quit)
         }
@@ -163,7 +175,7 @@ fun main(args: Array<String>) = application {
                                 LocalLayoutDirection provides if (language == "fa") LayoutDirection.Rtl else LayoutDirection.Ltr,
                             ) {
                                 EmberApp(engine, theme, { theme = it; engine.settings.theme = it },
-                                    language, { language = it; engine.settings.language = it }, update, { update = null })
+                                    language, { language = it; engine.settings.language = it })
                             }
                         }
                     }

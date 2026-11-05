@@ -26,6 +26,7 @@ dependencies {
     // Windows DPAPI for the stored sign-in session.
     implementation("net.java.dev.jna:jna-platform:5.14.0")
     implementation("com.google.zxing:core:3.5.3")
+    testImplementation(kotlin("test"))
 
     testImplementation("junit:junit:4.13.2")
 }
@@ -104,6 +105,8 @@ if (isWindowsHost) {
     tasks.matching { it.name == "run" || it.name.startsWith("package") || it.name == "createDistributable" || it.name == "prepareAppResources" }
         .configureEach { dependsOn(fetchTunnelBinaries, buildNativeHelper) }
 }
+
+tasks.withType<Test> { useJUnitPlatform() }
 
 compose.desktop {
     application {

@@ -48,6 +48,9 @@ object ShareLinks {
                 raw.startsWith("trojan://") -> link(raw, "trojan")
                 raw.startsWith("vmess://") -> vmess(raw)
                 raw.startsWith("ss://") -> shadowsocks(raw)
+                raw.startsWith("hysteria2://") -> hysteria2(raw, "hysteria2")
+                raw.startsWith("hy2://") -> hysteria2(raw, "hy2")
+                raw.startsWith(JSON_PREFIX) -> fromXrayOutbound(JSONObject(raw.removePrefix(JSON_PREFIX)), "")
                 else -> null
             }
         } catch (_: Exception) {
@@ -103,7 +106,59 @@ object ShareLinks {
                     JSONObject().put("address", address).put("port", s.port).put("method", s.method).put("password", s.password),
                 )))
         }
+        raw.startsWith("hysteria2://") || raw.startsWith("hy2://") -> {
+            val l = split(raw, if (raw.startsWith("hy2://")) "hy2" else "hysteria2")
+            JSONObject().put("tag", tag).put("protocol", "hysteria")
+                .put("settings", JSONObject().put("version", 2).put("address", address).put("port", l.port))
+                .put("streamSettings", JSONObject().put("network", "hysteria").put("security", "tls")
+                    .put("tlsSettings", JSONObject()
+                        .put("serverName", l.query["sni"]?.takeIf { it.isNotBlank() } ?: l.host)
+                        .put("alpn", JSONArray().put("h3"))
+                        .apply { if (l.query["insecure"] == "1" || l.query["allowInsecure"] == "1") put("allowInsecure", true) })
+                    .put("hysteriaSettings", JSONObject().put("version", 2).put("auth", l.userInfo)))
+        }
+        raw.startsWith(JSON_PREFIX) -> {
+            val outbound = JSONObject(raw.removePrefix(JSON_PREFIX))
+            outbound.put("tag", tag)
+            val settings = outbound.optJSONObject("settings") ?: JSONObject().also { outbound.put("settings", it) }
+            settings.optJSONArray("vnext")?.optJSONObject(0)?.put("address", address)
+            settings.optJSONArray("servers")?.optJSONObject(0)?.put("address", address)
+            if (settings.has("address")) settings.put("address", address)
+            outbound
+        }
         else -> error("Unsupported link type")
+    }
+
+    /** Prefix of a server that came from an Xray JSON subscription: the rest is its outbound as JSON. */
+    const val JSON_PREFIX = "xrayjson:"
+
+    private val JSON_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria")
+
+    /** A server from one entry of an Xray JSON subscription (the first outbound that is a real proxy). */
+    fun fromXrayOutbound(outbound: JSONObject, name: String): ProxyNode? {
+        val protocol = outbound.optString("protocol")
+        if (protocol !in JSON_PROTOCOLS) return null
+        val settings = outbound.optJSONObject("settings") ?: return null
+        val target = settings.optJSONArray("vnext")?.optJSONObject(0)
+            ?: settings.optJSONArray("servers")?.optJSONObject(0)
+            ?: settings
+        val host = target.optString("address").takeIf { it.isNotBlank() } ?: return null
+        val port = target.optInt("port", 0)
+        val raw = JSON_PREFIX + outbound.toString()
+        return node(raw, if (protocol == "shadowsocks") "ss" else protocol, name, host, port)
+    }
+
+    /** Servers from an Xray JSON subscription: an array of configs, or one config, each with `remarks` and `outbounds`. */
+    fun fromXrayJson(text: String): List<ProxyNode> {
+        val entries = when {
+            text.trimStart().startsWith("[") -> org.json.JSONArray(text).let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }
+            else -> listOf(JSONObject(text))
+        }
+        return entries.mapNotNull { entry ->
+            val outbounds = entry.optJSONArray("outbounds") ?: return@mapNotNull null
+            val name = entry.optString("remarks").ifBlank { entry.optString("remark") }.ifBlank { entry.optString("ps") }
+            (0 until outbounds.length()).firstNotNullOfOrNull { fromXrayOutbound(outbounds.getJSONObject(it), name) }
+        }
     }
 
     private class Link(val userInfo: String, val host: String, val port: Int, val query: Map<String, String>, val name: String)
@@ -144,6 +199,13 @@ object ShareLinks {
     private fun link(raw: String, scheme: String): ProxyNode {
         val l = split(raw, scheme)
         return node(raw, scheme, l.name, l.host, l.port)
+    }
+
+    private fun hysteria2(raw: String, scheme: String): ProxyNode? {
+        val l = split(raw, scheme)
+        // Obfuscated servers need a transport Xray does not have.
+        if (!l.query["obfs"].isNullOrBlank()) return null
+        return node(raw, "hysteria2", l.name, l.host, l.port)
     }
 
     private fun vmessJson(raw: String): JSONObject = JSONObject(String(decodeBase64(raw.removePrefix("vmess://").substringBefore('#'))))

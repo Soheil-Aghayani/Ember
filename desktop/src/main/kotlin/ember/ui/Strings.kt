@@ -5,6 +5,11 @@ import com.soheil.ember.data.TlsSplitMode
 
 data class Strings(
     val testSpeed: String,
+    val pasteFromClipboard: String,
+    val clipboardEmpty: String,
+    val favorite: String,
+    val diagnosticLog: String,
+    val diagnosticLogHelp: String,
     val stopTest: String,
     val ipv6: String,
     val ipv6Help: String,
@@ -97,8 +102,6 @@ data class Strings(
     val light: String,
     val dark: String,
     val system: String,
-    val viewUpdate: String,
-    val dismiss: String,
     val copy: String,
     val clear: String,
     val emptyLogs: String,
@@ -123,12 +126,16 @@ data class Strings(
     val connectionCheckFailed: (String) -> String,
     val appVersion: (String) -> String,
     val logFile: (String) -> String,
-    val updateAvailable: (String) -> String,
     val mtuValidation: (Int, Int) -> String,
 )
 
 val EnglishStrings = Strings(
     testSpeed = "Test speed",
+    pasteFromClipboard = "Add from the clipboard",
+    clipboardEmpty = "The clipboard is empty.",
+    favorite = "Favourite",
+    diagnosticLog = "Detailed log",
+    diagnosticLogHelp = "Writes Xray's detailed log, which names the sites you visit. Turn it on only to track down a problem.",
     stopTest = "Stop the test",
     ipv6 = "IPv6 through the tunnel",
     ipv6Help = "IPv6 traffic goes through the tunnel too. When off, public IPv6 stays blocked.",
@@ -221,8 +228,6 @@ val EnglishStrings = Strings(
     light = "Light",
     dark = "Dark",
     system = "System",
-    viewUpdate = "View update",
-    dismiss = "Dismiss",
     copy = "Copy",
     clear = "Clear",
     emptyLogs = "No log entries to show.",
@@ -247,12 +252,16 @@ val EnglishStrings = Strings(
     connectionCheckFailed = { "Could not verify the connection: $it" },
     appVersion = { "Ember $it" },
     logFile = { "Log file: $it" },
-    updateAvailable = { "Ember $it is available" },
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
 val PersianStrings = Strings(
     testSpeed = "تست سرعت",
+    pasteFromClipboard = "افزودن از کلیپ‌بورد",
+    clipboardEmpty = "کلیپ‌بورد خالی است.",
+    favorite = "علاقه‌مندی",
+    diagnosticLog = "گزارش تفصیلی",
+    diagnosticLogHelp = "گزارش دقیق Xray را می‌نویسد، همراه با نام سایت‌هایی که باز می‌کنید. فقط برای پیدا کردن مشکل روشن کنید.",
     stopTest = "توقف تست",
     ipv6 = "IPv6 از داخل تونل",
     ipv6Help = "ترافیک IPv6 هم از تونل می‌گذرد. خاموش باشد، IPv6 عمومی مسدود می‌ماند.",
@@ -345,8 +354,6 @@ val PersianStrings = Strings(
     light = "روشن",
     dark = "تیره",
     system = "سیستم",
-    viewUpdate = "مشاهدهٔ به‌روزرسانی",
-    dismiss = "بستن",
     copy = "کپی",
     clear = "پاک کردن",
     emptyLogs = "گزارشی برای نمایش نیست.",
@@ -371,7 +378,6 @@ val PersianStrings = Strings(
     connectionCheckFailed = { "بررسی اتصال انجام نشد: $it" },
     appVersion = { "Ember $it" },
     logFile = { "فایل گزارش: $it" },
-    updateAvailable = { "Ember $it در دسترس است" },
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 
