@@ -73,7 +73,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
         Box {
-            IconAction("add", strings.addServers, onClick = { addMenu = true }, filled = true)
+            IconAction("plus", strings.addServers, onClick = { addMenu = true }, filled = true)
             DropdownMenu(
                 expanded = addMenu, onDismissRequest = { addMenu = false },
                 shape = RoundedCornerShape(EmberDesktopMetrics.countryPopoverRadius),
@@ -223,8 +223,17 @@ private fun SubscriptionCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(subscription.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(testing ?: strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (testing != null) {
+                    IconAction("stop", strings.stopTest, onStopTest, tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    IconAction("bolt", strings.testSpeed, onTest, enabled = canTest && servers.isNotEmpty(), tint = MaterialTheme.colorScheme.primary)
+                }
+                IconAction("refresh", if (refreshing) strings.refreshing else strings.refresh, onRefresh, enabled = !refreshing && subscription.url.isNotBlank())
+                IconAction("edit", strings.editSubscription, onEdit)
+                IconAction("trash", strings.removeSubscription, onRemove)
+                Spacer(Modifier.width(4.dp))
                 EmberIcon(
                     if (expanded) "chevron-up" else "chevron-down", 18.dp, MaterialTheme.colorScheme.onSurfaceVariant,
                     contentDescription = if (expanded) strings.collapse else strings.expand,
@@ -251,21 +260,7 @@ private fun SubscriptionCard(
                     Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (expanded) Spacer(Modifier.height(8.dp))
-                if (expanded) Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (testing != null) {
-                        IconAction("stop", strings.stopTest, onStopTest, tint = MaterialTheme.colorScheme.primary)
-                    } else {
-                        IconAction("bolt", strings.testSpeed, onTest, enabled = canTest && servers.isNotEmpty(), tint = MaterialTheme.colorScheme.primary)
-                    }
-                    IconAction("refresh", if (refreshing) strings.refreshing else strings.refresh, onRefresh, enabled = !refreshing && subscription.url.isNotBlank())
-                    IconAction("edit", strings.editSubscription, onEdit)
-                    IconAction("trash", strings.removeSubscription, onRemove)
-                    testing?.let {
-                        Spacer(Modifier.width(8.dp))
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (expanded && testing == null && !canTest) {
+                if (testing == null && !canTest) {
                     Spacer(Modifier.height(4.dp))
                     Text(strings.testNeedsDisconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

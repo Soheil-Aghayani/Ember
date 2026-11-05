@@ -111,7 +111,7 @@ class AppRoutingRunner(dataDir: File, private val privileged: PrivilegedTask) {
     /** True when the task exists and starts the sing-box this installation ships. */
     fun taskReady(exe: File): Boolean {
         val xml = run("schtasks.exe", "/query", "/tn", TASK, "/xml").second
-        return xml.contains(exe.absolutePath, ignoreCase = true) && xml.contains(configFile.absolutePath, ignoreCase = true)
+        return xml.contains(exe.absolutePath, ignoreCase = true) && xml.contains(configFile.absolutePath, ignoreCase = true) && xml.contains("S4U", ignoreCase = true)
     }
 
     private fun isRunning(): Boolean = run("tasklist.exe", "/fi", "imagename eq sing-box.exe", "/fo", "csv", "/nh").second.contains("sing-box.exe", ignoreCase = true)
@@ -128,7 +128,7 @@ class AppRoutingRunner(dataDir: File, private val privileged: PrivilegedTask) {
         val register = """
             ${d}ErrorActionPreference = 'Stop'
             ${d}action = New-ScheduledTaskAction -Execute '${exe.absolutePath}' -Argument '$arguments' -WorkingDirectory '${dir.absolutePath}'
-            ${d}principal = New-ScheduledTaskPrincipal -UserId '$user' -LogonType Interactive -RunLevel Highest
+            ${d}principal = New-ScheduledTaskPrincipal -UserId '$user' -LogonType S4U -RunLevel Highest
             ${d}settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
             Register-ScheduledTask -TaskName 'Apps' -TaskPath '\Ember\' -Action ${d}action -Principal ${d}principal -Settings ${d}settings -Force | Out-Null
         """.trimIndent()

@@ -21,6 +21,19 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.77",
+        listOf(
+            "App rules and OpenVPN no longer open a black console window when they start.",
+            "Subscription cards: test, refresh, edit and remove sit next to the arrow. The add buttons are a plain + in a circle.",
+            "After updating, the first app-rules or OpenVPN connection asks Windows for permission once more.",
+        ),
+        listOf(
+            "قوانین برنامه‌ها و OpenVPN دیگر پنجرهٔ سیاه کنسول را باز نمی‌کنند.",
+            "کارت اشتراک: دکمه‌های تست، به‌روزرسانی، ویرایش و حذف کنار فلش هستند. دکمه‌های افزودن یک + ساده داخل دایره‌اند.",
+            "بعد از به‌روزرسانی، اولین اتصال با قوانین برنامه‌ها یا OpenVPN یک بار دیگر از Windows اجازه می‌گیرد.",
+        ),
+    ),
+    Release(
         "1.0.76",
         listOf(
             "New Apps setting (Settings → Connection): turn the VPN off for programs you pick, such as Firefox, or use it only for programs you pick. Experimental.",

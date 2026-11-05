@@ -86,7 +86,7 @@ internal fun AppRulesSettings(engine: EmberEngine) {
             Text(strings.appsList, Modifier.weight(1f).padding(start = 4.dp), style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Box {
-                IconAction("add", strings.addApp, onClick = {
+                IconAction("plus", strings.addApp, onClick = {
                     running = runningPrograms()
                     menu = true
                 }, enabled = enabled, filled = true)
