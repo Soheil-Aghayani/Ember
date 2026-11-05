@@ -1,6 +1,27 @@
 package ember.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -209,6 +230,8 @@ private fun SubscriptionCard(
 ) {
     val strings = LocalStrings.current
     var expanded by remember { mutableStateOf(false) }
+    var rowHeight by remember { mutableStateOf(0) }
+    val lastIndexes = remember { mutableMapOf<String, Int>() }
     val servers = subscription.nodes.filterNot { it.isInfo }
     val info = subscription.nodes.filter { it.isInfo }
     val sorted = sortNodes(servers, results, favorites)
@@ -223,7 +246,16 @@ private fun SubscriptionCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(subscription.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(testing ?: strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (testing != null) {
+                            CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            testing ?: strings.serversCount(servers.size), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 if (testing != null) {
                     IconAction("stop", strings.stopTest, onStopTest, tint = MaterialTheme.colorScheme.primary)
@@ -265,51 +297,139 @@ private fun SubscriptionCard(
                     Text(strings.testNeedsDisconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (expanded) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            if (expanded) sorted.forEachIndexed { index, node ->
-                if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                val selected = node.id == selectedId
-                val result = results[node.id]
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .clickable(role = Role.RadioButton) { onSelect(node) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    node.flagCode?.let {
-                        FlagIcon(it, 24.dp)
-                        Spacer(Modifier.width(12.dp))
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text(node.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(node.protocol.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (result != null) {
-                        val speed = result.mbps?.let { String.format(Locale.US, "%.1f Mbps", it) }
-                        val ping = result.pingMs?.let { "$it ms" }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                speed ?: ping ?: strings.noAnswer,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (ping == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(220)),
+                exit = shrinkVertically(tween(260)) + fadeOut(tween(140)),
+            ) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    val fastest = sorted.mapNotNull { results[it.id]?.mbps }.maxOrNull() ?: 0.0
+                    sorted.forEachIndexed { index, node ->
+                        key(node.id) {
+                            ServerRow(
+                                node = node, index = index, selected = node.id == selectedId, starred = node.id in favorites,
+                                result = results[node.id], fastest = fastest, rowHeight = rowHeight,
+                                onMeasured = { rowHeight = it }, lastIndexes = lastIndexes,
+                                onSelect = { onSelect(node) }, onToggleFavorite = { onToggleFavorite(node) },
                             )
-                            if (speed != null && ping != null) {
-                                Text(ping, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
                         }
                     }
-                    val starred = node.id in favorites
-                    IconAction(
-                        if (starred) "star-filled" else "star", strings.favorite, onClick = { onToggleFavorite(node) },
-                        tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (selected) {
-                        Spacer(Modifier.width(4.dp))
-                        EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary, contentDescription = strings.selected)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One server. It fades and rises in a moment after the list opens (each a little later than the one above), slides to
+ * its new place when a test changes the order, and shows how its speed compares with the fastest as a thin bar.
+ */
+@Composable
+private fun ServerRow(
+    node: ProxyNode,
+    index: Int,
+    selected: Boolean,
+    starred: Boolean,
+    result: ember.subs.NodeResult?,
+    fastest: Double,
+    rowHeight: Int,
+    onMeasured: (Int) -> Unit,
+    lastIndexes: MutableMap<String, Int>,
+    onSelect: () -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
+    val strings = LocalStrings.current
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay((index * 22L).coerceAtMost(330L))
+        appear.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+    }
+    val slide = remember { Animatable(0f) }
+    LaunchedEffect(index) {
+        val previous = lastIndexes[node.id]
+        lastIndexes[node.id] = index
+        if (previous != null && previous != index && rowHeight > 0) {
+            slide.snapTo(((previous - index) * rowHeight).toFloat())
+            slide.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
+        }
+    }
+    val background by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface, tween(250), label = "selected",
+    )
+    val speedBar = remember { Animatable(0f) }
+    val barTarget = if (result?.mbps != null && fastest > 0) (result.mbps / fastest).toFloat().coerceIn(0.04f, 1f) else 0f
+    LaunchedEffect(barTarget) { speedBar.animateTo(barTarget, tween(700, easing = FastOutSlowInEasing)) }
+    val pop = remember { Animatable(1f) }
+    var firstStar by remember { mutableStateOf(true) }
+    LaunchedEffect(starred) {
+        // a small bounce when the star is turned on (not when the list simply opens with it already on)
+        if (!firstStar && starred) {
+            pop.snapTo(0.55f)
+            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 420f))
+        }
+        firstStar = false
+    }
+
+    Column(
+        Modifier.zIndex(if (slide.isRunning) 1f else 0f)
+            .onSizeChanged { if (index == 0) onMeasured(it.height) }
+            .graphicsLayer {
+                alpha = appear.value
+                translationY = slide.value + (1f - appear.value) * 10.dp.toPx()
+            },
+    ) {
+        if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(
+            Modifier.fillMaxWidth()
+                .background(background)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .clickable(role = Role.RadioButton, onClick = onSelect)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            node.flagCode?.let {
+                FlagIcon(it, 24.dp)
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(node.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(node.protocol.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (result?.mbps != null) {
+                    Box(
+                        Modifier.padding(top = 6.dp, end = 12.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth(speedBar.value).fillMaxHeight().clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                        )
                     }
                 }
+            }
+            if (result != null) {
+                val speed = result.mbps?.let { String.format(Locale.US, "%.1f Mbps", it) }
+                val ping = result.pingMs?.let { "$it ms" }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        speed ?: ping ?: strings.noAnswer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (ping == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (speed != null && ping != null) {
+                        Text(ping, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Box(Modifier.scale(pop.value)) {
+                IconAction(
+                    if (starred) "star-filled" else "star", strings.favorite, onClick = onToggleFavorite,
+                    tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (selected) {
+                Spacer(Modifier.width(4.dp))
+                EmberIcon("check", 20.dp, MaterialTheme.colorScheme.primary, contentDescription = strings.selected)
             }
         }
     }

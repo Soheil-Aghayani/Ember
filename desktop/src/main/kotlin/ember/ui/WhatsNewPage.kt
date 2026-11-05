@@ -21,6 +21,19 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.80",
+        listOf(
+            "Servers page motion: cards fold and unfold smoothly, and the servers fade in one after another.",
+            "Each tested server has a thin bar showing its speed next to the fastest; after a test the rows slide into their new order.",
+            "A small spinner shows while a test runs, and the star bounces when you favourite a server.",
+        ),
+        listOf(
+            "حرکت‌های صفحهٔ سرورها: کارت‌ها نرم باز و بسته می‌شوند و سرورها یکی‌یکی ظاهر می‌شوند.",
+            "هر سرور تست‌شده یک نوار باریک دارد که سرعتش را نسبت به سریع‌ترین نشان می‌دهد؛ بعد از تست، ردیف‌ها به ترتیب تازه می‌لغزند.",
+            "هنگام تست یک چرخانندهٔ کوچک دیده می‌شود و ستاره با علاقه‌مندی کردن سرور می‌جهد.",
+        ),
+    ),
+    Release(
         "1.0.79",
         listOf(
             "Home screen motion: the Connect button runs a small arc while connecting, breathes slowly once connected, and sends out one ripple when the connection comes up.",
