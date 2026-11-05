@@ -38,8 +38,10 @@ data class Subscription(
 
 object SubscriptionParser {
 
-    fun parseNodes(body: String): List<ProxyNode> {
-        val text = body.trim()
+    fun parseNodes(body: String, nameHint: String = ""): List<ProxyNode> {
+        val text = body.trim().removePrefix("﻿")
+        if (ConfigFiles.isWireGuard(text)) return listOf(ConfigFiles.wireGuard(text, nameHint))
+        if (ConfigFiles.isOpenVpn(text)) error(ConfigFiles.OPENVPN_UNSUPPORTED)
         if (text.startsWith("{") || text.startsWith("[")) {
             val fromJson = runCatching { ShareLinks.fromXrayJson(text) }.getOrDefault(emptyList()).distinctBy { it.id }
             if (fromJson.isNotEmpty()) return fromJson
@@ -131,9 +133,11 @@ class SubscriptionStore(private val file: File) {
     /** Server links pasted directly (one per line): kept as a list without a link to refresh. */
     private fun addPasted(text: String, name: String): Subscription {
         val nodes = try {
-            SubscriptionParser.parseNodes(text)
+            SubscriptionParser.parseNodes(text, name.trim())
         } catch (failure: IllegalStateException) {
-            throw IllegalArgumentException("That is neither a subscription link (https://…) nor server links such as vless://…")
+            // Messages for files Ember recognises (WireGuard problems, OpenVPN) are specific; the rest get the general hint.
+            val specific = failure.message?.takeIf { it.startsWith("The WireGuard") || it.startsWith("OpenVPN") }
+            throw IllegalArgumentException(specific ?: "That is neither a subscription link (https://…) nor server links, a WireGuard file or Xray JSON.")
         }
         val subscription = Subscription(
             id = java.util.UUID.randomUUID().toString().take(8),

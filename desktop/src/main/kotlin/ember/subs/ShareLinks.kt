@@ -151,7 +151,13 @@ object ShareLinks {
             val settings = outbound.optJSONObject("settings") ?: JSONObject().also { outbound.put("settings", it) }
             settings.optJSONArray("vnext")?.optJSONObject(0)?.put("address", address)
             settings.optJSONArray("servers")?.optJSONObject(0)?.put("address", address)
-            if (settings.has("address")) settings.put("address", address)
+            if (outbound.optString("protocol") == "wireguard") {
+                // `address` here is the tunnel's own address list; the server is the first peer's endpoint.
+                settings.optJSONArray("peers")?.optJSONObject(0)?.let { peer ->
+                    val port = ConfigFiles.hostAndPort(peer.optString("endpoint"))?.second ?: 51820
+                    peer.put("endpoint", if (':' in address) "[$address]:$port" else "$address:$port")
+                }
+            } else if (settings.has("address")) settings.put("address", address)
             outbound
         }
         else -> error("Unsupported link type")
@@ -160,13 +166,18 @@ object ShareLinks {
     /** Prefix of a server that came from an Xray JSON subscription: the rest is its outbound as JSON. */
     const val JSON_PREFIX = "xrayjson:"
 
-    private val JSON_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria")
+    private val JSON_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria", "wireguard")
 
     /** A server from one entry of an Xray JSON subscription (the first outbound that is a real proxy). */
     fun fromXrayOutbound(outbound: JSONObject, name: String): ProxyNode? {
         val protocol = outbound.optString("protocol")
         if (protocol !in JSON_PROTOCOLS) return null
         val settings = outbound.optJSONObject("settings") ?: return null
+        if (protocol == "wireguard") {
+            val endpoint = settings.optJSONArray("peers")?.optJSONObject(0)?.optString("endpoint").orEmpty()
+            val (host, port) = ConfigFiles.hostAndPort(endpoint) ?: return null
+            return node(JSON_PREFIX + outbound.toString(), protocol, name, host, port)
+        }
         val target = settings.optJSONArray("vnext")?.optJSONObject(0)
             ?: settings.optJSONArray("servers")?.optJSONObject(0)
             ?: settings
@@ -183,6 +194,8 @@ object ShareLinks {
             else -> listOf(JSONObject(text))
         }
         return entries.mapNotNull { entry ->
+            // A bare outbound ({"protocol": "vless", "settings": …}) is a server on its own.
+            if (entry.has("protocol") && !entry.has("outbounds")) return@mapNotNull fromXrayOutbound(entry, entry.optString("tag"))
             val outbounds = entry.optJSONArray("outbounds") ?: return@mapNotNull null
             val name = entry.optString("remarks").ifBlank { entry.optString("remark") }.ifBlank { entry.optString("ps") }
             (0 until outbounds.length()).firstNotNullOfOrNull { fromXrayOutbound(outbounds.getJSONObject(it), name) }

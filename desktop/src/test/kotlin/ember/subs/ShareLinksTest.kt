@@ -134,6 +134,52 @@ class ShareLinksTest {
         assertEquals(listOf("A", "B", "C"), sortNodes(listOf(a, b, c), results, setOf(a.id)).map { it.name })
     }
 
+    private val wireGuardFile = """
+        [Interface]
+        PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+        Address = 10.8.0.2/32, fd00::2/128
+        DNS = 1.1.1.1
+        MTU = 1280
+
+        [Peer]
+        PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+        AllowedIPs = 0.0.0.0/0, ::/0
+        Endpoint = wg.example.com:51820
+        PersistentKeepalive = 25
+    """.trimIndent()
+
+    @Test
+    fun readsAWireGuardFileAndPinsItsEndpoint() {
+        val node = SubscriptionParser.parseNodes(wireGuardFile, "Office").single()
+        assertEquals("wireguard", node.protocol)
+        assertEquals("wg.example.com", node.host)
+        assertEquals(51820, node.port)
+        assertEquals("Office", node.name)
+        val outbound = ShareLinks.outbound(node.raw, "203.0.113.9", "proxy")
+        val settings = outbound.getJSONObject("settings")
+        assertEquals("203.0.113.9:51820", settings.getJSONArray("peers").getJSONObject(0).getString("endpoint"))
+        // the tunnel's own addresses are left alone
+        assertEquals("10.8.0.2/32", settings.getJSONArray("address").getString(0))
+        assertEquals(1280, settings.getInt("mtu"))
+        assertEquals(25, settings.getJSONArray("peers").getJSONObject(0).getInt("keepAlive"))
+    }
+
+    @Test
+    fun explainsFilesItCannotUse() {
+        val openVpn = "client\ndev tun\nproto udp\nremote vpn.example.com 1194\n"
+        assertTrue(assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(openVpn) }.message!!.startsWith("OpenVPN"))
+        val noPeer = "[Interface]\nPrivateKey = x\nAddress = 10.0.0.2/32\n"
+        assertEquals("The WireGuard file has no [Peer] section.", assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(noPeer) }.message)
+    }
+
+    @Test
+    fun readsABareXrayOutbound() {
+        val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
+        val node = SubscriptionParser.parseNodes(json).single()
+        assertEquals("b.example.com", node.host)
+        assertEquals("mine", node.name)
+    }
+
     @Test
     fun skippedHostnamesGoDirectToTheAddressesLookedUpForThem() {
         val node = ShareLinks.parse("vless://$uuid@h.example.com:443?type=tcp#N")!!

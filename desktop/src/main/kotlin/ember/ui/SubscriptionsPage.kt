@@ -42,7 +42,9 @@ import ember.subs.ProxyNode
 import ember.subs.Subscription
 import ember.subs.sortNodes
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Subscription links: add a link, see its servers sorted by the last speed test, and pick the one Connect should use. */
 @Composable
@@ -73,6 +75,23 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             } else {
                 message = null
                 scope.launch { runCatching { engine.subscriptions.add(text, "") }.onFailure { message = it.message ?: strings.signInFailed } }
+            }
+        })
+        IconAction("import-file", strings.importFile, onClick = {
+            scope.launch {
+                val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
+                if (chosen.isNotEmpty()) message = null
+                val problems = mutableListOf<String>()
+                for (file in chosen) {
+                    // A server file is small; anything bigger is not one.
+                    if (file.length() > 2_000_000) {
+                        problems += strings.fileTooLarge(file.name)
+                        continue
+                    }
+                    runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { file.readText() }, file.nameWithoutExtension) }
+                        .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
+                }
+                if (problems.isNotEmpty()) message = problems.joinToString("\n")
             }
         })
         Spacer(Modifier.width(4.dp))
@@ -122,6 +141,15 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         )
         Spacer(Modifier.height(16.dp))
     }
+}
+
+/** The system file dialog, for server files; call it off the UI thread (it blocks until the user is done). */
+private fun chooseServerFiles(title: String): List<java.io.File> {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
+    dialog.isMultipleMode = true
+    dialog.file = "*.json;*.conf;*.txt;*.ovpn" // Windows reads this as the file-type filter
+    dialog.isVisible = true
+    return dialog.files.toList()
 }
 
 @Composable

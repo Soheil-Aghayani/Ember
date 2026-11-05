@@ -118,11 +118,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 
-private enum class Page(val icon: String) {
+/** [bottom] pages sit at the bottom of the sidebar, apart from the main ones. */
+private enum class Page(val icon: String, val bottom: Boolean = false) {
     Home("home"),
     Servers("subscriptions"),
     Settings("settings"),
     Logs("logs"),
+    WhatsNew("whats-new", bottom = true),
+    About("info-circle", bottom = true),
 }
 
 private val CardShape = RoundedCornerShape(16.dp)
@@ -191,6 +194,8 @@ private fun MainShell(
                     Page.Servers -> SubscriptionsPage(engine)
                     Page.Settings -> SettingsPage(engine, theme, onThemeChange, language, onLanguageChange)
                     Page.Logs -> LogsPage()
+                    Page.WhatsNew -> WhatsNewPage(language)
+                    Page.About -> AboutPage()
                 }
             }
         }
@@ -210,6 +215,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
             Text("Ember", style = MaterialTheme.typography.headlineSmall)
         }
         for (p in Page.entries) {
+            if (p.bottom && p == Page.entries.first { it.bottom }) Spacer(Modifier.weight(1f))
             val active = p == selected
             val interaction = remember { MutableInteractionSource() }
             val hovered by interaction.collectIsHoveredAsState()
@@ -238,7 +244,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EmberIcon(p.icon, 20.dp, contentColor)
                     Spacer(Modifier.width(12.dp))
-                    Text(when (p) { Page.Home -> strings.home; Page.Servers -> strings.servers; Page.Settings -> strings.settings; Page.Logs -> strings.logs }, style = MaterialTheme.typography.titleSmall, color = contentColor)
+                    Text(when (p) { Page.Home -> strings.home; Page.Servers -> strings.servers; Page.Settings -> strings.settings; Page.Logs -> strings.logs; Page.WhatsNew -> strings.whatsNew; Page.About -> strings.about }, style = MaterialTheme.typography.titleSmall, color = contentColor)
                 }
             }
         }
@@ -519,118 +525,7 @@ private fun HomePage(
 }
 
 @Composable
-private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit) {
-    val strings = LocalStrings.current
-    var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
-    var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
-    var ipv6 by remember { mutableStateOf(engine.settings.ipv6) }
-    val available = engine.tunnel.isAvailable
-    val setupScope = rememberCoroutineScope()
-    var noPrompt by remember { mutableStateOf(false) }
-    var noPromptBusy by remember { mutableStateOf(true) }
-    var noPromptError by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        noPrompt = withContext(Dispatchers.IO) { available && engine.tunnel.privileged.isInstalled() }
-        noPromptBusy = false
-    }
-
-    Text(strings.settings, style = MaterialTheme.typography.headlineLarge)
-    Spacer(Modifier.height(16.dp))
-    GeneralSettings(engine, theme, onThemeChange, language, onLanguageChange)
-    Spacer(Modifier.height(16.dp))
-    Card {
-        Column {
-            Text(strings.protection, Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SwitchRow(
-                strings.wholeDevice,
-                if (available) strings.wholeDeviceHelp
-                else strings.wholeDeviceUnavailable,
-                whole && available,
-                enabled = available,
-            ) {
-                whole = it
-                engine.settings.wholeDevice = it
-            }
-            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow(
-                strings.killSwitch,
-                strings.killSwitchHelp,
-                killSwitch,
-                enabled = available,
-            ) {
-                killSwitch = it
-                engine.settings.killSwitch = it
-            }
-            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow(strings.ipv6, strings.ipv6Help, ipv6, enabled = available) {
-                ipv6 = it
-                engine.settings.ipv6 = it
-            }
-            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow(
-                strings.noPrompts,
-                strings.noPromptsHelp,
-                noPrompt,
-                enabled = available && !noPromptBusy,
-            ) { wanted ->
-                noPromptBusy = true
-                noPromptError = null
-                setupScope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            if (wanted) engine.tunnel.privileged.install() else engine.tunnel.privileged.uninstall()
-                        }
-                        noPrompt = wanted
-                    } catch (failure: Throwable) {
-                        noPromptError = failure.message ?: strings.setupFailed
-                    } finally {
-                        noPromptBusy = false
-                    }
-                }
-            }
-            noPromptError?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                )
-            }
-        }
-    }
-    Spacer(Modifier.height(16.dp))
-    Spacer(Modifier.height(16.dp))
-    Text(strings.trustedNetworksTitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-    TrustedNetworksSettings(engine)
-    Spacer(Modifier.height(16.dp))
-    SkipVpnSettings(engine, whole && available)
-    Spacer(Modifier.height(16.dp))
-    AdvancedSettings(engine)
-    Spacer(Modifier.height(16.dp))
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text(strings.about, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            Text(strings.appVersion(System.getProperty("jpackage.app-version") ?: strings.developmentBuild), style = MaterialTheme.typography.bodyMedium)
-            Text(
-                strings.logFile(ember.engine.appDataDir().resolve("ember.log").toString()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (available) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = { engine.restoreInternet() }, shape = RoundedCornerShape(12.dp)) { Text(strings.repairNetwork) }
-                Spacer(Modifier.height(4.dp))
-                Text(strings.repairNetworkHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -649,74 +544,6 @@ private fun formatDuration(seconds: Long): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
-}
-
-@Composable
-private fun GeneralSettings(engine: EmberEngine, theme: String, onThemeChange: (String) -> Unit, language: String, onLanguageChange: (String) -> Unit) {
-    val strings = LocalStrings.current
-    var keepInTray by remember { mutableStateOf(engine.settings.keepInTray) }
-    var autoConnect by remember { mutableStateOf(engine.settings.autoConnect) }
-    var autostart by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(true) }
-    var failure by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        autostart = withContext(Dispatchers.IO) { Autostart.isEnabled() }
-        busy = false
-    }
-    Card {
-        Column {
-            Text(strings.general, Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SwitchRow(strings.keepInTray,
-                strings.trayHelp, keepInTray,
-                enabled = androidx.compose.ui.window.isTraySupported) {
-                keepInTray = it
-                engine.settings.keepInTray = it
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow(strings.startWithWindows, strings.startQuietly, autostart,
-                enabled = Autostart.supported && !busy) { enabled ->
-                busy = true
-                failure = null
-                scope.launch {
-                    val saved = withContext(Dispatchers.IO) { Autostart.setEnabled(enabled) }
-                    if (saved) autostart = enabled
-                    else failure = strings.startupFailed
-                    busy = false
-                }
-            }
-            failure?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SwitchRow(strings.autoConnect, strings.autoConnectHelp, autoConnect) {
-                autoConnect = it
-                engine.settings.autoConnect = it
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Column(Modifier.padding(16.dp)) {
-                Text(strings.appearance, style = MaterialTheme.typography.bodyLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (choice in listOf("Light", "Dark", "System")) {
-                        EmberFilterChip(
-                            selected = theme == choice,
-                            onClick = { onThemeChange(choice) },
-                            label = { Text(when (choice) { "Light" -> strings.light; "Dark" -> strings.dark; else -> strings.system }) },
-                        )
-                    }
-                }
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Column(Modifier.padding(16.dp)) {
-                Text(strings.language, style = MaterialTheme.typography.bodyLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((code, label) in listOf("en" to strings.englishLanguage, "fa" to strings.persianLanguage)) {
-                        EmberFilterChip(selected = language == code, onClick = { onLanguageChange(code) }, label = { Text(label) })
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -796,62 +623,6 @@ private fun EmberFilterChip(
         elevation = FilterChipDefaults.filterChipElevation(hoveredElevation = 0.dp),
     )
 }
-
-@Composable
-private fun AdvancedSettings(engine: EmberEngine) {
-    val strings = LocalStrings.current
-    var mtuText by remember { mutableStateOf(engine.settings.mtu.toString()) }
-    var diagnostic by remember { mutableStateOf(engine.settings.diagnosticLog) }
-    var expanded by remember { mutableStateOf(false) }
-    val interactionSource = remember { MutableInteractionSource() }
-    val validMtu = parseMtu(mtuText) != null
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    role = Role.Button,
-                ) { expanded = !expanded }.padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Text(strings.advanced, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                EmberIcon(if (expanded) "chevron-up" else "chevron-down", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (expanded) {
-                SwitchRow(strings.diagnosticLog, strings.diagnosticLogHelp, diagnostic) {
-                    diagnostic = it
-                    engine.settings.diagnosticLog = it
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text(strings.mtuHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(
-                    value = mtuText,
-                    onValueChange = { value ->
-                        mtuText = value
-                        parseMtu(value)?.let { engine.settings.mtu = it }
-                    },
-                    label = { Text("MTU") },
-                    isError = !validMtu,
-                    supportingText = { if (!validMtu) Text(strings.mtuValidation(MTU_RANGE.first, MTU_RANGE.last)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextButton(onClick = {
-                    engine.settings.mtu = HevSocks5TunnelConfig.TUN_MTU
-                    mtuText = engine.settings.mtu.toString()
-                }) { Text(strings.resetDefault) }
-                Text(strings.nextConnection, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-private fun parseMtu(value: String): Int? =
-    value.takeIf { it.isNotEmpty() && it.all { char -> char in '0'..'9' } }
-        ?.toIntOrNull()?.takeIf { it in MTU_RANGE }
 
 @Composable
 private fun connectingRingAlpha(state: ConnectionState): Float {
