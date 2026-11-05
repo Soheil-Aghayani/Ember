@@ -133,4 +133,19 @@ class ShareLinksTest {
         assertEquals(listOf("B", "A", "C"), sortNodes(listOf(a, b, c), results, emptySet()).map { it.name })
         assertEquals(listOf("A", "B", "C"), sortNodes(listOf(a, b, c), results, setOf(a.id)).map { it.name })
     }
+
+    @Test
+    fun skippedHostnamesGoDirectToTheAddressesLookedUpForThem() {
+        val node = ShareLinks.parse("vless://$uuid@h.example.com:443?type=tcp#N")!!
+        val config = XrayConfig.single(node, "203.0.113.7", 10808, null, java.io.File("x.log"), false, mapOf("open.spotify.com" to listOf("1.2.3.4")))
+        val outbounds = config.getJSONArray("outbounds")
+        assertTrue((0 until outbounds.length()).any { outbounds.getJSONObject(it).getString("tag") == "direct" })
+        assertEquals("1.2.3.4", config.getJSONObject("dns").getJSONObject("hosts").getJSONArray("full:open.spotify.com").getString(0))
+        val first = config.getJSONObject("routing").getJSONArray("rules").getJSONObject(0)
+        assertEquals("full:open.spotify.com", first.getJSONArray("domain").getString(0))
+        assertEquals("direct", first.getString("outboundTag"))
+        // without a skip list there is no direct outbound and no dns section
+        val plain = XrayConfig.single(node, "203.0.113.7", 10808, null, java.io.File("x.log"))
+        assertEquals(false, plain.has("dns"))
+    }
 }

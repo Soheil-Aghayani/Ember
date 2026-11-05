@@ -252,7 +252,8 @@ class EmberEngine(private val dataDir: File) {
                         AppLogger.w(TAG, "could not look up the server's name (${failure.javaClass.simpleName}); using its last known address")
                         remembered
                     }
-                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog))
+                val skipped = if (wholeDevice) resolveExclusions() else SkipList(emptyList(), emptyMap())
+                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog, skipped.domains))
                 xray.awaitListening(SOCKS_PORT)
                 // Before anything on the computer is changed: does this server pass traffic at all?
                 _progress.value = "Checking the server..."
@@ -268,7 +269,7 @@ class EmberEngine(private val dataDir: File) {
                         killSwitch = settings.killSwitch,
                         mtu = settings.mtu,
                         tcpBufferSize = settings.tcpBufferBytes,
-                        excludeCidrs = resolveExclusions(),
+                        excludeCidrs = skipped.cidrs,
                         ipv6 = settings.ipv6,
                         onProgress = { _progress.value = it },
                     )
@@ -350,21 +351,26 @@ class EmberEngine(private val dataDir: File) {
     }
 
     /** Turns the user's "skip the VPN" list into IPv4 addresses and ranges (domains are looked up now, on the real network). */
-    private fun resolveExclusions(): List<String> {
+    private class SkipList(val cidrs: List<String>, val domains: Map<String, List<String>>)
+
+    private fun resolveExclusions(): SkipList {
         val cidr = Regex("""^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$""")
         val domain = Regex("""^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$""")
         val result = linkedSetOf<String>()
+        val names = linkedMapOf<String, List<String>>()
         for (entry in settings.excludedAddresses) {
             when {
                 cidr.matches(entry) -> result.add(entry)
                 domain.matches(entry) -> runCatching {
-                    InetAddress.getAllByName(entry).filterIsInstance<Inet4Address>().forEach { result.add(it.hostAddress + "/32") }
+                    val ips = InetAddress.getAllByName(entry).filterIsInstance<Inet4Address>().mapNotNull { it.hostAddress }
+                    ips.forEach { result.add("$it/32") }
+                    if (ips.isNotEmpty()) names[entry.lowercase()] = ips
                 }.onFailure { AppLogger.w(TAG, "could not look up $entry for the skip list", it) }
                 else -> AppLogger.w(TAG, "ignored an invalid skip-list entry: $entry")
             }
             if (result.size >= 300) break
         }
-        return result.toList()
+        return SkipList(result.toList(), names)
     }
 
     /** Measures download speed and delay through the running tunnel. */

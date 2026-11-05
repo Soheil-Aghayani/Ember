@@ -28,7 +28,16 @@ object XrayConfig {
         .put("settings", JSONObject().put("auth", "noauth").put("udp", true).put("ip", "127.0.0.1"))
 
     /** One server behind a local SOCKS5 port (and a local HTTP proxy when [httpPort] is given). */
-    fun single(node: ProxyNode, address: String, socksPort: Int, httpPort: Int?, logFile: File, verbose: Boolean = false): JSONObject {
+    /**
+     * One server behind a local SOCKS5 port (and a local HTTP proxy when [httpPort] is given). [bypass] maps hostnames
+     * the user wants to reach without the VPN to the IPv4 addresses Ember looked up for them: Xray sends exactly those
+     * names straight out. (Whole-device mode hands applications made-up addresses for every name, so a route to a
+     * website's real address is never used by them; the decision has to be made here, where the name is still known.)
+     */
+    fun single(
+        node: ProxyNode, address: String, socksPort: Int, httpPort: Int?, logFile: File,
+        verbose: Boolean = false, bypass: Map<String, List<String>> = emptyMap(),
+    ): JSONObject {
         val inbounds = JSONArray().put(socksInbound("in", socksPort))
         if (httpPort != null) {
             inbounds.put(JSONObject().put("tag", "http").put("listen", "127.0.0.1").put("port", httpPort).put("protocol", "http"))
@@ -38,10 +47,20 @@ object XrayConfig {
         val outbounds = JSONArray()
             .put(ShareLinks.outbound(node.raw, address, "proxy"))
             .put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
-        val rules = JSONArray().put(
-            JSONObject().put("type", "field").put("network", "udp").put("port", "443").put("outboundTag", "block"),
-        )
-        return base(logFile, verbose).put("inbounds", inbounds).put("outbounds", outbounds)
+        val rules = JSONArray()
+        val config = base(logFile, verbose)
+        if (bypass.isNotEmpty()) {
+            outbounds.put(JSONObject().put("tag", "direct").put("protocol", "freedom")
+                .put("settings", JSONObject().put("domainStrategy", "UseIPv4")))
+            val hosts = JSONObject()
+            for ((name, ips) in bypass) hosts.put("full:$name", JSONArray(ips))
+            // Only exact names are routed directly, and each one has its addresses here, so Xray never has to ask a
+            // resolver (which would hand back a made-up address and loop through the tunnel).
+            config.put("dns", JSONObject().put("hosts", hosts).put("servers", JSONArray().put("localhost")))
+            rules.put(JSONObject().put("type", "field").put("domain", JSONArray(bypass.keys.map { "full:$it" })).put("outboundTag", "direct"))
+        }
+        rules.put(JSONObject().put("type", "field").put("network", "udp").put("port", "443").put("outboundTag", "block"))
+        return config.put("inbounds", inbounds).put("outbounds", outbounds)
             .put("routing", JSONObject().put("domainStrategy", "AsIs").put("rules", rules))
     }
 

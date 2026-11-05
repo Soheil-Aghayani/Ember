@@ -45,7 +45,7 @@ pub fn spawn(hev: &Path, config: &Path, log: &Path) -> Result<Child> {
     let output = std::fs::File::create(log).map_err(|e| e.to_string())?;
     let errors = output.try_clone().map_err(|e| e.to_string())?;
     Command::new(hev)
-        .arg(config)
+        .arg(plain_path(config))
         .stdout(Stdio::from(output))
         .stderr(Stdio::from(errors))
         .current_dir(
@@ -55,6 +55,16 @@ pub fn spawn(hev: &Path, config: &Path, log: &Path) -> Result<Child> {
         .creation_flags(CREATE_NO_WINDOW.0)
         .spawn()
         .map_err(|e| e.to_string())
+}
+
+/// The path as a plain Windows path. `canonicalize` returns the `\\?\` form, which the tunnel program (an MSYS build)
+/// cannot open: it logged "Open ... failed!" and exited at once.
+pub fn plain_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with(r"UNC\") => rest.to_string(),
+        _ => text.into_owned(),
+    }
 }
 
 pub fn alive(pid: i32) -> Result<bool> {
@@ -144,4 +154,16 @@ pub fn timestamp() -> String {
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
         t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strips_the_verbatim_prefix_but_keeps_other_paths() {
+        assert_eq!(plain_path(Path::new(r"\\?\C:\Users\a\hev.yaml")), r"C:\Users\a\hev.yaml");
+        assert_eq!(plain_path(Path::new(r"C:\Users\a\hev.yaml")), r"C:\Users\a\hev.yaml");
+        assert_eq!(plain_path(Path::new(r"\\?\UNC\server\share\x")), r"\\?\UNC\server\share\x");
+    }
 }

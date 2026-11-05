@@ -282,6 +282,12 @@ impl Session<'_> {
                     .into_iter()
                     .find(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
                 {
+                    // An adapter left by an earlier run would be found too; the process must still be running a moment
+                    // later for the adapter to be its own.
+                    sleep(Duration::from_millis(500));
+                    if let Some(status) = proc.try_wait().map_err(|e| e.to_string())? {
+                        break Err(format!("the tunnel process exited during start-up ({status})"));
+                    }
                     break Ok(adapter);
                 }
                 if start.elapsed() >= Duration::from_secs(20) {
