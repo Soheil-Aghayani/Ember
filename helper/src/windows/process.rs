@@ -2,7 +2,7 @@ use ember_helper::Result;
 use std::{
     os::windows::process::CommandExt,
     path::Path,
-    process::{Child, Command},
+    process::{Child, Command, Stdio},
 };
 use windows::Win32::{
     Foundation::{CloseHandle, ERROR_ACCESS_DENIED, ERROR_NO_MORE_FILES, HANDLE, WAIT_TIMEOUT},
@@ -40,9 +40,14 @@ pub fn elevated() -> Result<bool> {
     Ok(elevation.TokenIsElevated != 0)
 }
 
-pub fn spawn(hev: &Path, config: &Path) -> Result<Child> {
+/// Starts the tunnel process. Its output goes to `log` (it says why it stops when it fails to start).
+pub fn spawn(hev: &Path, config: &Path, log: &Path) -> Result<Child> {
+    let output = std::fs::File::create(log).map_err(|e| e.to_string())?;
+    let errors = output.try_clone().map_err(|e| e.to_string())?;
     Command::new(hev)
         .arg(config)
+        .stdout(Stdio::from(output))
+        .stderr(Stdio::from(errors))
         .current_dir(
             hev.parent()
                 .ok_or("tunnel executable has no parent folder")?,

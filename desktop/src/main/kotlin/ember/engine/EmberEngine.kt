@@ -111,7 +111,13 @@ class EmberEngine(private val dataDir: File) {
         startNetworkTrustWatch()
         runCatching { xray.killStale() }
         startSubscriptionUpkeep()
-        if (tunnel.isBlocked()) {
+        val interrupted = tunnel.isBlocked() || tunnel.isStale()
+        if (interrupted && settings.wasConnected && selectedNode() != null) {
+            // Ember went away while connected (a crash, or a restart of Windows): the kill switch is still holding the
+            // internet, so connect again to the same server instead of leaving the computer cut off.
+            _blockedNotice.value = "Ember was closed while connected. Reconnecting to keep you protected…"
+            resumeAfterInterruption()
+        } else if (tunnel.isBlocked()) {
             _blockedNotice.value = "Ember closed while the kill switch was on, so internet access is still blocked."
         } else if (tunnel.isStale()) {
             _blockedNotice.value = "Ember was closed while the tunnel was on (or Windows restarted). Leftover network rules may still block or redirect traffic."
@@ -145,6 +151,26 @@ class EmberEngine(private val dataDir: File) {
                 }
                 delay(REFRESH_CHECK_MS)
             }
+        }
+    }
+
+    /** Reconnects after an interruption, retrying while the network comes back (for example after Windows starts). */
+    private fun resumeAfterInterruption() {
+        scope.launch {
+            delay(2_500)
+            repeat(6) {
+                if (_state.value != ConnectionState.DISCONNECTED) return@launch
+                val node = selectedNode() ?: return@launch
+                AppLogger.i(TAG, "resuming the connection that was interrupted")
+                connect(node)
+                while (_state.value == ConnectionState.CONNECTING) delay(500)
+                if (_state.value == ConnectionState.CONNECTED) {
+                    _blockedNotice.value = null
+                    return@launch
+                }
+                delay(5_000)
+            }
+            _blockedNotice.value = "Ember could not reconnect by itself. Internet access may still be blocked."
         }
     }
 
@@ -184,7 +210,11 @@ class EmberEngine(private val dataDir: File) {
             val startedAtNanos = System.nanoTime()
             try {
                 // A running speed test owns the Xray process; stop it first.
-                testJob?.cancelAndJoin()
+                testJob?.let {
+                    it.cancel()
+                    xray.stop() // ends the test's blocking requests at once
+                    it.join()
+                }
                 val address = runCatching { resolveIpv4(node.host) }
                     .onSuccess { subscriptions.rememberAddress(node, it) }
                     .getOrElse { failure ->
@@ -209,6 +239,7 @@ class EmberEngine(private val dataDir: File) {
                         mtu = settings.mtu,
                         tcpBufferSize = settings.tcpBufferBytes,
                         excludeCidrs = resolveExclusions(),
+                        ipv6 = settings.ipv6,
                         onProgress = { _progress.value = it },
                     )
                     startWatchingTunnel()
@@ -216,6 +247,7 @@ class EmberEngine(private val dataDir: File) {
                 _connectedAtMs.value = System.currentTimeMillis()
                 _progress.value = null
                 _state.value = ConnectionState.CONNECTED
+                settings.wasConnected = true
                 checkExit()
                 probeConnection(address, node.port)
                 AppLogger.i(TAG, "connected via a ${node.protocol} server (wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
@@ -257,7 +289,14 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
+    /** Stops a running speed test. */
+    fun cancelTest() {
+        testJob?.cancel()
+        runCatching { xray.stop() }
+    }
+
     fun disconnect() {
+        settings.wasConnected = false
         connectJob?.cancel()
         scope.launch { teardown() }
     }
@@ -275,6 +314,7 @@ class EmberEngine(private val dataDir: File) {
     }
 
     fun shutdown() {
+        settings.wasConnected = false
         connectJob?.cancel()
         runBlocking { teardown() }
     }

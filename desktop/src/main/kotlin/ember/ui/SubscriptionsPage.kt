@@ -62,11 +62,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-        Button(onClick = { showAdd = true }, shape = RoundedCornerShape(12.dp)) {
-            EmberIcon("add", 18.dp, MaterialTheme.colorScheme.onPrimary)
-            Spacer(Modifier.width(8.dp))
-            Text(strings.addSubscription)
-        }
+        IconAction("add", strings.addSubscription, onClick = { showAdd = true }, filled = true)
     }
     Spacer(Modifier.height(8.dp))
     Text(strings.subscriptionsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -96,6 +92,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                 engine.settings.selectedNodeId = node.id
             },
             onTest = { engine.testNodes(subscription.nodes) },
+            onStopTest = { engine.cancelTest() },
             onRefresh = {
                 busyId = subscription.id
                 message = null
@@ -127,6 +124,7 @@ private fun SubscriptionCard(
     refreshing: Boolean,
     onSelect: (ProxyNode) -> Unit,
     onTest: () -> Unit,
+    onStopTest: () -> Unit,
     onRefresh: () -> Unit,
     onRemove: () -> Unit,
     onEdit: () -> Unit,
@@ -177,20 +175,21 @@ private fun SubscriptionCard(
                     Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (expanded) Spacer(Modifier.height(8.dp))
-                if (expanded) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onTest, enabled = canTest && servers.isNotEmpty(), shape = RoundedCornerShape(12.dp)) {
-                        EmberIcon("bolt", 18.dp, MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(6.dp))
-                        Text(strings.testSpeed)
+                if (expanded) Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (testing != null) {
+                        IconAction("stop", strings.stopTest, onStopTest, tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        IconAction("bolt", strings.testSpeed, onTest, enabled = canTest && servers.isNotEmpty(), tint = MaterialTheme.colorScheme.primary)
                     }
-                    TextButton(onClick = onRefresh, enabled = !refreshing) { Text(if (refreshing) strings.refreshing else strings.refresh) }
-                    TextButton(onClick = onEdit) { Text(strings.editSubscription) }
-                    TextButton(onClick = onRemove) { Text(strings.removeSubscription) }
+                    IconAction("refresh", if (refreshing) strings.refreshing else strings.refresh, onRefresh, enabled = !refreshing)
+                    IconAction("edit", strings.editSubscription, onEdit)
+                    IconAction("trash", strings.removeSubscription, onRemove)
+                    testing?.let {
+                        Spacer(Modifier.width(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                if (expanded && testing != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(testing, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else if (expanded && !canTest) {
+                if (expanded && testing == null && !canTest) {
                     Spacer(Modifier.height(4.dp))
                     Text(strings.testNeedsDisconnect, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

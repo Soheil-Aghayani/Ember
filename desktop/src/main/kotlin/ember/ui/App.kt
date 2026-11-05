@@ -476,16 +476,19 @@ private fun HomePage(
                 )
             }
         }
-        if (canPick && choices.isNotEmpty()) {
+        if ((canPick && choices.isNotEmpty()) || testing != null) {
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { engine.testNodes(choices) }, enabled = testing == null) {
-                EmberIcon("bolt", 18.dp, MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(6.dp))
-                Text(strings.testSpeed)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (testing != null) {
+                    IconAction("stop", strings.stopTest, onClick = { engine.cancelTest() }, tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    IconAction("bolt", strings.testSpeed, onClick = { engine.testNodes(choices) }, tint = MaterialTheme.colorScheme.primary)
+                }
+                testing?.let {
+                    Spacer(Modifier.width(8.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-        }
-        testing?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (connected && !whole) {
             Spacer(Modifier.height(12.dp))
@@ -530,6 +533,7 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
     val strings = LocalStrings.current
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
+    var ipv6 by remember { mutableStateOf(engine.settings.ipv6) }
     val available = engine.tunnel.isAvailable
     val setupScope = rememberCoroutineScope()
     var noPrompt by remember { mutableStateOf(false) }
@@ -567,6 +571,11 @@ private fun SettingsPage(engine: EmberEngine, theme: String, onThemeChange: (Str
             ) {
                 killSwitch = it
                 engine.settings.killSwitch = it
+            }
+            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            SwitchRow(strings.ipv6, strings.ipv6Help, ipv6, enabled = available) {
+                ipv6 = it
+                engine.settings.ipv6 = it
             }
             HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
             SwitchRow(
@@ -786,8 +795,8 @@ private fun LogsPage() {
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty()) { Text(strings.copy) }
-        OutlinedButton(onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty()) { Text(strings.clear) }
+        IconAction("copy", strings.copy, onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty())
+        IconAction("trash", strings.clear, onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty())
     }
     Spacer(Modifier.height(12.dp))
     Card {

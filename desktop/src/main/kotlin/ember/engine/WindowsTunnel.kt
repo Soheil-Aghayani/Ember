@@ -14,6 +14,7 @@ import java.util.Base64
 
 private const val TAG = "WindowsTunnel"
 private const val ADAPTER_NAME = "EmberTun"
+private const val TUN_ADDRESS6 = "fd00:8:0:1::2"
 private const val START_TIMEOUT_MS = 120_000L
 private const val HELPER_SILENT_TIMEOUT_MS = 20_000L
 private const val STOP_TIMEOUT_MS = 20_000L
@@ -90,6 +91,7 @@ class WindowsTunnel(dataDir: File) {
         mtu: Int = HevSocks5TunnelConfig.TUN_MTU,
         tcpBufferSize: Int = HevSocks5TunnelConfig.DEFAULT_TCP_BUFFER_SIZE_BYTES,
         excludeCidrs: List<String> = emptyList(),
+        ipv6: Boolean = false,
         onProgress: (String) -> Unit = {},
     ) {
         val staleCleanupStartedAtNanos = System.nanoTime()
@@ -99,12 +101,23 @@ class WindowsTunnel(dataDir: File) {
             logElapsed("stale helper cleanup", staleCleanupStartedAtNanos)
         }
         val hevConfig = HevSocks5TunnelConfig.write(stateDir.parentFile, socksPort, useMapDns = true, mtu = mtu, tunnelName = ADAPTER_NAME, tcpBufferSize = tcpBufferSize)
+        if (ipv6) {
+            // hev needs its own IPv6 address to carry IPv6 packets; the helper gives the adapter the same one.
+            runCatching {
+                val file = File(hevConfig)
+                val yaml = file.readText()
+                if (!yaml.contains("ipv6:")) {
+                    file.writeText(yaml.replace("  ipv4: '${HevSocks5TunnelConfig.TUN_ADDRESS}'\n", "  ipv4: '${HevSocks5TunnelConfig.TUN_ADDRESS}'\n  ipv6: '$TUN_ADDRESS6'\n"))
+                }
+            }.onFailure { AppLogger.w(TAG, "could not add IPv6 to the tunnel settings", it) }
+        }
         val config = JSONObject()
             .put("stateDir", stateDir.absolutePath)
             .put("hevConfigPath", hevConfig)
             .put("adapterName", ADAPTER_NAME)
             .put("tunAddress", HevSocks5TunnelConfig.TUN_ADDRESS)
             .put("mapdnsAddress", HevSocks5TunnelConfig.MAPDNS_ADDRESS)
+            .apply { if (ipv6) put("tunAddress6", TUN_ADDRESS6) }
             .put("edgeIps", JSONArray(edgeIps))
             .put("excludeCidrs", JSONArray(excludeCidrs))
             .put("killSwitch", killSwitch)

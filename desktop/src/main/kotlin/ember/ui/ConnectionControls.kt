@@ -66,21 +66,21 @@ internal fun SpeedTestControl(engine: EmberEngine) {
             failure?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(
+            IconAction(
+                icon = if (failure != null || result != null) "refresh" else "bolt",
+                description = when {
+                    failure != null -> strings.tryAgain
+                    result != null -> strings.testAgain
+                    else -> strings.testSpeed
+                },
                 onClick = {
                     testing = true
                     result = null
                     failure = null
                     attempt++
                 },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-            ) {
-                Text(when {
-                    failure != null -> strings.tryAgain
-                    result != null -> strings.testAgain
-                    else -> strings.testSpeed
-                })
-            }
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }

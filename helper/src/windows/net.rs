@@ -3,7 +3,10 @@ use ember_helper::{
     network::{self, DefaultRoute},
     Result,
 };
-use std::{mem::size_of, net::Ipv4Addr};
+use std::{
+    mem::size_of,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 use windows::{
     core::{GUID, PWSTR},
     Win32::{
@@ -117,6 +120,18 @@ fn address(ip: Ipv4Addr) -> SOCKADDR_INET {
                 S_un: IN_ADDR_0 {
                     S_addr: u32::from_ne_bytes(ip.octets()),
                 },
+            },
+            ..Default::default()
+        },
+    }
+}
+
+fn address6(ip: Ipv6Addr) -> SOCKADDR_INET {
+    SOCKADDR_INET {
+        Ipv6: SOCKADDR_IN6 {
+            sin6_family: AF_INET6,
+            sin6_addr: IN6_ADDR {
+                u: IN6_ADDR_0 { Byte: ip.octets() },
             },
             ..Default::default()
         },
@@ -241,6 +256,45 @@ fn ensure_address(adapter: &Adapter, ip: Ipv4Addr) -> Result<()> {
     row.SuffixOrigin = IpSuffixOriginManual;
     // SAFETY: initialized IPv4 address row; this creates only an active unicast address.
     check(unsafe { CreateUnicastIpAddressEntry(&row) })
+}
+
+/// Gives the tunnel adapter an IPv6 address and sends all global IPv6 traffic into it (two routes, like the IPv4 pair).
+pub fn configure_ipv6(adapter: &Adapter, ip: Ipv6Addr) -> Result<()> {
+    let mut row = MIB_UNICASTIPADDRESS_ROW::default();
+    // SAFETY: initializes valid default values in a writable row.
+    unsafe {
+        InitializeUnicastIpAddressEntry(&mut row);
+    }
+    row.InterfaceLuid = adapter.luid;
+    row.InterfaceIndex = adapter.index;
+    row.Address = address6(ip);
+    // SAFETY: row identifies the requested address/interface; this call only reads.
+    if unsafe { GetUnicastIpAddressEntry(&mut row) }.is_err() {
+        row.OnLinkPrefixLength = 64;
+        row.PrefixOrigin = IpPrefixOriginManual;
+        row.SuffixOrigin = IpSuffixOriginManual;
+        // SAFETY: initialized IPv6 address row; this creates only an active unicast address.
+        check(unsafe { CreateUnicastIpAddressEntry(&row) }).map_err(|e| format!("ipv6 address: {e}"))?;
+    }
+    for prefix in ["::", "8000::"] {
+        let mut route = MIB_IPFORWARD_ROW2::default();
+        // SAFETY: writable, correctly sized row. API initializes default lifetimes and flags.
+        unsafe {
+            InitializeIpForwardEntry(&mut route);
+        }
+        route.InterfaceIndex = adapter.index;
+        route.DestinationPrefix = IP_ADDRESS_PREFIX {
+            Prefix: address6(prefix.parse().unwrap()),
+            PrefixLength: 1,
+        };
+        route.NextHop = address6(Ipv6Addr::UNSPECIFIED);
+        route.Metric = 1;
+        route.Protocol = MIB_IPPROTO_NETMGMT;
+        // SAFETY: row has an IPv6 prefix/next hop and an interface index; API routes are nonpersistent and
+        // disappear with the adapter.
+        check(unsafe { CreateIpForwardEntry2(&route) }).map_err(|e| format!("ipv6 route {prefix}/1: {e}"))?;
+    }
+    Ok(())
 }
 
 pub fn configure(adapter: &Adapter, ip: Ipv4Addr, dns: Ipv4Addr) -> Result<()> {

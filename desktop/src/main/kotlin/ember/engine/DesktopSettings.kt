@@ -73,6 +73,16 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("selectedNodeId", "")
         set(value) = put("selectedNodeId", value)
 
+    /** Carries IPv6 through the tunnel too; off keeps public IPv6 blocked. */
+    var ipv6: Boolean
+        get() = props.getProperty("ipv6", "true").toBoolean()
+        set(value) = put("ipv6", value.toString())
+
+    /** True from a successful connect until the user disconnects: still true after a crash or a restart. */
+    var wasConnected: Boolean
+        get() = props.getProperty("wasConnected", "false").toBoolean()
+        set(value) = put("wasConnected", value.toString())
+
     var adminNoticeSeen: Boolean
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
         set(value) = put("adminNoticeSeen", value.toString())

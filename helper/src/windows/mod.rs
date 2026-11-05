@@ -202,7 +202,7 @@ impl Session<'_> {
         ))
     }
 
-    fn guards(&self) -> Result<()> {
+    fn guards(&self, ipv6_through_tunnel: bool) -> Result<()> {
         let start = Instant::now();
         for (name, protocol) in [("Ember DNS guard (UDP)", 17), ("Ember DNS guard (TCP)", 6)] {
             self.firewall.block(
@@ -213,12 +213,20 @@ impl Session<'_> {
                 None,
             )?;
         }
+        // With IPv6 in the tunnel the guard only covers the real adapters, so IPv6 cannot go around the tunnel; without it
+        // the guard covers every adapter and public IPv6 is simply refused.
+        let physical = if ipv6_through_tunnel {
+            let usable = self.firewall.usable_interfaces(&net::active_names(&net::adapters()?, &self.config.adapter_name));
+            if usable.is_empty() { None } else { Some(usable) }
+        } else {
+            None
+        };
         self.firewall.block(
             "Ember IPv6 guard",
             "2000::-3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
             256,
             None,
-            None,
+            physical.as_deref(),
         )?;
         self.state.elapsed("firewall guards set", start);
         Ok(())
@@ -236,17 +244,7 @@ impl Session<'_> {
         // exists makes the new tunnel process fail or hands this helper the dying adapter, whose address calls answer
         // "Element not found".
         process::kill_tunnels(|s| self.state.log(s));
-        let leftover_wait = Instant::now();
-        while net::adapters()?
-            .iter()
-            .any(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
-        {
-            if leftover_wait.elapsed() >= Duration::from_secs(10) {
-                self.state.log("an old tunnel adapter is still there; continuing anyway");
-                break;
-            }
-            sleep(Duration::from_millis(200));
-        }
+        self.wait_for_old_adapter(Duration::from_secs(10))?;
         self.state.remove("stop");
         self.state.status("STARTING")?;
         self.state.log(&format!(
@@ -264,29 +262,50 @@ impl Session<'_> {
         step("kill switch", self.kill_switch(&adapters))?;
         step("bypass routes", self.bypass(&default))?;
 
-        let start = Instant::now();
-        *child = Some(step(
-            "starting the tunnel process",
-            process::spawn(hev, &self.config.hev_config_path),
-        )?);
-        let proc = child.as_mut().ok_or("tunnel process was not started")?;
-        let adapter = loop {
-            if proc.try_wait().map_err(|e| e.to_string())?.is_some() {
-                return Err("the tunnel process exited during start-up".into());
+        // Windows can still be removing the previous tunnel adapter when the new process asks for the same name, and
+        // the process then exits at once. Try again a few times before giving up.
+        let hev_log = self.state.dir.join("hev.log");
+        let mut attempt = 0;
+        let (adapter, start) = loop {
+            attempt += 1;
+            let start = Instant::now();
+            *child = Some(step(
+                "starting the tunnel process",
+                process::spawn(hev, &self.config.hev_config_path, &hev_log),
+            )?);
+            let proc = child.as_mut().ok_or("tunnel process was not started")?;
+            let outcome: std::result::Result<net::Adapter, String> = loop {
+                if let Some(status) = proc.try_wait().map_err(|e| e.to_string())? {
+                    break Err(format!("the tunnel process exited during start-up ({status})"));
+                }
+                if let Some(adapter) = net::adapters()?
+                    .into_iter()
+                    .find(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
+                {
+                    break Ok(adapter);
+                }
+                if start.elapsed() >= Duration::from_secs(20) {
+                    break Err(format!(
+                        "the tunnel adapter '{}' did not appear",
+                        self.config.adapter_name
+                    ));
+                }
+                sleep(Duration::from_millis(100));
+            };
+            match outcome {
+                Ok(adapter) => break (adapter, start),
+                Err(e) if attempt < 3 && e.contains("exited") => {
+                    let said = fs::read_to_string(&hev_log).unwrap_or_default();
+                    self.state.log(&format!(
+                        "{e}; it said: {}; trying again",
+                        said.trim().chars().take(300).collect::<String>()
+                    ));
+                    process::kill_tunnels(|s| self.state.log(s));
+                    self.wait_for_old_adapter(Duration::from_secs(5))?;
+                    sleep(Duration::from_millis(1000));
+                }
+                Err(e) => return Err(e),
             }
-            if let Some(adapter) = net::adapters()?
-                .into_iter()
-                .find(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
-            {
-                break adapter;
-            }
-            if start.elapsed() >= Duration::from_secs(20) {
-                return Err(format!(
-                    "the tunnel adapter '{}' did not appear",
-                    self.config.adapter_name
-                ));
-            }
-            sleep(Duration::from_millis(100));
         };
         self.state.elapsed("tunnel adapter appeared", start);
         self.state.log(&format!("tunnel adapter index {}", adapter.index));
@@ -294,19 +313,19 @@ impl Session<'_> {
         // A new Wintun adapter exists a moment before Windows has made its IPv4 interface; until then the
         // calls answer "Element not found" (0x80070490).
         let configure_deadline = Instant::now() + Duration::from_secs(10);
-        loop {
+        let adapter = loop {
             let current = net::adapters()?
                 .into_iter()
                 .find(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
                 .unwrap_or_else(|| adapter.clone());
             match net::configure(&current, self.config.tun_address, self.config.mapdns_address) {
-                Ok(()) => break,
+                Ok(()) => break current,
                 Err(e) if e.contains("0x80070490") && Instant::now() < configure_deadline => {
                     sleep(Duration::from_millis(150));
                 }
                 Err(e) => return Err(format!("configuring the tunnel adapter: {e}")),
             }
-        }
+        };
         for text in ["0.0.0.0/1", "128.0.0.0/1"] {
             step(
                 "adding the tunnel routes",
@@ -318,11 +337,42 @@ impl Session<'_> {
                 ),
             )?;
         }
+        // IPv6 is best effort: when it cannot be set up, public IPv6 stays blocked as before.
+        let ipv6_through_tunnel = match self.config.tun_address6 {
+            Some(ip6) => match net::configure_ipv6(&adapter, ip6) {
+                Ok(()) => {
+                    self.state.log("IPv6 goes through the tunnel");
+                    true
+                }
+                Err(e) => {
+                    self.state.log(&format!("IPv6 stays blocked: {e}"));
+                    false
+                }
+            },
+            None => false,
+        };
         self.state.elapsed("tunnel interface configured", start);
-        step("firewall guards", self.guards())?;
+        step("firewall guards", self.guards(ipv6_through_tunnel))?;
         self.state.status("UP")?;
         self.state.elapsed("tunnel is up", total);
+        let proc = child.as_mut().ok_or("tunnel process was not started")?;
         self.watch(proc)
+    }
+
+    /// Waits until no adapter with the tunnel's name is left from an earlier run.
+    fn wait_for_old_adapter(&self, limit: Duration) -> Result<()> {
+        let waited = Instant::now();
+        while net::adapters()?
+            .iter()
+            .any(|a| a.name.eq_ignore_ascii_case(&self.config.adapter_name))
+        {
+            if waited.elapsed() >= limit {
+                self.state.log("an old tunnel adapter is still there; continuing anyway");
+                break;
+            }
+            sleep(Duration::from_millis(200));
+        }
+        Ok(())
     }
 
     fn cleanup(&self) {

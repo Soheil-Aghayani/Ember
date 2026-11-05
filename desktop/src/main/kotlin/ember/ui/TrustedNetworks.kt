@@ -63,12 +63,12 @@ internal fun TrustedNetworksSettings(engine: EmberEngine) {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedButton(
-                    onClick = {
-                        if (engine.trustCurrentNetwork()) trusted = engine.settings.trustedNetworks
-                    },
+                IconAction(
+                    "shield-check", strings.trustThisNetwork,
+                    onClick = { if (engine.trustCurrentNetwork()) trusted = engine.settings.trustedNetworks },
                     enabled = current != null && current !in trusted,
-                ) { Text(strings.trustThisNetwork) }
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
             HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
             if (trusted.isEmpty()) {
@@ -86,10 +86,10 @@ internal fun TrustedNetworksSettings(engine: EmberEngine) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(name(id), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                        TextButton(onClick = {
+                        IconAction("trash", strings.removeNetwork, onClick = {
                             engine.untrustNetwork(id)
                             trusted = engine.settings.trustedNetworks
-                        }) { Text(strings.removeNetwork) }
+                        })
                     }
                 }
                 Spacer(Modifier.height(4.dp))

@@ -5,6 +5,9 @@ import com.soheil.ember.data.TlsSplitMode
 
 data class Strings(
     val testSpeed: String,
+    val stopTest: String,
+    val ipv6: String,
+    val ipv6Help: String,
     val serverAlone: (String) -> String,
     val subscriptions: String,
     val servers: String,
@@ -126,6 +129,9 @@ data class Strings(
 
 val EnglishStrings = Strings(
     testSpeed = "Test speed",
+    stopTest = "Stop the test",
+    ipv6 = "IPv6 through the tunnel",
+    ipv6Help = "IPv6 traffic goes through the tunnel too. When off, public IPv6 stays blocked.",
     serverAlone = { "Server alone: $it" },
     subscriptions = "Subscriptions",
     servers = "Servers",
@@ -247,6 +253,9 @@ val EnglishStrings = Strings(
 
 val PersianStrings = Strings(
     testSpeed = "تست سرعت",
+    stopTest = "توقف تست",
+    ipv6 = "IPv6 از داخل تونل",
+    ipv6Help = "ترافیک IPv6 هم از تونل می‌گذرد. خاموش باشد، IPv6 عمومی مسدود می‌ماند.",
     serverAlone = { "سرور به‌تنهایی: $it" },
     subscriptions = "اشتراک‌ها",
     servers = "سرورها",

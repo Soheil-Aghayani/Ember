@@ -31,6 +31,8 @@ impl StateConfig {
 struct RawUpConfig {
     adapter_name: String,
     tun_address: String,
+    #[serde(default)]
+    tun_address6: Option<String>,
     mapdns_address: String,
     hev_config_path: PathBuf,
     edge_ips: Vec<String>,
@@ -43,6 +45,8 @@ struct RawUpConfig {
 pub struct UpConfig {
     pub adapter_name: String,
     pub tun_address: Ipv4Addr,
+    /// Set when the tunnel should also carry IPv6.
+    pub tun_address6: Option<std::net::Ipv6Addr>,
     pub mapdns_address: Ipv4Addr,
     pub hev_config_path: PathBuf,
     pub edge_ips: Vec<Ipv4Addr>,
@@ -118,6 +122,7 @@ impl UpConfig {
         Ok(Self {
             adapter_name: raw.adapter_name,
             tun_address,
+            tun_address6: raw.tun_address6.as_deref().and_then(|s| s.parse().ok()),
             mapdns_address,
             hev_config_path,
             edge_ips,
