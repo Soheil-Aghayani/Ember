@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.78",
+        listOf(
+            "The installer now sets up Ember's network helpers for you (a checkbox, on by default), so connecting, app rules and OpenVPN never show a Windows permission prompt.",
+        ),
+        listOf(
+            "نصب‌کننده حالا ابزارهای شبکهٔ Ember را برایتان آماده می‌کند (یک گزینه، به‌صورت پیش‌فرض روشن)، پس اتصال، قوانین برنامه‌ها و OpenVPN دیگر پیام اجازهٔ Windows نشان نمی‌دهند.",
+        ),
+    ),
+    Release(
         "1.0.77",
         listOf(
             "App rules and OpenVPN no longer open a black console window when they start.",

@@ -41,6 +41,7 @@ VersionInfoVersion={#Version}
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"
+Name: "noprompts"; Description: "Connect without Windows permission prompts (sets up Ember's network helpers once, now)"; GroupDescription: "Permissions:"
 
 [InstallDelete]
 ; Start from clean app folders so no file of an older version can linger or go missing.
@@ -50,15 +51,20 @@ Type: filesandordirs; Name: "{app}\runtime"
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "ember.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "register-tasks.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Ember"; Filename: "{app}\Ember.exe"; IconFilename: "{app}\ember.ico"
 Name: "{autodesktop}\Ember"; Filename: "{app}\Ember.exe"; IconFilename: "{app}\ember.ico"; Tasks: desktopicon
 
 [Run]
+; Register the scheduled tasks that start Ember's network programs with administrator rights, so connecting never shows a prompt.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{tmp}\register-tasks.ps1"" -AppDir ""{app}"" -DataDir ""{userappdata}\Ember"""; Flags: runhidden waituntilterminated; Tasks: noprompts
 Filename: "{app}\Ember.exe"; Description: "Start Ember"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
+; Remove the scheduled tasks Ember registered.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Get-ScheduledTask -TaskPath '\Ember\' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveEmberTasks"
 ; Remove any route or firewall rule Ember left behind (harmless when there is nothing to remove).
 Filename: "{app}\app\resources\ember-helper.exe"; Parameters: "restore --config ""{userappdata}\Ember\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberNative"; Check: NativeHelperExists
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\app\resources\ember-tunnel.ps1"" -Mode Restore -ConfigPath ""{userappdata}\Ember\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberScript"; Check: ScriptHelperOnly
