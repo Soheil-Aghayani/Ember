@@ -8,7 +8,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -301,7 +303,7 @@ private fun HomePage(
         ConnectionState.CONNECTED -> MaterialTheme.colorScheme.tertiary
         ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondary
         ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
-    }, tween(220))
+    }, tween(500))
     val connectedScale = remember { Animatable(1f) }
     LaunchedEffect(state) {
         if (state == ConnectionState.CONNECTED) {
@@ -328,10 +330,17 @@ private fun HomePage(
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
-        Box(
-            Modifier.size(180.dp).scale(connectedScale.value).clip(CircleShape)
-                .background(ring.copy(alpha = connectingRingAlpha(state)))
-                .pointerHoverIcon(PointerIcon.Hand).clickable(role = Role.Button) {
+        ConnectOrb(
+            state = state,
+            ring = ring,
+            ringAlpha = connectingRingAlpha(state),
+            popScale = connectedScale.value,
+            label = when (state) {
+                ConnectionState.DISCONNECTED -> strings.connect
+                ConnectionState.CONNECTING -> strings.cancel
+                ConnectionState.CONNECTED -> strings.disconnect
+            },
+            onClick = {
                 when {
                     state != ConnectionState.DISCONNECTED -> engine.disconnect()
                     engine.selectedNode() == null -> onOpenServers()
@@ -339,29 +348,29 @@ private fun HomePage(
                     else -> engine.connectSelected()
                 }
             },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(140.dp).clip(CircleShape).background(ring.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
-                Text(
-                    when (state) {
-                        ConnectionState.DISCONNECTED -> strings.connect
-                        ConnectionState.CONNECTING -> strings.cancel
-                        ConnectionState.CONNECTED -> strings.disconnect
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ring,
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            when (state) {
-                ConnectionState.CONNECTED -> strings.connected
-                ConnectionState.CONNECTING -> strings.connecting
-                ConnectionState.DISCONNECTED -> strings.disconnected
-            },
-            style = MaterialTheme.typography.headlineMedium,
         )
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // the check mark pops in when the connection comes up
+            AnimatedVisibility(
+                visible = state == ConnectionState.CONNECTED,
+                enter = scaleIn(tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(240)),
+                exit = fadeOut(tween(120)),
+            ) {
+                Row {
+                    EmberIcon("check", 28.dp, MaterialTheme.colorScheme.tertiary)
+                    Spacer(Modifier.width(8.dp))
+                }
+            }
+            Text(
+                when (state) {
+                    ConnectionState.CONNECTED -> strings.connected
+                    ConnectionState.CONNECTING -> strings.connecting
+                    ConnectionState.DISCONNECTED -> strings.disconnected
+                },
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        }
         val secondary = when (state) {
             ConnectionState.CONNECTED -> formatDuration(elapsed)
             ConnectionState.CONNECTING -> progress
@@ -376,7 +385,7 @@ private fun HomePage(
                 textAlign = TextAlign.Center,
             )
         }
-        traffic?.let { TrafficCaption(it) }
+        traffic?.let { SpeedReadout(it) }
         if (state == ConnectionState.CONNECTED) SpeedTestControl(engine)
         Spacer(Modifier.height(32.dp))
 
@@ -404,8 +413,18 @@ private fun HomePage(
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (shownCode.length == 2) FlagIcon(shownCode, 24.dp)
-                    else EmberIcon(if (autoMode) "bolt" else "subscriptions", 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    // the flag slides out and the next one slides in when the server changes
+                    AnimatedContent(
+                        targetState = shownCode.takeIf { it.length == 2 } ?: (if (autoMode) "bolt" else "subscriptions"),
+                        transitionSpec = {
+                            (slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(200))) togetherWith
+                                (slideOutHorizontally(tween(200)) { it } + fadeOut(tween(120)))
+                        },
+                        label = "flag",
+                    ) { shown ->
+                        if (shown.length == 2) FlagIcon(shown, 24.dp)
+                        else EmberIcon(shown, 24.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Spacer(Modifier.width(12.dp))
                     Text(
                         when {
@@ -547,21 +566,6 @@ private fun formatDuration(seconds: Long): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
-}
-
-@Composable
-private fun TrafficCaption(traffic: TrafficStats) {
-    val reading by traffic.readings.collectAsState()
-    if (reading.available) {
-        Spacer(Modifier.height(8.dp))
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            Text(
-                "↓ ${formatBytesPerSecond(reading.downloadSpeed)}   ↑ ${formatBytesPerSecond(reading.uploadSpeed)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
 }
 
 private enum class LogFilter { All, Info, Problems }

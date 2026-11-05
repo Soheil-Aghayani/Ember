@@ -21,6 +21,19 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.79",
+        listOf(
+            "Home screen motion: the Connect button runs a small arc while connecting, breathes slowly once connected, and sends out one ripple when the connection comes up.",
+            "A check mark pops in beside \"Connected\"; the colours glide between states; the flag slides when you change server.",
+            "Speed numbers glide between readings, with a line of the last minute of download speed below them.",
+        ),
+        listOf(
+            "حرکت‌های صفحهٔ خانه: دکمهٔ اتصال هنگام اتصال یک کمان کوچک می‌چرخاند، پس از اتصال آرام نفس می‌کشد و لحظهٔ برقراری اتصال یک موج از خودش می‌فرستد.",
+            "کنار «متصل» یک تیک ظاهر می‌شود؛ رنگ‌ها نرم عوض می‌شوند؛ با تغییر سرور، پرچم می‌لغزد.",
+            "عددهای سرعت نرم تغییر می‌کنند و زیر آن‌ها خطی از یک دقیقهٔ اخیر سرعت دانلود دیده می‌شود.",
+        ),
+    ),
+    Release(
         "1.0.78",
         listOf(
             "The installer now sets up Ember's network helpers for you (a checkbox, on by default), so connecting, app rules and OpenVPN never show a Windows permission prompt.",
