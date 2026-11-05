@@ -83,13 +83,21 @@ fun main(args: Array<String>) = application {
             Item(if (state == ConnectionState.DISCONNECTED) strings.connect else strings.disconnect, onClick = {
                 if (state == ConnectionState.DISCONNECTED) engine.connectSelected() else engine.disconnect()
             })
-            val servers = sortNodes(subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }, results, favorites).take(10)
+            val servers = sortNodes(subscriptions.flatMap { it.nodes }.filterNot { it.isInfo }, results, favorites).take(12)
             if (servers.isNotEmpty()) {
                 Separator()
-                CheckboxItem(strings.fastestServer, checked = selectedId == AUTO_NODE, onCheckedChange = { engine.chooseServer(AUTO_NODE) })
-                for (server in servers) {
-                    val speed = results[server.id]?.mbps?.let { String.format(java.util.Locale.US, "  (%.0f Mbps)", it) }.orEmpty()
-                    CheckboxItem(server.title + speed, checked = selectedId == server.id, onCheckedChange = { engine.chooseServer(server.id) })
+                val current = when (selectedId) {
+                    AUTO_NODE -> strings.fastestServer
+                    else -> engine.subscriptions.nodeById(selectedId)?.plainTitle ?: strings.chooseServer
+                }
+                // One submenu instead of a long flat list; titles carry no emoji because the Windows menu cannot draw them.
+                Menu(strings.servers + ": " + current) {
+                    CheckboxItem(strings.fastestServer, checked = selectedId == AUTO_NODE, onCheckedChange = { engine.chooseServer(AUTO_NODE) })
+                    Separator()
+                    for (server in servers) {
+                        val speed = results[server.id]?.mbps?.let { String.format(java.util.Locale.US, "  (%.0f Mbps)", it) }.orEmpty()
+                        CheckboxItem(server.plainTitle + speed, checked = selectedId == server.id, onCheckedChange = { engine.chooseServer(server.id) })
+                    }
                 }
             }
             Separator()

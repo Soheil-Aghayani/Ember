@@ -63,6 +63,15 @@ class ShareLinksTest {
     }
 
     @Test
+    fun recognisesUsageMessagesAndStripsEmojiForPlainTitles() {
+        val info = ShareLinks.parse("vless://$uuid@real.example.com:8080?type=tcp#%F0%9F%93%8A96.37%20GB%20%E2%8F%B3%E2%88%9E%20%D8%B1%D9%88%D8%B2%20%D8%A7%D8%B9%D8%AA%D8%A8%D8%A7%D8%B1")!!
+        assertTrue(info.isInfo)
+        assertEquals(false, ShareLinks.parse("vless://$uuid@real.example.com:8080?type=tcp#Finland%202")!!.isInfo)
+        val flagged = ShareLinks.parse("vless://$uuid@h.example.com:443?type=tcp#%D8%A7%D8%B6%D8%B7%D8%B1%D8%A7%D8%B1%DB%8C%202.5x%20%F0%9F%87%AB%F0%9F%87%AE")!!
+        assertEquals("اضطراری 2.5x", flagged.plainTitle)
+    }
+
+    @Test
     fun readsPlainAndBase64Subscriptions() {
         val links = listOf(
             "vless://$uuid@a.example.com:443?type=tcp#A",

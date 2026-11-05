@@ -18,7 +18,12 @@ data class ProxyNode(
     val raw: String,
 ) {
     /** Placeholder rows panels add to show traffic left or expiry ("99 GB left"); they cannot be connected to. */
-    val isInfo: Boolean get() = host.lowercase() in INFO_HOSTS || port <= 1
+    val isInfo: Boolean get() = host.lowercase() in INFO_HOSTS || port <= 1 || looksLikeInformation(name)
+
+    /** [title] without emoji and symbols, for places that cannot draw them (the Windows tray menu shows boxes). */
+    val plainTitle: String
+        get() = buildString { title.codePoints().forEach { if (!isEmojiLike(it)) appendCodePoint(it) } }
+            .replace(Regex("\\s+"), " ").trim().ifBlank { title }
 
     /**
      * Country code from the flag emoji at the start of the name, which panels put there ("🇹🇷 Turkey 1"). Some names
@@ -45,6 +50,17 @@ data class ProxyNode(
         return codes to String(points, i, points.size - i).trim()
     }
 }
+
+private fun isEmojiLike(cp: Int): Boolean =
+    cp in 0x1F000..0x1FAFF || cp in 0x2300..0x23FF || cp in 0x2600..0x27BF || cp in 0x2B00..0x2BFF ||
+        cp == 0xFE0F || cp == 0x200D
+
+private val DATA_AMOUNT = Regex("(?i)\\d+(\\.\\d+)?\\s*(GB|MB|TB)")
+private val INFO_WORDS = listOf("⏳", "⌛", "📊", "روز", "اعتبار", "حجم", "باقی", "expire", "remaining", "days", "left", "traffic")
+
+/** Panels put usage messages in the list as if they were servers ("96 GB ⏳∞ days left"). */
+private fun looksLikeInformation(name: String): Boolean =
+    DATA_AMOUNT.containsMatchIn(name) && INFO_WORDS.any { name.contains(it, ignoreCase = true) }
 
 private const val REGIONAL_A = 0x1F1E6
 private const val REGIONAL_Z = 0x1F1FF
