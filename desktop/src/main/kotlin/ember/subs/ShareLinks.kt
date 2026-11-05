@@ -20,18 +20,30 @@ data class ProxyNode(
     /** Placeholder rows panels add to show traffic left or expiry ("99 GB left"); they cannot be connected to. */
     val isInfo: Boolean get() = host.lowercase() in INFO_HOSTS || port <= 1
 
-    /** Two-letter country code from a flag emoji at the start of the name, which panels put there ("🇹🇷 Turkey 1"). */
-    val flagCode: String?
-        get() {
-            val points = name.codePoints().limit(2).toArray()
-            if (points.size < 2 || points.any { it !in REGIONAL_A..REGIONAL_Z }) return null
-            return points.map { ('a' + (it - REGIONAL_A)) }.joinToString("")
-        }
+    /**
+     * Country code from the flag emoji at the start of the name, which panels put there ("🇹🇷 Turkey 1"). Some names
+     * start with two flags (the entry country, then the exit country): the last one is the country you come out in.
+     */
+    val flagCode: String? get() = leadingFlags().first.lastOrNull()
 
-    /** The name without the leading flag emoji (the app draws the flag itself). */
-    val title: String
-        get() = if (flagCode == null) name else name.codePoints().skip(2).toArray()
-            .let { String(it, 0, it.size) }.trim().ifBlank { name }
+    /** The name without the leading flag emojis (the app draws the flag itself). */
+    val title: String get() = leadingFlags().second.ifBlank { name }
+
+    private fun leadingFlags(): Pair<List<String>, String> {
+        val points = name.codePoints().toArray()
+        val codes = mutableListOf<String>()
+        var i = 0
+        while (i < points.size) {
+            while (i < points.size && Character.isWhitespace(points[i])) i++
+            if (i + 1 < points.size && points[i] in REGIONAL_A..REGIONAL_Z && points[i + 1] in REGIONAL_A..REGIONAL_Z) {
+                codes += "" + ('a' + (points[i] - REGIONAL_A)) + ('a' + (points[i + 1] - REGIONAL_A))
+                i += 2
+            } else {
+                break
+            }
+        }
+        return codes to String(points, i, points.size - i).trim()
+    }
 }
 
 private const val REGIONAL_A = 0x1F1E6

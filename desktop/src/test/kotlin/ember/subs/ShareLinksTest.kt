@@ -56,6 +56,13 @@ class ShareLinksTest {
     }
 
     @Test
+    fun usesTheLastLeadingFlagWhenThereAreTwo() {
+        val node = ShareLinks.parse("vless://$uuid@h.example.com:443?type=tcp#%F0%9F%87%AE%F0%9F%87%B7%20%F0%9F%87%AB%F0%9F%87%AE%202.5x")!!
+        assertEquals("fi", node.flagCode)
+        assertEquals("2.5x", node.title)
+    }
+
+    @Test
     fun readsPlainAndBase64Subscriptions() {
         val links = listOf(
             "vless://$uuid@a.example.com:443?type=tcp#A",
