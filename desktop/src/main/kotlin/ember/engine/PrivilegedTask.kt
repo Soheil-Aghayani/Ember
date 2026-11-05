@@ -103,7 +103,8 @@ class PrivilegedTask(dataDir: File) {
         error("Removing the one-time setup did not finish.")
     }
 
-    private fun elevatedPowerShell(commandText: String) {
+    /** Runs [commandText] in an elevated PowerShell (one Windows prompt). */
+    internal fun elevatedPowerShell(commandText: String) {
         val inner = Base64.getEncoder().encodeToString(commandText.toByteArray(Charsets.UTF_16LE))
         val outer = "Start-Process -FilePath powershell.exe -Verb RunAs -WindowStyle Hidden " +
             "-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','$inner'"

@@ -10,7 +10,9 @@ import ember.subs.ProxyNode
 import ember.subs.SubscriptionStore
 import ember.subs.XrayConfig
 import ember.subs.XrayRunner
+import ember.subs.OpenVpnProfile
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,6 +41,9 @@ const val SOCKS_PORT = 10808
 const val HTTP_PORT = 10809
 const val LOCAL_BIND = "127.0.0.1"
 
+/** A question for the user while an OpenVPN server connects: [askUser] true asks for a user name too, otherwise just a password. */
+class CredentialRequest(val serverName: String, val subject: String, val askUser: Boolean, val answer: CompletableDeferred<OpenVpnCredentials?>)
+
 /** Owns the subscription servers, the Xray connection and the whole-device tunnel for the desktop app. */
 class EmberEngine(private val dataDir: File) {
 
@@ -48,6 +53,7 @@ class EmberEngine(private val dataDir: File) {
     val tunnel = WindowsTunnel(dataDir)
     val subscriptions = SubscriptionStore(File(dataDir, "subscriptions.json"))
     private val xray = XrayRunner(dataDir)
+    private val openVpn = OpenVpnRunner(dataDir, tunnel.privileged)
     private val nodeTester = NodeTester(xray)
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -76,12 +82,26 @@ class EmberEngine(private val dataDir: File) {
         _selectedId.value = id
         if (_state.value == ConnectionState.DISCONNECTED) return
         val node = selectedNode() ?: return
-        connectJob?.cancel()
+        val job = connectJob
         scope.launch {
+            if (_usingOpenVpn.value) job?.cancelAndJoin() else job?.cancel()
             teardown()
             connect(node)
         }
     }
+
+    private val _credentialRequest = MutableStateFlow<CredentialRequest?>(null)
+
+    /** Set while an OpenVPN server waits for a user name and password (or a key password); answer it to go on. */
+    val credentialRequest: StateFlow<CredentialRequest?> = _credentialRequest
+
+    /** Credentials typed during this run, kept in memory only (never written to disk). */
+    private val rememberedCredentials = mutableMapOf<String, OpenVpnCredentials>()
+
+    private val _usingOpenVpn = MutableStateFlow(false)
+
+    /** True while the connection that is up (or coming up) is an OpenVPN one: OpenVPN routes the traffic itself. */
+    val usingOpenVpn: StateFlow<Boolean> = _usingOpenVpn
 
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError
@@ -221,6 +241,10 @@ class EmberEngine(private val dataDir: File) {
     /** Connects through one server: Xray runs it as a local SOCKS5 proxy, and the whole-device tunnel (when on) sends everything into it. */
     fun connect(node: ProxyNode) {
         if (_state.value != ConnectionState.DISCONNECTED) return
+        if (node.protocol == "openvpn") {
+            connectOpenVpn(node)
+            return
+        }
         val wholeDevice = settings.wholeDevice
         if (wholeDevice && !tunnel.isAvailable) {
             _lastError.value = "Whole-device mode is not available in this build. Turn it off in Settings to use proxy mode."
@@ -294,9 +318,83 @@ class EmberEngine(private val dataDir: File) {
         }
     }
 
-    /** Measures delay and download speed of the servers in [nodes]. Only while disconnected, or the test would use the tunnel. */
-    fun testNodes(nodes: List<ProxyNode>) {
-        if (_state.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
+    /**
+     * Connects through an installed OpenVPN. OpenVPN adds its own adapter and routes (as the profile says), so Xray, the
+     * Wintun tunnel and the kill switch are not involved; a one-time Windows prompt registers the task that starts it.
+     */
+    private fun connectOpenVpn(node: ProxyNode) {
+        val exe = openVpn.executable()
+        val profile = OpenVpnProfile.decode(node.raw)?.second
+        if (exe == null) {
+            _lastError.value = "OpenVPN is not installed. Get it at openvpn.net/community-downloads."
+            return
+        }
+        if (profile == null) {
+            _lastError.value = "This OpenVPN server could not be read. Add its file again."
+            return
+        }
+        _state.value = ConnectionState.CONNECTING
+        _wholeDevice.value = false
+        _usingOpenVpn.value = true
+        _lastError.value = null
+        _connectedNode.value = node
+        _progress.value = "Connecting to " + node.title + "..."
+        connectJob = scope.launch {
+            val startedAtNanos = System.nanoTime()
+            try {
+                testJob?.let {
+                    it.cancel()
+                    xray.stop()
+                    it.join()
+                }
+                if (!openVpn.taskReady(exe)) {
+                    _progress.value = "Waiting for Windows permission (one time)…"
+                    openVpn.installTask(exe)
+                    _progress.value = "Connecting to " + node.title + "..."
+                }
+                openVpn.session(
+                    profile,
+                    askCredentials = { subject, askUser -> askForCredentials(node, subject, askUser) },
+                    onProgress = { _progress.value = it },
+                    onConnected = {
+                        _connectedAtMs.value = System.currentTimeMillis()
+                        _progress.value = null
+                        _state.value = ConnectionState.CONNECTED
+                        AppLogger.i(TAG, "connected via OpenVPN after ${elapsedMsSince(startedAtNanos)} ms")
+                        checkExit()
+                    },
+                )
+                if (_state.value == ConnectionState.CONNECTED) _lastError.value = "OpenVPN stopped."
+                teardown()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Throwable) {
+                AppLogger.e(TAG, "OpenVPN connecting failed after ${elapsedMsSince(startedAtNanos)} ms", failure)
+                if (failure is OpenVpnAuthFailed) rememberedCredentials.keys.removeAll { it.startsWith(node.id) }
+                _lastError.value = failure.message ?: failure.javaClass.simpleName
+                teardown()
+            }
+        }
+    }
+
+    private suspend fun askForCredentials(node: ProxyNode, subject: String, askUser: Boolean): OpenVpnCredentials? {
+        val key = node.id + ":" + subject
+        rememberedCredentials[key]?.let { return it }
+        val request = CredentialRequest(node.title, subject, askUser, CompletableDeferred())
+        _credentialRequest.value = request
+        val answer = try {
+            request.answer.await()
+        } finally {
+            _credentialRequest.value = null
+        }
+        return answer?.also { rememberedCredentials[key] = it }
+    }
+
+    /** Measures delay and download speed of the servers in [all]. Only while disconnected, or the test would use the tunnel. */
+    fun testNodes(all: List<ProxyNode>) {
+        // OpenVPN servers cannot be measured through Xray.
+        val nodes = all.filter { it.protocol != "openvpn" }
+        if (nodes.isEmpty() || _state.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
         if (!xray.isAvailable) {
             _lastError.value = "The Xray program is missing from this installation."
             return
@@ -328,8 +426,17 @@ class EmberEngine(private val dataDir: File) {
 
     fun disconnect() {
         settings.wasConnected = false
-        connectJob?.cancel()
-        scope.launch { teardown() }
+        val job = connectJob
+        // OpenVPN needs a moment to close; the next connection must not start before it has.
+        if (_usingOpenVpn.value) {
+            scope.launch {
+                job?.cancelAndJoin()
+                teardown()
+            }
+        } else {
+            job?.cancel()
+            scope.launch { teardown() }
+        }
     }
 
     /** Lifts the kill switch after a crash or a dead tunnel. Shows a Windows administrator prompt. */
@@ -346,8 +453,10 @@ class EmberEngine(private val dataDir: File) {
 
     fun shutdown() {
         settings.wasConnected = false
-        connectJob?.cancel()
-        runBlocking { teardown() }
+        runBlocking {
+            connectJob?.cancelAndJoin()
+            teardown()
+        }
     }
 
     /** Turns the user's "skip the VPN" list into IPv4 addresses and ranges (domains are looked up now, on the real network). */
@@ -376,6 +485,8 @@ class EmberEngine(private val dataDir: File) {
     /** Measures download speed and delay through the running tunnel. */
     suspend fun runSpeedTest(): Result<SpeedResult> {
         if (_state.value != ConnectionState.CONNECTED) return Result.failure(IllegalStateException("Connect first, then test the speed."))
+        // OpenVPN routes the computer itself: a plain request is what a program gets.
+        if (_usingOpenVpn.value) return SpeedTest.run(null)
         val viaXray = SpeedTest.run(SOCKS_PORT)
         if (!_wholeDevice.value) return viaXray
         // In whole-device mode the number that matters is what a program on the computer gets (through the tunnel);
@@ -394,7 +505,7 @@ class EmberEngine(private val dataDir: File) {
         _exit.value = ExitStatus(checking = true)
         scope.launch {
             delay(1_500)
-            val result = ExitCheck().fetchProxiedIpInfo(SOCKS_PORT)
+            val result = if (_usingOpenVpn.value) ExitCheck().fetchDirectIpInfo() else ExitCheck().fetchProxiedIpInfo(SOCKS_PORT)
             _exit.value = ExitStatus(
                 info = result.getOrNull(),
                 error = result.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName },
@@ -560,6 +671,7 @@ class EmberEngine(private val dataDir: File) {
         _progress.value = null
         _exit.value = ExitStatus()
         _wholeDevice.value = false
+        _usingOpenVpn.value = false
         _state.value = ConnectionState.DISCONNECTED
     }
 }

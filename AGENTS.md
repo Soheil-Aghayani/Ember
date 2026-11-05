@@ -1,6 +1,6 @@
 # Ember: instructions for coding agents
 
-Ember is a free, open-source VPN client (MIT) for Windows. The user adds subscription links (VLESS, VMess, Trojan, Shadowsocks, Hysteria2 or Xray JSON) or server files (Xray JSON, WireGuard `.conf`; OpenVPN is recognised but not supported); Ember reads the servers, measures them, and connects through the chosen one with Xray-core, optionally for the whole computer (Wintun tunnel and kill switch). It began as a fork of FoxyVPN, a Firefox-account client; the Android app in this repository still is that older client. Read this file before changing anything.
+Ember is a free, open-source VPN client (MIT) for Windows. The user adds subscription links (VLESS, VMess, Trojan, Shadowsocks, Hysteria2 or Xray JSON) or server files (Xray JSON, WireGuard `.conf`, OpenVPN `.ovpn` run through the OpenVPN the user installed, without Ember's kill switch); Ember reads the servers, measures them, and connects through the chosen one with Xray-core, optionally for the whole computer (Wintun tunnel and kill switch). It began as a fork of FoxyVPN, a Firefox-account client; the Android app in this repository still is that older client. Read this file before changing anything.
 
 ## Product targets
 

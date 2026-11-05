@@ -88,7 +88,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                         problems += strings.fileTooLarge(file.name)
                         continue
                     }
-                    runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { file.readText() }, file.nameWithoutExtension) }
+                    runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
                         .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
                 }
                 if (problems.isNotEmpty()) message = problems.joinToString("\n")
@@ -140,6 +140,18 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             },
         )
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** The text of a server file. An OpenVPN profile gets the certificate and key files next to it moved inside. */
+private fun readServerFile(file: java.io.File): String {
+    val text = file.readText()
+    if (!ember.subs.ConfigFiles.isOpenVpn(text)) return text
+    val folder = file.parentFile?.canonicalFile ?: return text
+    return ember.subs.OpenVpnProfile.prepare(text) { name ->
+        // Only files in the profile's own folder (or below it) are read.
+        val target = java.io.File(folder, name).canonicalFile
+        target.takeIf { it.isFile && it.length() < 100_000 && it.path.startsWith(folder.path + java.io.File.separator) }?.readText()
     }
 }
 

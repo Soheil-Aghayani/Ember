@@ -166,10 +166,69 @@ class ShareLinksTest {
 
     @Test
     fun explainsFilesItCannotUse() {
-        val openVpn = "client\ndev tun\nproto udp\nremote vpn.example.com 1194\n"
-        assertTrue(assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(openVpn) }.message!!.startsWith("OpenVPN"))
         val noPeer = "[Interface]\nPrivateKey = x\nAddress = 10.0.0.2/32\n"
         assertEquals("The WireGuard file has no [Peer] section.", assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(noPeer) }.message)
+    }
+
+    private val ovpn = """
+        client
+        dev tun
+        proto udp
+        remote vpn.example.com 443 udp
+        auth-user-pass creds.txt
+        ca ca.crt
+        tls-auth ta.key 1
+        script-security 2
+        up /bin/evil.cmd
+        plugin evil.dll
+        <cert>
+        up not-a-directive-inside-a-block
+        </cert>
+    """.trimIndent()
+
+    @Test
+    fun readsAnOpenVpnProfileAndRemovesWhatRunsPrograms() {
+        val files = mapOf("ca.crt" to "CA-PEM", "ta.key" to "TA-KEY")
+        val profile = OpenVpnProfile.prepare(ovpn) { files[it] }
+        assertTrue("<ca>\nCA-PEM\n</ca>" in profile)
+        assertTrue("<tls-auth>\nTA-KEY\n</tls-auth>" in profile)
+        assertTrue("key-direction 1" in profile)
+        // credentials are asked for, never read from a file next to the profile
+        assertTrue("auth-user-pass\n" in profile && "creds.txt" !in profile)
+        assertTrue(OpenVpnProfile.needsCredentials(profile))
+        for (removed in listOf("script-security 2", "/bin/evil.cmd", "evil.dll")) assertTrue(removed !in profile, removed)
+        // text inside a certificate block is left alone
+        assertTrue("up not-a-directive-inside-a-block" in profile)
+    }
+
+    @Test
+    fun anOpenVpnServerKeepsItsNameAndIdWhenStoredAndReadBack() {
+        val node = OpenVpnProfile.node(OpenVpnProfile.prepare(ovpn) { "X" }, "Work")
+        assertEquals("openvpn", node.protocol)
+        assertEquals("vpn.example.com", node.host)
+        assertEquals(443, node.port)
+        assertEquals("Work", node.name)
+        val back = ShareLinks.parse(node.raw)!!
+        assertEquals(node.id, back.id)
+        assertEquals("Work", back.name)
+        assertEquals(true, OpenVpnProfile.decode(node.raw)!!.second.contains("remote vpn.example.com 443 udp"))
+    }
+
+    @Test
+    fun anOpenVpnProfileNeedsItsFilesAndCannotUseP12() {
+        assertTrue(assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(ovpn) }.message!!.contains("ca.crt"))
+        assertTrue(assertFailsWith<IllegalStateException> { OpenVpnProfile.prepare("pkcs12 x.p12") { null } }.message!!.contains(".p12"))
+        assertTrue(assertFailsWith<IllegalStateException> { OpenVpnProfile.node("client\ndev tun\n", "") }.message!!.contains("remote"))
+    }
+
+    @Test
+    fun aJsonServerKeepsItsNameAfterARestart() {
+        val json = """[{"remarks":"Berlin","outbounds":[{"protocol":"vless","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}]}]"""
+        val node = SubscriptionParser.parseNodes(json).single()
+        val back = ShareLinks.parse(node.raw)!!
+        assertEquals("Berlin", back.name)
+        assertEquals(node.id, back.id)
+        assertEquals(false, ShareLinks.outbound(node.raw, "203.0.113.7", "proxy").has("ember_name"))
     }
 
     @Test

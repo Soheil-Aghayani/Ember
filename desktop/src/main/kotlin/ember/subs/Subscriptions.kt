@@ -41,7 +41,7 @@ object SubscriptionParser {
     fun parseNodes(body: String, nameHint: String = ""): List<ProxyNode> {
         val text = body.trim().removePrefix("﻿")
         if (ConfigFiles.isWireGuard(text)) return listOf(ConfigFiles.wireGuard(text, nameHint))
-        if (ConfigFiles.isOpenVpn(text)) error(ConfigFiles.OPENVPN_UNSUPPORTED)
+        if (ConfigFiles.isOpenVpn(text)) return listOf(OpenVpnProfile.node(text, nameHint))
         if (text.startsWith("{") || text.startsWith("[")) {
             val fromJson = runCatching { ShareLinks.fromXrayJson(text) }.getOrDefault(emptyList()).distinctBy { it.id }
             if (fromJson.isNotEmpty()) return fromJson
@@ -136,8 +136,8 @@ class SubscriptionStore(private val file: File) {
             SubscriptionParser.parseNodes(text, name.trim())
         } catch (failure: IllegalStateException) {
             // Messages for files Ember recognises (WireGuard problems, OpenVPN) are specific; the rest get the general hint.
-            val specific = failure.message?.takeIf { it.startsWith("The WireGuard") || it.startsWith("OpenVPN") }
-            throw IllegalArgumentException(specific ?: "That is neither a subscription link (https://…) nor server links, a WireGuard file or Xray JSON.")
+            val specific = failure.message?.takeIf { it.startsWith("The WireGuard") || it.startsWith("The OpenVPN") }
+            throw IllegalArgumentException(specific ?: "That is neither a subscription link (https://…) nor server links, a WireGuard or OpenVPN file or Xray JSON.")
         }
         val subscription = Subscription(
             id = java.util.UUID.randomUUID().toString().take(8),
@@ -174,7 +174,8 @@ class SubscriptionStore(private val file: File) {
 
     /** The tested server with the best speed (or, failing that, the lowest delay) across all subscriptions. */
     fun bestNode(): ProxyNode? {
-        val candidates = _subscriptions.value.flatMap { it.nodes }.filterNot { it.isInfo }
+        // OpenVPN servers cannot be measured by Xray, so they are never the "fastest" pick.
+        val candidates = _subscriptions.value.flatMap { it.nodes }.filterNot { it.isInfo || it.protocol == "openvpn" }
         val results = _results.value
         return candidates.filter { results[it.id]?.pingMs != null }.maxWithOrNull(
             compareBy<ProxyNode> { results[it.id]?.mbps ?: -1.0 }.thenBy { -(results[it.id]?.pingMs ?: Int.MAX_VALUE) },

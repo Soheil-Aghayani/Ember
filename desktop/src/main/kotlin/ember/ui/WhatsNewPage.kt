@@ -21,6 +21,19 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.74",
+        listOf(
+            "OpenVPN servers: add a .ovpn file and connect with the OpenVPN you installed. Certificates next to the file are picked up, and Ember asks for a user name and password when the profile needs them.",
+            "The first OpenVPN connection asks Windows for permission once. OpenVPN sets up its own routes, so the kill switch does not cover these servers.",
+            "Servers added from JSON now keep their names after a restart.",
+        ),
+        listOf(
+            "سرورهای OpenVPN: فایل ovpn را اضافه کنید و با OpenVPN نصب‌شدهٔ خودتان وصل شوید. گواهی‌های کنار فایل خوانده می‌شوند و اگر پروفایل نام کاربری و رمز بخواهد، Ember می‌پرسد.",
+            "اولین اتصال OpenVPN یک بار از Windows اجازه می‌گیرد. OpenVPN مسیرهای خودش را می‌سازد، پس محافظ قطع اتصال این سرورها را پوشش نمی‌دهد.",
+            "سرورهایی که از JSON اضافه می‌شوند بعد از راه‌اندازی دوباره نامشان را حفظ می‌کنند.",
+        ),
+    ),
+    Release(
         "1.0.73",
         listOf(
             "Settings is a short list of groups (Interface, Connection, More); each row opens its own page.",

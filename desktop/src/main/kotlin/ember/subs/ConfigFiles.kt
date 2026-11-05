@@ -54,7 +54,4 @@ object ConfigFiles {
         val port = endpoint.substringAfterLast(':').toIntOrNull() ?: return null
         return host.takeIf { it.isNotBlank() }?.let { it to port }
     }
-
-    const val OPENVPN_UNSUPPORTED =
-        "OpenVPN profiles (.ovpn) are not supported yet: Ember needs a separate OpenVPN engine for them. WireGuard, Xray JSON and share links work."
 }

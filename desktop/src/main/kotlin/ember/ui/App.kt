@@ -145,6 +145,7 @@ fun EmberApp(
     }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         MainShell(engine, theme, onThemeChange, language, onLanguageChange)
+        CredentialDialog(engine)
     }
 }
 
@@ -261,6 +262,7 @@ private fun HomePage(
     val connectedAt by engine.connectedAtMs.collectAsState()
     val blocked by engine.blockedNotice.collectAsState()
     val whole by engine.wholeDevice.collectAsState()
+    val viaOpenVpn by engine.usingOpenVpn.collectAsState()
     val traffic = remember(state, whole) {
         if (state == ConnectionState.CONNECTED && whole) TrafficStats() else null
     }
@@ -490,7 +492,7 @@ private fun HomePage(
                 }
             }
         }
-        if (connected && !whole) {
+        if (connected && !whole && !viaOpenVpn) {
             Spacer(Modifier.height(12.dp))
             Text(
                 strings.proxyModeCaption("$LOCAL_BIND:$SOCKS_PORT", "$LOCAL_BIND:$HTTP_PORT"),

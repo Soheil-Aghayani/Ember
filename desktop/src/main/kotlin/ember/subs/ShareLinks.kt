@@ -78,7 +78,8 @@ object ShareLinks {
                 raw.startsWith("ss://") -> shadowsocks(raw)
                 raw.startsWith("hysteria2://") -> hysteria2(raw, "hysteria2")
                 raw.startsWith("hy2://") -> hysteria2(raw, "hy2")
-                raw.startsWith(JSON_PREFIX) -> fromXrayOutbound(JSONObject(raw.removePrefix(JSON_PREFIX)), "")
+                raw.startsWith(JSON_PREFIX) -> JSONObject(raw.removePrefix(JSON_PREFIX)).let { fromXrayOutbound(it, it.optString(NAME_KEY), raw) }
+                raw.startsWith(OpenVpnProfile.PREFIX) -> OpenVpnProfile.fromRaw(raw)
                 else -> null
             }
         } catch (_: Exception) {
@@ -147,6 +148,7 @@ object ShareLinks {
         }
         raw.startsWith(JSON_PREFIX) -> {
             val outbound = JSONObject(raw.removePrefix(JSON_PREFIX))
+            outbound.remove(NAME_KEY)
             outbound.put("tag", tag)
             val settings = outbound.optJSONObject("settings") ?: JSONObject().also { outbound.put("settings", it) }
             settings.optJSONArray("vnext")?.optJSONObject(0)?.put("address", address)
@@ -166,25 +168,33 @@ object ShareLinks {
     /** Prefix of a server that came from an Xray JSON subscription: the rest is its outbound as JSON. */
     const val JSON_PREFIX = "xrayjson:"
 
+    /** The server's name, kept inside the stored outbound so it survives a restart (Xray ignores unknown keys). */
+    private const val NAME_KEY = "ember_name"
+
     private val JSON_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria", "wireguard")
 
     /** A server from one entry of an Xray JSON subscription (the first outbound that is a real proxy). */
-    fun fromXrayOutbound(outbound: JSONObject, name: String): ProxyNode? {
+    fun fromXrayOutbound(outbound: JSONObject, name: String, original: String? = null): ProxyNode? {
         val protocol = outbound.optString("protocol")
         if (protocol !in JSON_PROTOCOLS) return null
         val settings = outbound.optJSONObject("settings") ?: return null
         if (protocol == "wireguard") {
             val endpoint = settings.optJSONArray("peers")?.optJSONObject(0)?.optString("endpoint").orEmpty()
             val (host, port) = ConfigFiles.hostAndPort(endpoint) ?: return null
-            return node(JSON_PREFIX + outbound.toString(), protocol, name, host, port)
+            return node(original ?: storedOutbound(outbound, name), protocol, name, host, port)
         }
         val target = settings.optJSONArray("vnext")?.optJSONObject(0)
             ?: settings.optJSONArray("servers")?.optJSONObject(0)
             ?: settings
         val host = target.optString("address").takeIf { it.isNotBlank() } ?: return null
         val port = target.optInt("port", 0)
-        val raw = JSON_PREFIX + outbound.toString()
+        val raw = original ?: storedOutbound(outbound, name)
         return node(raw, if (protocol == "shadowsocks") "ss" else protocol, name, host, port)
+    }
+
+    private fun storedOutbound(outbound: JSONObject, name: String): String {
+        if (name.isNotBlank()) outbound.put(NAME_KEY, name)
+        return JSON_PREFIX + outbound.toString()
     }
 
     /** Servers from an Xray JSON subscription: an array of configs, or one config, each with `remarks` and `outbounds`. */
@@ -234,7 +244,7 @@ object ShareLinks {
     private fun id(raw: String): String =
         MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).joinToString("") { "%02x".format(it) }.take(12)
 
-    private fun node(raw: String, protocol: String, name: String, host: String, port: Int) =
+    internal fun node(raw: String, protocol: String, name: String, host: String, port: Int) =
         ProxyNode(id(raw), name.ifBlank { "$host:$port" }, protocol, host, port, raw)
 
     private fun link(raw: String, scheme: String): ProxyNode {
