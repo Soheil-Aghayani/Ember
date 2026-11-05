@@ -42,7 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Section { Startup, Protection, Skip, Trusted, Advanced }
+private enum class Section { Startup, Protection, Apps, Skip, Trusted, Advanced }
 
 /** Settings as a short list of groups; each row opens its own page (or a menu, for language and theme). */
 @Composable
@@ -65,6 +65,7 @@ internal fun SettingsPage(
                 when (open) {
                     Section.Startup -> strings.startupAndTray
                     Section.Protection -> strings.protection
+                    Section.Apps -> strings.appRules
                     Section.Skip -> strings.skipVpn
                     Section.Trusted -> strings.trustedNetworksTitle
                     Section.Advanced -> strings.advanced
@@ -76,6 +77,7 @@ internal fun SettingsPage(
         when (open) {
             Section.Startup -> StartupSettings(engine)
             Section.Protection -> ProtectionSettings(engine)
+            Section.Apps -> AppRulesSettings(engine)
             Section.Skip -> SkipVpnSettings(engine, engine.settings.wholeDevice && available)
             Section.Trusted -> TrustedNetworksSettings(engine)
             Section.Advanced -> AdvancedSettings(engine)
@@ -113,6 +115,8 @@ internal fun SettingsPage(
                 if (engine.settings.wholeDevice && available) strings.wholeDeviceShort else strings.proxyOnlyShort,
             ) { section = Section.Protection }
             RowDivider()
+            NavRow(strings.appRules, strings.appRulesShort(engine.settings.appRuleMode)) { section = Section.Apps }
+            RowDivider()
             NavRow(strings.skipVpn, strings.entriesCount(engine.settings.excludedAddresses.size)) { section = Section.Skip }
             RowDivider()
             NavRow(strings.trustedNetworksTitle, strings.entriesCount(engine.settings.trustedNetworks.size)) { section = Section.Trusted }
@@ -132,7 +136,7 @@ private fun GroupLabel(text: String) {
 }
 
 @Composable
-private fun RowDivider() = HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+internal fun RowDivider() = HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
 /** A row that opens another page; [value] is what is set now. */
 @Composable

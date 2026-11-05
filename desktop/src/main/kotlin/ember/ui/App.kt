@@ -263,6 +263,7 @@ private fun HomePage(
     val blocked by engine.blockedNotice.collectAsState()
     val whole by engine.wholeDevice.collectAsState()
     val viaOpenVpn by engine.usingOpenVpn.collectAsState()
+    val viaAppRules by engine.appRules.collectAsState()
     val traffic = remember(state, whole) {
         if (state == ConnectionState.CONNECTED && whole) TrafficStats() else null
     }
@@ -492,7 +493,7 @@ private fun HomePage(
                 }
             }
         }
-        if (connected && !whole && !viaOpenVpn) {
+        if (connected && !whole && !viaOpenVpn && !viaAppRules) {
             Spacer(Modifier.height(12.dp))
             Text(
                 strings.proxyModeCaption("$LOCAL_BIND:$SOCKS_PORT", "$LOCAL_BIND:$HTTP_PORT"),

@@ -58,6 +58,16 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("excludedAddresses", "").split(';').map { it.trim() }.filter { it.isNotEmpty() }
         set(value) = put("excludedAddresses", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains(';') }.distinct().joinToString(";"))
 
+    /** What the [appRuleApps] list does (see [AppRuleMode]). */
+    var appRuleMode: String
+        get() = props.getProperty("appRuleMode", AppRuleMode.OFF).takeIf { it == AppRuleMode.SKIP || it == AppRuleMode.ONLY } ?: AppRuleMode.OFF
+        set(value) = put("appRuleMode", value)
+
+    /** Program file names (firefox.exe) the app rules apply to. */
+    var appRuleApps: List<String>
+        get() = props.getProperty("appRuleApps", "").split(';').map { it.trim() }.filter { it.isNotEmpty() }
+        set(value) = put("appRuleApps", value.map { it.trim() }.filter { it.isNotEmpty() && !it.contains(';') && !it.contains('\\') && !it.contains('/') }.distinct().joinToString(";"))
+
     /** Connect by itself when the computer joins a network that is not in [trustedNetworks]. */
     var autoConnectUntrusted: Boolean
         get() = props.getProperty("autoConnectUntrusted", "false").toBoolean()

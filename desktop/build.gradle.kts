@@ -52,6 +52,12 @@ val tunnelAssets = listOf(
         "2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a",
         "Xray-windows-64.zip",
     ),
+    // Decides per program whether traffic uses the VPN (the Apps setting).
+    TunnelAsset(
+        "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-windows-amd64.zip",
+        "99185d75d314a07dbba4a130c8ad986cbeb629a07927975636b341ca61f991df",
+        "sing-box-1.14.4-windows-amd64.zip",
+    ),
 )
 
 val tunnelDir = layout.projectDirectory.dir("appResources/windows-x64/tunnel").asFile

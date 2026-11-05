@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.76",
+        listOf(
+            "New Apps setting (Settings → Connection): turn the VPN off for programs you pick, such as Firefox, or use it only for programs you pick. Experimental.",
+            "Add a program from the list of running ones or browse for its .exe. Needs whole-device mode and one Windows prompt the first time; the kill switch does not cover this mode.",
+        ),
+        listOf(
+            "تنظیم تازهٔ برنامه‌ها (تنظیمات ← اتصال): VPN را برای برنامه‌هایی که انتخاب می‌کنید، مثل Firefox، خاموش کنید یا فقط برای آن‌ها روشن بماند. آزمایشی.",
+            "برنامه را از فهرست برنامه‌های در حال اجرا اضافه کنید یا فایل exe آن را انتخاب کنید. به حالت کل دستگاه و یک بار پیام اجازهٔ Windows نیاز دارد؛ محافظ قطع اتصال این حالت را پوشش نمی‌دهد.",
+        ),
+    ),
+    Release(
         "1.0.75",
         listOf(
             "Servers page: one + button with a menu (add a link, add from the clipboard, add from a file).",

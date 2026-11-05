@@ -54,6 +54,7 @@ class EmberEngine(private val dataDir: File) {
     val subscriptions = SubscriptionStore(File(dataDir, "subscriptions.json"))
     private val xray = XrayRunner(dataDir)
     private val openVpn = OpenVpnRunner(dataDir, tunnel.privileged)
+    private val appRouting = AppRoutingRunner(dataDir, tunnel.privileged)
     private val nodeTester = NodeTester(xray)
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -99,6 +100,11 @@ class EmberEngine(private val dataDir: File) {
     private val rememberedCredentials = mutableMapOf<String, OpenVpnCredentials>()
 
     private val _usingOpenVpn = MutableStateFlow(false)
+
+    private val _appRules = MutableStateFlow(false)
+
+    /** True while the connection that is up (or coming up) decides per program whether to use the VPN (the Apps setting). */
+    val appRules: StateFlow<Boolean> = _appRules
 
     /** True while the connection that is up (or coming up) is an OpenVPN one: OpenVPN routes the traffic itself. */
     val usingOpenVpn: StateFlow<Boolean> = _usingOpenVpn
@@ -246,7 +252,12 @@ class EmberEngine(private val dataDir: File) {
             return
         }
         val wholeDevice = settings.wholeDevice
-        if (wholeDevice && !tunnel.isAvailable) {
+        val appRules = wholeDevice && settings.appRuleMode != AppRuleMode.OFF && settings.appRuleApps.isNotEmpty()
+        if (appRules && !appRouting.isAvailable) {
+            _lastError.value = "App rules are not available in this build. Turn them off in Settings."
+            return
+        }
+        if (wholeDevice && !appRules && !tunnel.isAvailable) {
             _lastError.value = "Whole-device mode is not available in this build. Turn it off in Settings to use proxy mode."
             return
         }
@@ -255,7 +266,8 @@ class EmberEngine(private val dataDir: File) {
             return
         }
         _state.value = ConnectionState.CONNECTING
-        _wholeDevice.value = wholeDevice
+        _wholeDevice.value = wholeDevice && !appRules
+        _appRules.value = appRules
         _lastError.value = null
         _connectedNode.value = node
         _progress.value = "Connecting to " + node.title + "..."
@@ -277,7 +289,7 @@ class EmberEngine(private val dataDir: File) {
                         remembered
                     }
                 val skipped = if (wholeDevice) resolveExclusions() else SkipList(emptyList(), emptyMap())
-                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog, skipped.domains))
+                xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog, if (appRules) emptyMap() else skipped.domains))
                 xray.awaitListening(SOCKS_PORT)
                 // Before anything on the computer is changed: does this server pass traffic at all?
                 _progress.value = "Checking the server..."
@@ -286,7 +298,17 @@ class EmberEngine(private val dataDir: File) {
                 if (serverCheck == null) {
                     error("This server did not answer. Try another server.")
                 }
-                if (wholeDevice) {
+                if (appRules) {
+                    // sing-box decides per program; Xray only carries what it sends in.
+                    val exe = appRouting.exe!!
+                    if (!appRouting.taskReady(exe)) {
+                        _progress.value = "Waiting for Windows permission (one time)…"
+                        appRouting.installTask(exe)
+                    }
+                    _progress.value = "Setting up app rules…"
+                    appRouting.start(AppRoutingConfig.build(settings.appRuleMode, settings.appRuleApps, SOCKS_PORT, skipped.cidrs, skipped.domains.keys.toList(), appRouting.logFile))
+                    startWatchingAppRules()
+                } else if (wholeDevice) {
                     tunnel.start(
                         socksPort = SOCKS_PORT,
                         edgeIps = listOf(address),
@@ -488,7 +510,7 @@ class EmberEngine(private val dataDir: File) {
         // OpenVPN routes the computer itself: a plain request is what a program gets.
         if (_usingOpenVpn.value) return SpeedTest.run(null)
         val viaXray = SpeedTest.run(SOCKS_PORT)
-        if (!_wholeDevice.value) return viaXray
+        if (!_wholeDevice.value && !_appRules.value) return viaXray
         // In whole-device mode the number that matters is what a program on the computer gets (through the tunnel);
         // the Xray-alone number next to it shows whether the server or the tunnel is the limit.
         val viaTunnel = SpeedTest.run(null)
@@ -521,8 +543,9 @@ class EmberEngine(private val dataDir: File) {
         scope.launch {
             delay(2_500)
             val viaXray = probe(proxied = true)
-            val viaTunnel = if (_wholeDevice.value) probe(proxied = false) else null
-            AppLogger.i(TAG, "connection check: through Xray=${viaXray ?: "failed"}, through the tunnel=${if (_wholeDevice.value) (viaTunnel ?: "failed") else "not used"}")
+            val routed = _wholeDevice.value || _appRules.value
+            val viaTunnel = if (routed) probe(proxied = false) else null
+            AppLogger.i(TAG, "connection check: through Xray=${viaXray ?: "failed"}, through the tunnel=${if (routed) (viaTunnel ?: "failed") else "not used"}")
             if (viaXray == null) {
                 val direct = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress(address, port), 4_000) } }
                 AppLogger.w(TAG, "plain connection from Ember to the server: " + (direct.exceptionOrNull()?.let { it.javaClass.simpleName + " " + it.message } ?: "reachable"))
@@ -531,7 +554,7 @@ class EmberEngine(private val dataDir: File) {
             if (_state.value != ConnectionState.CONNECTED) return@launch
             when {
                 viaXray == null -> _lastError.value = "Connected, but this server did not pass any traffic. Try another server."
-                _wholeDevice.value && viaTunnel == null ->
+                (_wholeDevice.value || _appRules.value) && viaTunnel == null ->
                     _lastError.value = "The server works, but your computer's traffic is not getting through the tunnel. See the Logs page."
             }
         }
@@ -565,6 +588,22 @@ class EmberEngine(private val dataDir: File) {
                 if (!xray.isRunning()) {
                     AppLogger.e(TAG, "Xray stopped; closing the connection")
                     _lastError.value = "The connection program stopped unexpectedly."
+                    teardown()
+                    return@launch
+                }
+            }
+        }
+    }
+
+    /** Ends the connection if sing-box stops. */
+    private fun startWatchingAppRules() {
+        watchJob?.cancel()
+        watchJob = scope.launch {
+            while (true) {
+                delay(2_000)
+                if (!appRouting.running()) {
+                    AppLogger.e(TAG, "the app-rules program stopped; closing the connection")
+                    _lastError.value = "The app-rules program stopped unexpectedly."
                     teardown()
                     return@launch
                 }
@@ -659,6 +698,7 @@ class EmberEngine(private val dataDir: File) {
         if (_wholeDevice.value && !helperAlreadyBlocked) {
             runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
         }
+        if (_appRules.value) runCatching { appRouting.stop() }.onFailure { AppLogger.w(TAG, "stopping the app-rules program failed", it) }
         runCatching { xray.stop() }
         xrayWatchJob?.cancel()
         xrayWatchJob = null
@@ -672,6 +712,7 @@ class EmberEngine(private val dataDir: File) {
         _exit.value = ExitStatus()
         _wholeDevice.value = false
         _usingOpenVpn.value = false
+        _appRules.value = false
         _state.value = ConnectionState.DISCONNECTED
     }
 }
