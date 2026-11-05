@@ -3,6 +3,7 @@ package ember.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +62,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val favorites by engine.favorites.collectAsState()
     val clipboard = LocalClipboardManager.current
     var showAdd by remember { mutableStateOf(false) }
+    var addMenu by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Subscription?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -68,34 +72,56 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-        IconAction("clipboard", strings.pasteFromClipboard, onClick = {
-            val text = clipboard.getText()?.text.orEmpty().trim()
-            if (text.isEmpty()) {
-                message = strings.clipboardEmpty
-            } else {
-                message = null
-                scope.launch { runCatching { engine.subscriptions.add(text, "") }.onFailure { message = it.message ?: strings.signInFailed } }
+        Box {
+            IconAction("add", strings.addServers, onClick = { addMenu = true }, filled = true)
+            DropdownMenu(
+                expanded = addMenu, onDismissRequest = { addMenu = false },
+                shape = RoundedCornerShape(EmberDesktopMetrics.countryPopoverRadius),
+                containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, shadowElevation = 6.dp,
+            ) {
+                DropdownMenuItem(
+                    text = { Text(strings.addSubscription) },
+                    leadingIcon = { EmberIcon("add", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { addMenu = false; showAdd = true },
+                )
+                DropdownMenuItem(
+                    text = { Text(strings.pasteFromClipboard) },
+                    leadingIcon = { EmberIcon("clipboard", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = {
+                        addMenu = false
+                        val text = clipboard.getText()?.text.orEmpty().trim()
+                        if (text.isEmpty()) {
+                            message = strings.clipboardEmpty
+                        } else {
+                            message = null
+                            scope.launch { runCatching { engine.subscriptions.add(text, "") }.onFailure { message = it.message ?: strings.signInFailed } }
+                        }
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(strings.importFile) },
+                    leadingIcon = { EmberIcon("import-file", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = {
+                        addMenu = false
+                        scope.launch {
+                            val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
+                            if (chosen.isNotEmpty()) message = null
+                            val problems = mutableListOf<String>()
+                            for (file in chosen) {
+                                // A server file is small; anything bigger is not one.
+                                if (file.length() > 2_000_000) {
+                                    problems += strings.fileTooLarge(file.name)
+                                    continue
+                                }
+                                runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
+                                    .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
+                            }
+                            if (problems.isNotEmpty()) message = problems.joinToString("\n")
+                        }
+                    },
+                )
             }
-        })
-        IconAction("import-file", strings.importFile, onClick = {
-            scope.launch {
-                val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
-                if (chosen.isNotEmpty()) message = null
-                val problems = mutableListOf<String>()
-                for (file in chosen) {
-                    // A server file is small; anything bigger is not one.
-                    if (file.length() > 2_000_000) {
-                        problems += strings.fileTooLarge(file.name)
-                        continue
-                    }
-                    runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
-                        .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
-                }
-                if (problems.isNotEmpty()) message = problems.joinToString("\n")
-            }
-        })
-        Spacer(Modifier.width(4.dp))
-        IconAction("add", strings.addSubscription, onClick = { showAdd = true }, filled = true)
+        }
     }
     Spacer(Modifier.height(8.dp))
     Text(strings.subscriptionsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -182,7 +208,7 @@ private fun SubscriptionCard(
     onEdit: () -> Unit,
 ) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(false) }
     val servers = subscription.nodes.filterNot { it.isInfo }
     val info = subscription.nodes.filter { it.isInfo }
     val sorted = sortNodes(servers, results, favorites)
@@ -221,7 +247,7 @@ private fun SubscriptionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                for (row in info) {
+                if (expanded) for (row in info) {
                     Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (expanded) Spacer(Modifier.height(8.dp))

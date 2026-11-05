@@ -154,6 +154,7 @@ data class Strings(
     val keyPasswordFor: (String) -> String,
     val signIn: String,
     val credentialsNotSaved: String,
+    val addServers: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -308,6 +309,7 @@ val EnglishStrings = Strings(
     keyPasswordFor = { "Password for the key of $it" },
     signIn = "Sign in",
     credentialsNotSaved = "Ember keeps this only until you close it.",
+    addServers = "Add servers",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -462,6 +464,7 @@ val PersianStrings = Strings(
     keyPasswordFor = { "رمز کلید برای $it" },
     signIn = "ورود",
     credentialsNotSaved = "Ember این را فقط تا بستن برنامه نگه می‌دارد.",
+    addServers = "افزودن سرور",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 

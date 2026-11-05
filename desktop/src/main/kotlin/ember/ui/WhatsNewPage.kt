@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.75",
+        listOf(
+            "Servers page: one + button with a menu (add a link, add from the clipboard, add from a file).",
+            "Each subscription card starts folded; its notes and buttons (test, refresh, edit, remove) sit behind the arrow.",
+        ),
+        listOf(
+            "صفحهٔ سرورها: یک دکمهٔ + با منو (افزودن لینک، افزودن از کلیپ‌بورد، افزودن از فایل).",
+            "هر کارت اشتراک بسته شروع می‌شود؛ یادداشت‌ها و دکمه‌ها (تست، به‌روزرسانی، ویرایش، حذف) پشت فلش هستند.",
+        ),
+    ),
+    Release(
         "1.0.74",
         listOf(
             "OpenVPN servers: add a .ovpn file and connect with the OpenVPN you installed. Certificates next to the file are picked up, and Ember asks for a user name and password when the profile needs them.",
