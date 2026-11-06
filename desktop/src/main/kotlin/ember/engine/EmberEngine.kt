@@ -7,6 +7,8 @@ import com.soheil.ember.vpn.IpLocationInfo
 import ember.subs.AUTO_NODE
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
+import ember.subs.SiteChecker
+import ember.subs.SiteResult
 import ember.subs.SubscriptionStore
 import ember.subs.XrayConfig
 import ember.subs.XrayRunner
@@ -56,6 +58,7 @@ class EmberEngine(private val dataDir: File) {
     private val openVpn = OpenVpnRunner(dataDir, tunnel.privileged)
     private val appRouting = AppRoutingRunner(dataDir, tunnel.privileged)
     private val nodeTester = NodeTester(xray)
+    private val siteChecker = SiteChecker(xray)
 
     private val _state = MutableStateFlow(ConnectionState.DISCONNECTED)
     val state: StateFlow<ConnectionState> = _state
@@ -141,6 +144,39 @@ class EmberEngine(private val dataDir: File) {
     /** The server that is connected (or being connected to). */
     private val _connectedNode = MutableStateFlow<ProxyNode?>(null)
     val connectedNode: StateFlow<ProxyNode?> = _connectedNode
+
+    /** What each server answered when asked for [label]'s website (kept until cleared; not saved). */
+    data class SiteCheckState(val label: String, val results: Map<String, SiteResult>)
+
+    private val _siteCheck = MutableStateFlow<SiteCheckState?>(null)
+    val siteCheck: StateFlow<SiteCheckState?> = _siteCheck
+
+    fun clearSiteCheck() {
+        _siteCheck.value = null
+    }
+
+    /** Asks every server in [all] for [url] (a website the user wants to use). Only while disconnected, like a speed test. */
+    fun checkSite(all: List<ProxyNode>, label: String, url: String) {
+        if (_state.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
+        if (!xray.isAvailable) {
+            _lastError.value = "The Xray program is missing from this installation."
+            return
+        }
+        _siteCheck.value = SiteCheckState(label, emptyMap())
+        _testProgress.value = "Starting…"
+        testJob = scope.launch {
+            try {
+                siteChecker.run(all, url, { _testProgress.value = it }) { node, result ->
+                    _siteCheck.value = _siteCheck.value?.let { it.copy(results = it.results + (node.id to result)) }
+                }
+            } catch (failure: Throwable) {
+                AppLogger.w(TAG, "the website check failed", failure)
+                _lastError.value = failure.message ?: failure.javaClass.simpleName
+            } finally {
+                _testProgress.value = null
+            }
+        }
+    }
 
     /** Plain-language step of a running server test, or null when none runs. */
     private val _testProgress = MutableStateFlow<String?>(null)

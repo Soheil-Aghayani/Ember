@@ -178,6 +178,13 @@ data class Strings(
     val emptyServersTitle: String,
     val emptyLogsTitle: String,
     val emptyAppsTitle: String,
+    val checkSite: String,
+    val checkSiteTitle: String,
+    val checkSiteHelp: String,
+    val siteHint: String,
+    val checkButton: String,
+    val siteSummary: (String, Int, Int) -> String,
+    val clearCheck: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -356,6 +363,13 @@ val EnglishStrings = Strings(
     emptyServersTitle = "No servers yet",
     emptyLogsTitle = "Nothing logged yet",
     emptyAppsTitle = "No apps in the list",
+    checkSite = "Check which servers reach a website",
+    checkSiteTitle = "Which servers reach a website?",
+    checkSiteHelp = "Some sites refuse certain servers. Ember asks every server for the site and marks the ones it accepts. Disconnect first.",
+    siteHint = "Website, for example open.spotify.com",
+    checkButton = "Check",
+    siteSummary = { site, ok, total -> "$site: $ok of $total servers work" },
+    clearCheck = "Clear the check",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -534,6 +548,13 @@ val PersianStrings = Strings(
     emptyServersTitle = "هنوز سروری نیست",
     emptyLogsTitle = "هنوز گزارشی نیست",
     emptyAppsTitle = "برنامه‌ای در فهرست نیست",
+    checkSite = "بررسی اینکه کدام سرورها به یک وب‌سایت می‌رسند",
+    checkSiteTitle = "کدام سرورها به یک وب‌سایت می‌رسند؟",
+    checkSiteHelp = "بعضی سایت‌ها بعضی سرورها را رد می‌کنند. Ember از همهٔ سرورها آن سایت را می‌خواهد و سرورهای پذیرفته‌شده را علامت می‌زند. اول اتصال را قطع کنید.",
+    siteHint = "وب‌سایت، مثلاً open.spotify.com",
+    checkButton = "بررسی",
+    siteSummary = { site, ok, total -> "\u2066$site\u2069: $ok از $total سرور کار می‌کند" },
+    clearCheck = "پاک کردن نتیجه",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 

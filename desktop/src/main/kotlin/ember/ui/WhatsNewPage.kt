@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.83",
+        listOf(
+            "Website check: the magnifier on the Servers page asks every server for a website (Spotify, YouTube, ChatGPT or any address) and marks the ones that reach it. Servers that work come first.",
+            "Some sites refuse certain servers' addresses; this finds the ones that work without trying them one by one. Disconnect first.",
+        ),
+        listOf(
+            "بررسی وب‌سایت: ذره‌بین در صفحهٔ سرورها از همهٔ سرورها یک وب‌سایت (Spotify، YouTube، ChatGPT یا هر آدرس) را می‌خواهد و سرورهایی را که می‌رسند علامت می‌زند. سرورهای سالم اول می‌آیند.",
+            "بعضی سایت‌ها آدرس بعضی سرورها را رد می‌کنند؛ این ابزار سرورهای سالم را بدون امتحان یکی‌یکی پیدا می‌کند. اول اتصال را قطع کنید.",
+        ),
+    ),
+    Release(
         "1.0.82",
         listOf(
             "Short messages (toasts) slide up from the bottom for things like \"Added 17 servers\", \"Copied\" and errors, instead of a red line on the page.",

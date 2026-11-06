@@ -232,6 +232,25 @@ class ShareLinksTest {
     }
 
     @Test
+    fun aSiteRefusingTheServerCountsAsNotWorking() {
+        assertEquals(true, SiteResult(200, 120).ok)
+        assertEquals(true, SiteResult(401, 90).ok) // an API that wants a key still answered
+        assertEquals(false, SiteResult(403, 80).ok)
+        assertEquals(false, SiteResult(451, 80).ok)
+        assertEquals(false, SiteResult(502, 80).ok)
+        assertEquals(false, SiteResult(null, null).ok)
+    }
+
+    @Test
+    fun readsAWebsiteTheUserTyped() {
+        assertEquals("https://open.spotify.com", normalizeSiteUrl("open.spotify.com"))
+        assertEquals("https://www.youtube.com/", normalizeSiteUrl("  https://www.youtube.com/ "))
+        assertNull(normalizeSiteUrl(""))
+        assertNull(normalizeSiteUrl("localhost"))
+        assertNull(normalizeSiteUrl("ftp://example.com"))
+    }
+
+    @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
         val node = SubscriptionParser.parseNodes(json).single()

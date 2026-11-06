@@ -87,6 +87,8 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     var editing by remember { mutableStateOf<Subscription?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
     val toaster = LocalToaster.current
+    val siteCheck by engine.siteCheck.collectAsState()
+    var showCheck by remember { mutableStateOf(false) }
 
     fun addFromClipboard() {
         val text = clipboard.getText()?.text.orEmpty().trim()
@@ -121,11 +123,23 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         }
     }
 
+    if (showCheck) {
+        SiteCheckDialog(
+            onCheck = { url, label ->
+                showCheck = false
+                if (state != ConnectionState.DISCONNECTED) toaster.show(strings.testNeedsDisconnect)
+                else engine.checkSite(subscriptions.flatMap { it.nodes }, label, url)
+            },
+            onClose = { showCheck = false },
+        )
+    }
     if (showAdd) AddSubscriptionDialog(engine, null, onClose = { showAdd = false })
     editing?.let { current -> AddSubscriptionDialog(engine, current, onClose = { editing = null }) }
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(strings.subscriptions, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        IconAction("magnifier", strings.checkSite, onClick = { showCheck = true }, enabled = subscriptions.isNotEmpty() && testing == null)
+        Spacer(Modifier.width(4.dp))
         Box {
             IconAction("plus", strings.addServers, onClick = { addMenu = true }, filled = true)
             DropdownMenu(
@@ -153,6 +167,18 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     }
     Spacer(Modifier.height(8.dp))
     Text(strings.subscriptionsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    siteCheck?.let { check ->
+        Spacer(Modifier.height(12.dp))
+        Card {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    strings.siteSummary(check.label, check.results.values.count { it.ok }, check.results.size),
+                    Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                )
+                IconAction("close", strings.clearCheck, onClick = { engine.clearSiteCheck() })
+            }
+        }
+    }
     Spacer(Modifier.height(16.dp))
 
     if (subscriptions.isEmpty()) {
@@ -175,6 +201,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             testing = testing,
             refreshing = busyId == subscription.id,
             favorites = favorites,
+            siteResults = siteCheck?.results,
             onToggleFavorite = { engine.toggleFavorite(it) },
             onSelect = { node -> engine.chooseServer(node.id) },
             onTest = { engine.testNodes(subscription.nodes) },
@@ -225,6 +252,7 @@ private fun SubscriptionCard(
     results: Map<String, ember.subs.NodeResult>,
     selectedId: String,
     favorites: Set<String>,
+    siteResults: Map<String, ember.subs.SiteResult>?,
     onToggleFavorite: (ProxyNode) -> Unit,
     canTest: Boolean,
     testing: String?,
@@ -242,7 +270,9 @@ private fun SubscriptionCard(
     val lastIndexes = remember { mutableMapOf<String, Int>() }
     val servers = subscription.nodes.filterNot { it.isInfo }
     val info = subscription.nodes.filter { it.isInfo }
-    val sorted = sortNodes(servers, results, favorites)
+    val ordered = sortNodes(servers, results, favorites)
+    // after a website check the servers that reached it come first, then the ones not asked, then the refused ones
+    val sorted = if (siteResults == null) ordered else ordered.sortedBy { n -> siteResults[n.id]?.let { if (it.ok) 0 else 2 } ?: 1 }
     Card {
         Column(Modifier.padding(vertical = 8.dp)) {
             Row(
@@ -317,7 +347,7 @@ private fun SubscriptionCard(
                         key(node.id) {
                             ServerRow(
                                 node = node, index = index, selected = node.id == selectedId, starred = node.id in favorites,
-                                result = results[node.id], fastest = fastest, rowHeight = rowHeight,
+                                result = results[node.id], site = siteResults?.get(node.id), fastest = fastest, rowHeight = rowHeight,
                                 onMeasured = { rowHeight = it }, lastIndexes = lastIndexes,
                                 onSelect = { onSelect(node) }, onToggleFavorite = { onToggleFavorite(node) },
                             )
@@ -340,6 +370,7 @@ private fun ServerRow(
     selected: Boolean,
     starred: Boolean,
     result: ember.subs.NodeResult?,
+    site: ember.subs.SiteResult?,
     fastest: Double,
     rowHeight: Int,
     onMeasured: (Int) -> Unit,
@@ -428,6 +459,17 @@ private fun ServerRow(
                         Text(ping, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
+            site?.let {
+                val color = if (it.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+                Spacer(Modifier.width(8.dp))
+                EmberIcon(if (it.ok) "check" else "close", 16.dp, color)
+                Spacer(Modifier.width(2.dp))
+                Text(
+                    if (it.ok) "${it.ms} ms" else (it.code?.toString() ?: strings.noAnswer),
+                    style = MaterialTheme.typography.labelSmall, color = color,
+                )
+                Spacer(Modifier.width(4.dp))
             }
             Box(Modifier.scale(pop.value)) {
                 IconAction(
