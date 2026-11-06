@@ -1,3 +1,6 @@
+import java.net.URL
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -28,7 +31,29 @@ tasks.matching { it.name.startsWith("externalNativeBuild") || it.name.contains("
     .configureEach { dependsOn(fetchHevSocks5Tunnel) }
 tasks.named("preBuild").configure { dependsOn(fetchHevSocks5Tunnel) }
 
-val releaseKeystoreFile = rootProject.file("release-keystore.jks")
+// Xray-core for Android: the official 64-bit ARM build, checked against a pinned SHA-256, packaged as libxray.so.
+val xrayAndroidDir = file("src/main/jniLibs/arm64-v8a")
+val fetchXrayAndroid = tasks.register("fetchXrayAndroid") {
+    val target = File(xrayAndroidDir, "libxray.so")
+    outputs.file(target)
+    onlyIf { !target.exists() }
+    doLast {
+        val zip = layout.buildDirectory.file("xray-android/Xray-android-arm64-v8a.zip").get().asFile.apply { parentFile.mkdirs() }
+        URL("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-arm64-v8a.zip").openStream()
+            .use { input -> zip.outputStream().use { input.copyTo(it) } }
+        val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
+        check(actual == "ee7878bb47ce28ff5b068e2d173ba1a9fab20ca1aec94191644919ec08ba5f1d") { "Checksum mismatch for the Xray download: $actual" }
+        xrayAndroidDir.mkdirs()
+        copy {
+            from(zipTree(zip)) { include("xray") }
+            into(xrayAndroidDir)
+            rename("xray", "libxray.so")
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(fetchXrayAndroid) }
+
+val releaseKeystoreFile = System.getenv("SIGNING_KEYSTORE")?.let(::File) ?: rootProject.file("release-keystore.jks")
 val releaseKeyAlias: String? = System.getenv("SIGNING_KEY_ALIAS")
 val releaseKeyPassword: String? = System.getenv("SIGNING_KEY_PASSWORD")
 val releaseStorePassword: String? = System.getenv("SIGNING_STORE_PASSWORD")
@@ -47,12 +72,13 @@ android {
         applicationId = "com.soheil.ember"
         minSdk = 26
         targetSdk = 35
-        versionCode = 44
-        versionName = "1.0.7"
+        versionCode = 100
+        versionName = "2.0.0"
 
         externalNativeBuild {
             ndkBuild {
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+                // Xray is packaged for 64-bit ARM phones (nearly all phones and Android TVs made in the last years)
+                abiFilters += listOf("arm64-v8a")
                 arguments += listOf(
 
                     "APP_PLATFORM=android-26",
@@ -82,7 +108,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 
             if (hasReleaseSigning) {
@@ -120,19 +146,25 @@ android {
         resources.excludes.add("META-INF/*.DSA")
         resources.excludes.add("META-INF/*.RSA")
         resources.pickFirsts.add("META-INF/io.netty.versions.properties")
+        jniLibs {
+            // libxray.so is a program, not a library: it must be unpacked on install and left as it is
+            useLegacyPackaging = true
+            keepDebugSymbols += "**/libxray.so"
+        }
     }
 }
 
 dependencies {
-    implementation(project(":core"))
+    // the older Firefox-account code in core is not used here; its network libraries would only add size
+    implementation(project(":core")) { exclude(group = "io.netty") }
 
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.4.0-alpha10")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.core:core-ktx:1.15.0")
@@ -141,15 +173,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    implementation("io.netty:netty-handler:4.1.115.Final")
-    implementation("io.netty:netty-codec-http2:4.1.115.Final")
-    implementation("io.netty:netty-transport:4.1.115.Final")
-
-    implementation("io.netty:netty-handler-proxy:4.1.115.Final")
-
-    implementation("org.conscrypt:conscrypt-android:2.5.2")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     testImplementation("junit:junit:4.13.2")

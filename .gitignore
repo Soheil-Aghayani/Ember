@@ -28,3 +28,4 @@ helper/target/
 *.p12
 *.cer
 signing/
+android/src/main/jniLibs/

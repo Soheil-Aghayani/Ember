@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.91",
+        listOf(
+            "The window's rounded corners are smooth now: the hard cut-out that made them look jagged is gone.",
+            "The Android app is new: it opens the same subscription links, files, QR codes and Cloudflare WARP as this app (see Ember-2.0.0.apk).",
+        ),
+        listOf(
+            "گوشه‌های گردِ پنجره حالا نرم هستند: برش سخت که آن‌ها را دندانه‌دار نشان می‌داد حذف شد.",
+            "برنامهٔ اندروید تازه است: همان لینک‌های اشتراک، فایل‌ها، کدهای QR و Cloudflare WARP این برنامه را باز می‌کند (Ember-2.0.0.apk).",
+        ),
+    ),
+    Release(
         "1.0.90",
         listOf(
             "WARP through one of your servers: for networks that block Cloudflare, the + menu can add WARP carried inside a connection to a server you pick. Your traffic leaves from Cloudflare. The server must carry UDP.",

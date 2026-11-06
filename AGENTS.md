@@ -1,13 +1,13 @@
 # Ember: instructions for coding agents
 
-Ember is a free, open-source VPN client (MIT) for Windows. The user adds subscription links (VLESS, VMess, Trojan, Shadowsocks, Hysteria2 or Xray JSON) or server files (Xray JSON, WireGuard `.conf`, OpenVPN `.ovpn` run through the OpenVPN the user installed, without Ember's kill switch); Ember reads the servers, measures them, and connects through the chosen one with Xray-core, optionally for the whole computer (Wintun tunnel and kill switch). It began as a fork of FoxyVPN, a Firefox-account client; the Android app in this repository still is that older client. Read this file before changing anything.
+Ember is a free, open-source VPN client (MIT) for Windows. The user adds subscription links (VLESS, VMess, Trojan, Shadowsocks, Hysteria2 or Xray JSON) or server files (Xray JSON, WireGuard `.conf`, OpenVPN `.ovpn` run through the OpenVPN the user installed, without Ember's kill switch); Ember reads the servers, measures them, and connects through the chosen one with Xray-core, optionally for the whole computer (Wintun tunnel and kill switch). It began as a fork of FoxyVPN, a Firefox-account client; the Android app has been rewritten for subscription links; the Firefox code left in `core/` is unused. Read this file before changing anything.
 
 ## Product targets
 
 | Target | Status | Compatibility rule |
 |---|---|---|
 | Windows PC | Current target | Windows desktop app (subscription links, Xray); whole-device mode is experimental and must not be run by an agent. |
-| Android phone | Not converted | The Android app is still the older Firefox-account client and cannot use subscription links. Converting it means running Xray there. |
+| Android phone | Converted, not yet tried on a device | The Android app (`android/`) opens subscription links, files, QR codes and WARP like the desktop app and connects with Xray (packaged as `libxray.so`) plus hev-socks5-tunnel, for 64-bit ARM only. It shares the server code in `core/src/main/kotlin/ember/subs/`. OpenVPN, app rules, the website check, failover and the kill switch are desktop-only. |
 | Sony Smart TV | Initial Android TV experience implemented; physical-device validation pending | Known target: Sony BRAVIA BF1, Android TV OS 12. Keep TV screens remote-first and do not call TV support verified until the owner checks it on this device. |
 
 Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A successful Android build is not evidence of Sony TV runtime support.
@@ -44,7 +44,7 @@ Source of truth: `design/tokens.json` (colours, Inter type scale from Apple's HI
 
 ## Versions and releases
 
-`tools/release.ps1 -Version 1.0.<n>` builds, tests, signs (when given a certificate) and copies the installer; see `docs/RELEASING.md`.
+`tools/release.ps1 -Version 1.0.<n>` builds, tests, signs (when given a certificate) and copies the installer; see `docs/RELEASING.md`. `tools/build-apk.ps1` builds the signed Android APK (key from `tools/New-AndroidKeystore.ps1`, kept outside the repository). The Android SDK is in `D:\Programming	oolsndroid-sdk`; Google's download hosts refuse some networks, so fetch it through a working server.
 
 Desktop installer versions are set with the `EMBER_VERSION` environment variable (`1.0.<n>`, counting up from the last installer in `C:\Users\Soheil\Downloads\Programs`). Finished installers are copied to that folder, and release notes plus checksums live in `D:\Programming\Ember-releases`.
 

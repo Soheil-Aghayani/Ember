@@ -25,7 +25,7 @@ private const val PING_PARALLEL = 16
 private const val SPEED_TOP = 12
 
 /** An IPv4 address for [host], or null when it cannot be looked up. */
-internal fun resolveIpv4(host: String): String? = runCatching {
+fun resolveIpv4(host: String): String? = runCatching {
     InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
 }.getOrNull()
 

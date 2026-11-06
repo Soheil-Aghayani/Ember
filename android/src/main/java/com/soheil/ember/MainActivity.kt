@@ -5,88 +5,45 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.navigation.compose.rememberNavController
-import com.soheil.ember.ui.navigation.EmberNavGraph
+import com.soheil.ember.engine.VpnState
+import com.soheil.ember.ui.EmberRoot
 import com.soheil.ember.ui.theme.EmberVpnTheme
-import com.soheil.ember.ui.theme.rememberThemeController
-import com.soheil.ember.vpn.EmberVpnService
+import com.soheil.ember.vpn.XrayVpnService
 
 class MainActivity : ComponentActivity() {
 
-    private val vpnPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            requestNotificationPermissionIfNeeded()
-            EmberVpnService.start(this)
-        } else {
+    private val engine get() = (application as EmberVpnApp).engine
 
-            Toast.makeText(
-                this,
-                "Ember needs Android's VPN permission to tunnel this device's traffic. " +
-                    "Proxy-only mode in Settings works without it.",
-                Toast.LENGTH_LONG,
-            ).show()
-        }
+    private val vpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) startVpn()
+        else VpnState.error.value = "Ember needs Android's VPN permission to protect this phone."
     }
 
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) {  }
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    private fun requestConnect() {
-        if ((application as EmberVpnApp).settingsStore.proxyOnlyMode) {
-            requestNotificationPermissionIfNeeded()
-            EmberVpnService.start(this)
-            return
-        }
-
-        val prepareIntent = VpnService.prepare(this)
-        if (prepareIntent != null) {
-            vpnPermissionLauncher.launch(prepareIntent)
-        } else {
-            requestNotificationPermissionIfNeeded()
-            EmberVpnService.start(this)
-        }
+    private fun connect() {
+        val prepare = VpnService.prepare(this)
+        if (prepare != null) vpnPermission.launch(prepare) else startVpn()
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val alreadyGranted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!alreadyGranted) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    private fun startVpn() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        XrayVpnService.start(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val app = application as EmberVpnApp
         setContent {
-
-            val themeController = rememberThemeController(app.settingsStore)
-            EmberVpnTheme(themeMode = themeController.mode) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    val navController = rememberNavController()
-                    EmberNavGraph(
-                        navController = navController,
-                        app = app,
-                        themeController = themeController,
-                        isTelevision = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK),
-                        onRequestConnect = { requestConnect() },
-                        onDisconnect = { EmberVpnService.stop(this) },
-                    )
-                }
+            EmberVpnTheme {
+                EmberRoot(engine, onConnect = ::connect, onDisconnect = { XrayVpnService.stop(this) })
             }
         }
     }
