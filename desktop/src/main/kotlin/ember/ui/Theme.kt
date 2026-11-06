@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -154,7 +155,8 @@ fun EmberTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable 
         MaterialTheme(
             colorScheme = (if (darkTheme) DarkColors else LightColors).glide(),
             typography = EmberTypography,
-            content = content,
-        )
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground, content = content)
+        }
     }
 }

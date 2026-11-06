@@ -59,6 +59,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -163,7 +164,7 @@ internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit
             .clip(CardShape)
             .background(MaterialTheme.colorScheme.surface)
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), CardShape),
-    ) { content() }
+    ) { CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) { content() } }
 }
 
 @Composable
