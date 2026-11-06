@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android refuses plain http by default. The server checks (test and connect) ask Cloudflare's tiny connectivity page
+     over http on purpose (no TLS handshake to measure), and only that one host is allowed. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">cp.cloudflare.com</domain>
+    </domain-config>
+</network-security-config>
