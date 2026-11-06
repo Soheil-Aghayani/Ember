@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.89",
+        listOf(
+            "Fixed a wrong error (\"The coroutine scope left the composition\") that appeared when you left the Servers page while servers were being added or refreshed. The work now finishes in the background.",
+        ),
+        listOf(
+            "خطای نادرست («The coroutine scope left the composition») که با ترک صفحهٔ سرورها هنگام افزودن یا به‌روزرسانی سرورها دیده می‌شد برطرف شد. کار حالا در پس‌زمینه تمام می‌شود.",
+        ),
+    ),
+    Release(
         "1.0.88",
         listOf(
             "QR codes: point at a server on the Servers page and press the QR button to show its link as a code your phone can scan.",

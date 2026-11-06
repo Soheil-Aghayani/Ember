@@ -78,7 +78,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun SubscriptionsPage(engine: EmberEngine) {
     val strings = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    val scope = LocalAppScope.current
     val subscriptions by engine.subscriptions.subscriptions.collectAsState()
     val results by engine.subscriptions.results.collectAsState()
     val testing by engine.testProgress.collectAsState()
@@ -102,7 +102,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             return
         }
         scope.launch {
-            runCatching { engine.subscriptions.add(text, "") }
+            attempt { engine.subscriptions.add(text, "") }
                 .onSuccess { toaster.show(strings.serversAdded(it.nodes.count { node -> !node.isInfo }), ToastKind.Success) }
                 .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
         }
@@ -111,7 +111,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     fun addWarp() {
         toaster.show(strings.warpRegistering)
         scope.launch {
-            runCatching { engine.subscriptions.addWarp() }
+            attempt { engine.subscriptions.addWarp() }
                 .onSuccess { toaster.show(strings.serversAdded(it.nodes.size), ToastKind.Success) }
                 .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
         }
@@ -128,7 +128,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                     problems += strings.fileTooLarge(file.name)
                     continue
                 }
-                runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
+                attempt { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
                     .onSuccess { added += it.nodes.count { node -> !node.isInfo } }
                     .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
             }
@@ -244,7 +244,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             onRefresh = {
                 busyId = subscription.id
                 scope.launch {
-                    runCatching { engine.subscriptions.refresh(subscription.id) }
+                    attempt { engine.subscriptions.refresh(subscription.id) }
                         .onSuccess { toaster.show(strings.updated, ToastKind.Success) }
                         .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
                     busyId = null
@@ -534,7 +534,7 @@ private fun ServerRow(
 @Composable
 private fun AddSubscriptionDialog(engine: EmberEngine, existing: Subscription?, onClose: () -> Unit) {
     val strings = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    val scope = LocalAppScope.current
     var url by remember { mutableStateOf(existing?.url ?: "") }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var busy by remember { mutableStateOf(false) }
@@ -566,7 +566,7 @@ private fun AddSubscriptionDialog(engine: EmberEngine, existing: Subscription?, 
                     error = null
                     busy = true
                     scope.launch {
-                        runCatching {
+                        attempt {
                             if (existing == null) engine.subscriptions.add(url, name) else engine.subscriptions.update(existing.id, name, url)
                         }
                             .onSuccess { onClose() }

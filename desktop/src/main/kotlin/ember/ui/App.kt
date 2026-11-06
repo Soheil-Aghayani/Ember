@@ -77,6 +77,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -133,6 +134,21 @@ private enum class Page(val icon: String, val bottom: Boolean = false) {
 
 private val CardShape = RoundedCornerShape(16.dp)
 
+/**
+ * A scope that lives as long as the window, for work that must finish even if the user leaves the page that started it
+ * (adding servers, registering with Cloudflare, refreshing a subscription).
+ */
+internal val LocalAppScope = staticCompositionLocalOf<kotlinx.coroutines.CoroutineScope> { error("no app scope") }
+
+/** Like [runCatching], but a cancelled coroutine is not a failure to report: the cancellation goes on. */
+internal inline fun <T> attempt(block: () -> T): Result<T> = try {
+    Result.success(block())
+} catch (cancel: kotlinx.coroutines.CancellationException) {
+    throw cancel
+} catch (failure: Throwable) {
+    Result.failure(failure)
+}
+
 @Composable
 fun EmberApp(
     engine: EmberEngine,
@@ -147,6 +163,7 @@ fun EmberApp(
         }
     }
     val toaster = remember { Toaster() }
+    val appScope = rememberCoroutineScope()
     val notice by engine.notice.collectAsState()
     LaunchedEffect(notice) {
         notice?.let {
@@ -154,7 +171,7 @@ fun EmberApp(
             engine.clearNotice()
         }
     }
-    CompositionLocalProvider(LocalToaster provides toaster) {
+    CompositionLocalProvider(LocalToaster provides toaster, LocalAppScope provides appScope) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             MainShell(engine, theme, onThemeChange, language, onLanguageChange)
             CredentialDialog(engine)
