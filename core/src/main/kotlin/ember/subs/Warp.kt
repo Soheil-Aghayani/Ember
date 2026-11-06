@@ -1,6 +1,7 @@
 package ember.subs
 
-import java.security.KeyPairGenerator
+import java.security.SecureRandom
+import java.math.BigInteger
 import java.time.Instant
 import java.util.Base64
 import java.util.concurrent.TimeUnit
@@ -35,10 +36,8 @@ object Warp {
 
     /** A fresh X25519 key pair as the base64 text WireGuard uses: (private, public). */
     fun newKeyPair(): Pair<String, String> {
-        val pair = KeyPairGenerator.getInstance("X25519").generateKeyPair()
-        // the raw 32 bytes are the tail of the standard encodings
-        val private = pair.private.encoded.takeLast(32).toByteArray()
-        val public = pair.public.encoded.takeLast(32).toByteArray()
+        val private = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val public = X25519.publicKey(private)
         val b64 = Base64.getEncoder()
         return b64.encodeToString(private) to b64.encodeToString(public)
     }
@@ -100,5 +99,58 @@ object Warp {
             client.newCall(patch).execute().close()
         }
         registration
+    }
+}
+
+/**
+ * The public half of an X25519 key (RFC 7748, scalar times the base point). Written out so it works on every Android
+ * version: the platform only offers X25519 from Android 13.
+ */
+object X25519 {
+    private val P = BigInteger.ONE.shiftLeft(255) - BigInteger.valueOf(19)
+    private val A24 = BigInteger.valueOf(121665)
+
+    fun publicKey(privateKey: ByteArray): ByteArray {
+        require(privateKey.size == 32) { "an X25519 key is 32 bytes" }
+        val clamped = privateKey.copyOf()
+        clamped[0] = (clamped[0].toInt() and 248).toByte()
+        clamped[31] = ((clamped[31].toInt() and 127) or 64).toByte()
+        val k = BigInteger(1, clamped.reversedArray())
+        val x1 = BigInteger.valueOf(9)
+        var x2 = BigInteger.ONE
+        var z2 = BigInteger.ZERO
+        var x3 = x1
+        var z3 = BigInteger.ONE
+        var swap = false
+        for (bit in 254 downTo 0) {
+            val kt = k.testBit(bit)
+            if (swap != kt) {
+                x2 = x3.also { x3 = x2 }
+                z2 = z3.also { z3 = z2 }
+            }
+            swap = kt
+            val a = (x2 + z2).mod(P)
+            val aa = (a * a).mod(P)
+            val b = (x2 - z2).mod(P)
+            val bb = (b * b).mod(P)
+            val e = (aa - bb).mod(P)
+            val c = (x3 + z3).mod(P)
+            val d = (x3 - z3).mod(P)
+            val da = (d * a).mod(P)
+            val cb = (c * b).mod(P)
+            x3 = (da + cb).pow(2).mod(P)
+            z3 = (x1 * (da - cb).pow(2)).mod(P)
+            x2 = (aa * bb).mod(P)
+            z2 = (e * (aa + A24 * e)).mod(P)
+        }
+        if (swap) {
+            x2 = x3.also { x3 = x2 }
+            z2 = z3.also { z3 = z2 }
+        }
+        val result = (x2 * z2.modPow(P - BigInteger.TWO, P)).mod(P)
+        val out = ByteArray(32)
+        val big = result.toByteArray().reversedArray() // little-endian, possibly with a sign byte at the end
+        System.arraycopy(big, 0, out, 0, minOf(32, big.size))
+        return out
     }
 }

@@ -344,6 +344,17 @@ class ShareLinksTest {
     }
 
     @Test
+    fun theWarpKeyMathAgreesWithTheJavaPlatformsX25519() {
+        // the platform's X25519 is the reference; Android below version 13 has none, so Ember carries its own
+        repeat(5) {
+            val pair = java.security.KeyPairGenerator.getInstance("X25519").generateKeyPair()
+            val rawPrivate = pair.private.encoded.takeLast(32).toByteArray()
+            val rawPublic = pair.public.encoded.takeLast(32).toByteArray()
+            assertEquals(rawPublic.toList(), X25519.publicKey(rawPrivate).toList())
+        }
+    }
+
+    @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
         val node = SubscriptionParser.parseNodes(json).single()
