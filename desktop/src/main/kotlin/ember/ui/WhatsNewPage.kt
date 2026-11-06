@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.81",
+        listOf(
+            "Dark theme polish (Settings > Appearance > Dark, or System): warm surface tones for dialogs, menus, switches and text fields in both themes, and the colours glide when you change theme.",
+        ),
+        listOf(
+            "بهبود تم تیره (تنظیمات > ظاهر > تیره، یا سیستم): رنگ‌های گرم برای پنجره‌های گفت‌وگو، منوها، کلیدها و کادرهای متن در هر دو تم، و رنگ‌ها هنگام تغییر تم نرم عوض می‌شوند.",
+        ),
+    ),
+    Release(
         "1.0.80",
         listOf(
             "Servers page motion: cards fold and unfold smoothly, and the servers fade in one after another.",

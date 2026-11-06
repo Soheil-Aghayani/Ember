@@ -1,6 +1,9 @@
 package ember.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -55,6 +58,11 @@ private val LightColors = lightColorScheme(
     surface = Color(0xFFFFFFFF), onSurface = Color(0xFF1F1B16),
     surfaceVariant = Color(0xFFF1ECE3), onSurfaceVariant = Color(0xFF6B645B),
     outline = Color(0xFF8A8277), outlineVariant = Color(0xFFE4DDD1),
+    onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFDDF1E2), onTertiaryContainer = Color(0xFF0B3A1B),
+    errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    inverseSurface = Color(0xFF2F2A24), inverseOnSurface = Color(0xFFF5EFE6), inversePrimary = Color(0xFFFF7139),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFFBF8F3), surfaceContainer = Color(0xFFF5F0E8),
+    surfaceContainerHigh = Color(0xFFF1ECE3), surfaceContainerHighest = Color(0xFFECE6DB),
 )
 
 private val DarkColors = darkColorScheme(
@@ -68,7 +76,29 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF24201C), onSurface = Color(0xFFF3EEE6),
     surfaceVariant = Color(0xFF3A342D), onSurfaceVariant = Color(0xFFA39B90),
     outline = Color(0xFF80786C), outlineVariant = Color(0xFF3A342D),
+    onTertiary = Color(0xFF0B3A1B), tertiaryContainer = Color(0xFF14301D), onTertiaryContainer = Color(0xFFBFEBCB),
+    errorContainer = Color(0xFF5C1A14), onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF3EEE6), inverseOnSurface = Color(0xFF2B2620), inversePrimary = Color(0xFFC4400A),
+    surfaceContainerLowest = Color(0xFF14110F), surfaceContainerLow = Color(0xFF1F1C18), surfaceContainer = Color(0xFF2A2520),
+    surfaceContainerHigh = Color(0xFF332D27), surfaceContainerHighest = Color(0xFF3D362F),
 )
+
+/** The colours of [this] scheme, gliding to new values over a third of a second when the theme changes. */
+@Composable
+private fun ColorScheme.glide(): ColorScheme {
+    @Composable fun a(color: Color) = animateColorAsState(color, tween(350), label = "theme").value
+    return copy(
+        primary = a(primary), onPrimary = a(onPrimary), primaryContainer = a(primaryContainer), onPrimaryContainer = a(onPrimaryContainer),
+        secondary = a(secondary), onSecondary = a(onSecondary), secondaryContainer = a(secondaryContainer), onSecondaryContainer = a(onSecondaryContainer),
+        tertiary = a(tertiary), onTertiary = a(onTertiary), tertiaryContainer = a(tertiaryContainer), onTertiaryContainer = a(onTertiaryContainer),
+        error = a(error), errorContainer = a(errorContainer), onErrorContainer = a(onErrorContainer),
+        background = a(background), onBackground = a(onBackground), surface = a(surface), onSurface = a(onSurface),
+        surfaceVariant = a(surfaceVariant), onSurfaceVariant = a(onSurfaceVariant), outline = a(outline), outlineVariant = a(outlineVariant),
+        inverseSurface = a(inverseSurface), inverseOnSurface = a(inverseOnSurface), inversePrimary = a(inversePrimary),
+        surfaceContainerLowest = a(surfaceContainerLowest), surfaceContainerLow = a(surfaceContainerLow), surfaceContainer = a(surfaceContainer),
+        surfaceContainerHigh = a(surfaceContainerHigh), surfaceContainerHighest = a(surfaceContainerHighest),
+    )
+}
 
 data class EmberStatusColors(val connected: Color, val connecting: Color)
 
@@ -122,7 +152,7 @@ fun EmberTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable 
         LocalEmberWindowControlColors provides WindowControlColors,
     ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = (if (darkTheme) DarkColors else LightColors).glide(),
             typography = EmberTypography,
             content = content,
         )
