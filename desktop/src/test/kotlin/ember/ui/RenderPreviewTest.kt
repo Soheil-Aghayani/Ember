@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +53,13 @@ class RenderPreviewTest {
             render(dir, "empty-$theme", dark, height = 420) {
                 Text("Servers", style = MaterialTheme.typography.headlineLarge)
                 Card { EmptyState("subscriptions", "No servers yet", EnglishStrings.noSubscriptions) {} }
+            }
+            render(dir, "qr-$theme", dark, width = 360, height = 360) {
+                androidx.compose.foundation.Image(
+                    ember.subs.QrCodes.encode("vless://11111111-2222-3333-4444-555555555555@vl.example.com:443?type=tcp&security=reality#UK").toComposeImageBitmap(),
+                    contentDescription = null, filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+                    modifier = Modifier.size(260.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color.White).padding(6.dp),
+                )
             }
             render(dir, "toast-$theme", dark, height = 220) {
                 val toaster = androidx.compose.runtime.remember { Toaster().apply { show("Added 17 servers", ToastKind.Success); show("Could not read that file", ToastKind.Error) } }

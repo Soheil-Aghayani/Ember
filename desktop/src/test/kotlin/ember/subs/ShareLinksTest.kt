@@ -302,6 +302,23 @@ class ShareLinksTest {
     }
 
     @Test
+    fun aServerLinkSurvivesBeingDrawnAsAQrCodeAndReadBack() {
+        val link = "vless://$uuid@vl.example.com:443?type=tcp&security=reality&pbk=KEY&sni=www.example.org&sid=ab&flow=xtls-rprx-vision#UK%20Reality"
+        val node = ShareLinks.parse(link)!!
+        assertEquals(link, node.shareLink)
+        val file = java.io.File.createTempFile("ember-qr", ".png")
+        try {
+            javax.imageio.ImageIO.write(QrCodes.encode(node.shareLink!!), "png", file)
+            assertEquals(link, QrCodes.decode(file))
+        } finally {
+            file.delete()
+        }
+        // servers that came from files have no link to share
+        assertNull(SubscriptionParser.parseNodes(wireGuardFile, "Office").single().shareLink)
+        assertNull(java.io.File("does-not-exist.png").let { QrCodes.decode(it) })
+    }
+
+    @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
         val node = SubscriptionParser.parseNodes(json).single()

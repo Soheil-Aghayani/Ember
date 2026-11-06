@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.88",
+        listOf(
+            "QR codes: point at a server on the Servers page and press the QR button to show its link as a code your phone can scan.",
+            "You can also add servers from a picture of a QR code (for example a screenshot): use the file option in the + menu.",
+        ),
+        listOf(
+            "کد QR: روی یک سرور در صفحهٔ سرورها بروید و دکمهٔ QR را بزنید تا لینکش به‌صورت کدی که گوشی اسکن می‌کند نشان داده شود.",
+            "همچنین می‌توانید از روی تصویر یک کد QR (مثلاً اسکرین‌شات) سرور اضافه کنید: گزینهٔ فایل در منوی + را بزنید.",
+        ),
+    ),
+    Release(
         "1.0.87",
         listOf(
             "Kill switch for OpenVPN servers: before OpenVPN starts, Ember blocks the real network except for the server's address, and lifts it when you disconnect. It stays in place if Ember closes by accident, like in whole-device mode.",

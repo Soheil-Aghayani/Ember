@@ -11,6 +11,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +67,7 @@ import com.soheil.ember.data.model.ConnectionState
 import ember.engine.EmberEngine
 import ember.subs.ProxyNode
 import ember.subs.Subscription
+import ember.subs.shareLink
 import ember.subs.sortNodes
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +93,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val toaster = LocalToaster.current
     val siteCheck by engine.siteCheck.collectAsState()
     var showCheck by remember { mutableStateOf(false) }
+    var qrNode by remember { mutableStateOf<ProxyNode?>(null) }
 
     fun addFromClipboard() {
         val text = clipboard.getText()?.text.orEmpty().trim()
@@ -132,6 +137,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         }
     }
 
+    qrNode?.let { QrDialog(it, onClose = { qrNode = null }) }
     if (showCheck) {
         SiteCheckDialog(
             onCheck = { url, label ->
@@ -231,6 +237,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             favorites = favorites,
             siteResults = siteCheck?.results,
             onToggleFavorite = { engine.toggleFavorite(it) },
+            onShowQr = { qrNode = it },
             onSelect = { node -> engine.chooseServer(node.id) },
             onTest = { engine.testNodes(subscription.nodes) },
             onStopTest = { engine.cancelTest() },
@@ -255,6 +262,9 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
 
 /** The text of a server file. An OpenVPN profile gets the certificate and key files next to it moved inside. */
 private fun readServerFile(file: java.io.File): String {
+    if (file.extension.lowercase() in setOf("png", "jpg", "jpeg", "bmp", "gif")) {
+        return ember.subs.QrCodes.decode(file) ?: error("No QR code was found in that picture.")
+    }
     val text = file.readText()
     if (!ember.subs.ConfigFiles.isOpenVpn(text)) return text
     val folder = file.parentFile?.canonicalFile ?: return text
@@ -269,7 +279,7 @@ private fun readServerFile(file: java.io.File): String {
 private fun chooseServerFiles(title: String): List<java.io.File> {
     val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
     dialog.isMultipleMode = true
-    dialog.file = "*.json;*.conf;*.txt;*.ovpn" // Windows reads this as the file-type filter
+    dialog.file = "*.json;*.conf;*.txt;*.ovpn;*.png;*.jpg;*.jpeg" // Windows reads this as the file-type filter
     dialog.isVisible = true
     return dialog.files.toList()
 }
@@ -282,6 +292,7 @@ private fun SubscriptionCard(
     favorites: Set<String>,
     siteResults: Map<String, ember.subs.SiteResult>?,
     onToggleFavorite: (ProxyNode) -> Unit,
+    onShowQr: (ProxyNode) -> Unit,
     canTest: Boolean,
     testing: String?,
     refreshing: Boolean,
@@ -378,6 +389,7 @@ private fun SubscriptionCard(
                                 result = results[node.id], site = siteResults?.get(node.id), fastest = fastest, rowHeight = rowHeight,
                                 onMeasured = { rowHeight = it }, lastIndexes = lastIndexes,
                                 onSelect = { onSelect(node) }, onToggleFavorite = { onToggleFavorite(node) },
+                                onShowQr = node.shareLink?.let { { onShowQr(node) } },
                             )
                         }
                     }
@@ -405,8 +417,11 @@ private fun ServerRow(
     lastIndexes: MutableMap<String, Int>,
     onSelect: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onShowQr: (() -> Unit)?,
 ) {
     val strings = LocalStrings.current
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay((index * 22L).coerceAtMost(330L))
@@ -450,6 +465,7 @@ private fun ServerRow(
         Row(
             Modifier.fillMaxWidth()
                 .background(background)
+                .hoverable(interaction)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(role = Role.RadioButton, onClick = onSelect)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -488,6 +504,8 @@ private fun ServerRow(
                     }
                 }
             }
+            // the QR button shows when the pointer is over the row or the row is the chosen server
+            if (onShowQr != null && (hovered || selected)) IconAction("qr", strings.showQr, onClick = onShowQr)
             site?.let {
                 val color = if (it.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 Spacer(Modifier.width(8.dp))

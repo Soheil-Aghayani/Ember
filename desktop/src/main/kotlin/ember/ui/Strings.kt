@@ -190,6 +190,11 @@ data class Strings(
     val autoFailover: String,
     val autoFailoverHelp: String,
     val connectForSite: (String) -> String,
+    val showQr: String,
+    val qrHint: String,
+    val qrTooLong: String,
+    val copyLink: String,
+    val close: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -320,7 +325,7 @@ val EnglishStrings = Strings(
     whatsNewIntro = "What changed in each version of Ember.",
     currentVersion = "You have this version",
     back = "Back",
-    importFile = "Add from a file (Xray JSON, WireGuard, OpenVPN)",
+    importFile = "Add from a file (JSON, WireGuard, OpenVPN, QR picture)",
     chooseFileTitle = "Choose a server file",
     fileTooLarge = { "$it is too large to be a server file." },
     settingsInterface = "Interface",
@@ -380,6 +385,11 @@ val EnglishStrings = Strings(
     autoFailover = "Switch servers automatically",
     autoFailoverHelp = "If the connected server stops passing traffic for about a minute, Ember connects to the next-fastest one. The connection is briefly interrupted.",
     connectForSite = { "Connect to the best server for $it" },
+    showQr = "Show QR code",
+    qrHint = "Scan it with the VPN app on your phone to add this server there.",
+    qrTooLong = "This server's link is too long for a QR code. Copy the link instead.",
+    copyLink = "Copy link",
+    close = "Close",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -510,7 +520,7 @@ val PersianStrings = Strings(
     whatsNewIntro = "تغییرات هر نسخهٔ Ember.",
     currentVersion = "نسخهٔ شما",
     back = "بازگشت",
-    importFile = "افزودن از فایل (Xray JSON ،WireGuard ،OpenVPN)",
+    importFile = "افزودن از فایل (JSON ،WireGuard ،OpenVPN ،تصویر QR)",
     chooseFileTitle = "انتخاب فایل سرور",
     fileTooLarge = { "فایل $it بیش از حد بزرگ است." },
     settingsInterface = "ظاهر و رفتار",
@@ -570,6 +580,11 @@ val PersianStrings = Strings(
     autoFailover = "تعویض خودکار سرور",
     autoFailoverHelp = "اگر سرور متصل حدود یک دقیقه ترافیک عبور ندهد، Ember به سریع‌ترین سرور بعدی وصل می‌شود. اتصال لحظه‌ای قطع می‌شود.",
     connectForSite = { "اتصال به بهترین سرور برای $it" },
+    showQr = "نمایش کد QR",
+    qrHint = "آن را با برنامهٔ VPN گوشی اسکن کنید تا این سرور آنجا اضافه شود.",
+    qrTooLong = "لینک این سرور برای کد QR بیش از حد بلند است. به جایش لینک را کپی کنید.",
+    copyLink = "کپی لینک",
+    close = "بستن",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 
