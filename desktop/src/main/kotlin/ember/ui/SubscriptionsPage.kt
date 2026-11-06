@@ -103,6 +103,15 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         }
     }
 
+    fun addWarp() {
+        toaster.show(strings.warpRegistering)
+        scope.launch {
+            runCatching { engine.subscriptions.addWarp() }
+                .onSuccess { toaster.show(strings.serversAdded(it.nodes.size), ToastKind.Success) }
+                .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
+        }
+    }
+
     fun importFiles() {
         scope.launch {
             val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
@@ -158,6 +167,11 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                     onClick = { addMenu = false; addFromClipboard() },
                 )
                 DropdownMenuItem(
+                    text = { Text(strings.addWarp) },
+                    leadingIcon = { EmberIcon("cloud", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { addMenu = false; addWarp() },
+                )
+                DropdownMenuItem(
                     text = { Text(strings.importFile) },
                     leadingIcon = { EmberIcon("import-file", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
                     onClick = { addMenu = false; importFiles() },
@@ -185,6 +199,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         Card {
             EmptyState("subscriptions", strings.emptyServersTitle, strings.noSubscriptions) {
                 Button(onClick = { showAdd = true }, shape = RoundedCornerShape(12.dp)) { Text(strings.addSubscription) }
+                IconAction("cloud", strings.addWarp, onClick = { addWarp() })
                 IconAction("clipboard", strings.pasteFromClipboard, onClick = { addFromClipboard() })
                 IconAction("import-file", strings.importFile, onClick = { importFiles() })
             }

@@ -43,6 +43,11 @@ object ConfigFiles {
         val settings = JSONObject().put("secretKey", privateKey).put("address", JSONArray(addresses))
             .put("peers", JSONArray().put(peerJson))
         iface["mtu"]?.toIntOrNull()?.let { settings.put("mtu", it) }
+        // not part of the WireGuard format: the three bytes Cloudflare WARP ties to a device
+        (iface["reserved"] ?: peer["reserved"])?.let { value ->
+            val bytes = list(value).mapNotNull { it.toIntOrNull() }.filter { it in 0..255 }
+            if (bytes.size == 3) settings.put("reserved", JSONArray(bytes))
+        }
         val outbound = JSONObject().put("protocol", "wireguard").put("settings", settings)
         return ShareLinks.fromXrayOutbound(outbound, nameHint) ?: error("The WireGuard endpoint is not valid.")
     }

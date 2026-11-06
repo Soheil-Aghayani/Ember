@@ -250,6 +250,31 @@ class ShareLinksTest {
         assertNull(normalizeSiteUrl("ftp://example.com"))
     }
 
+    private val warpAnswer = """
+        {"id":"abc","token":"tok","config":{"client_id":"AQID",
+         "peers":[{"public_key":"bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=","endpoint":{"host":"engage.cloudflareclient.com:2408","v4":"162.159.192.1:0"}}],
+         "interface":{"addresses":{"v4":"172.16.0.2","v6":"2606:4700:110:8a36::2"}}}}
+    """.trimIndent()
+
+    @Test
+    fun turnsACloudflareWarpRegistrationIntoWireGuardServers() {
+        val (private, public) = Warp.newKeyPair()
+        assertEquals(44, private.length)
+        assertEquals(44, public.length)
+        val registration = Warp.parseRegistration(warpAnswer, private)
+        assertEquals(listOf(1, 2, 3), registration.reserved)
+        assertEquals(listOf("172.16.0.2/32", "2606:4700:110:8a36::2/128"), registration.addresses)
+        val nodes = Warp.configs(registration).map { (name, text) -> ConfigFiles.wireGuard(text, name) }
+        assertEquals(listOf("Cloudflare WARP", "Cloudflare WARP (500)", "Cloudflare WARP (4500)"), nodes.map { it.name })
+        assertEquals(listOf(2408, 500, 4500), nodes.map { it.port })
+        val outbound = ShareLinks.outbound(nodes[1].raw, "162.159.192.1", "proxy")
+        val settings = outbound.getJSONObject("settings")
+        assertEquals("162.159.192.1:500", settings.getJSONArray("peers").getJSONObject(0).getString("endpoint"))
+        assertEquals(listOf(1, 2, 3), settings.getJSONArray("reserved").toList())
+        // and the node survives being saved and read back
+        assertEquals(nodes[1].id, ShareLinks.parse(nodes[1].raw)!!.id)
+    }
+
     @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""

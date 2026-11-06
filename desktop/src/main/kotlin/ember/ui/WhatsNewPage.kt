@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.85",
+        listOf(
+            "Cloudflare WARP: the + menu on the Servers page can register a free WARP device and add its servers (three ports), ready to test and connect like any other. It has one exit that follows your location, and only works if your network does not block Cloudflare.",
+            "WireGuard files may carry a Reserved line (the three bytes WARP needs).",
+        ),
+        listOf(
+            "Cloudflare WARP: منوی + در صفحهٔ سرورها می‌تواند یک دستگاه رایگان WARP ثبت کند و سرورهایش (سه پورت) را اضافه کند تا مثل بقیه تست و وصل شود. یک خروجی دارد که با موقعیت شما عوض می‌شود و فقط وقتی کار می‌کند که شبکه‌تان Cloudflare را مسدود نکرده باشد.",
+            "فایل‌های WireGuard می‌توانند خط Reserved داشته باشند (سه بایتی که WARP لازم دارد).",
+        ),
+    ),
+    Release(
         "1.0.84",
         listOf(
             "Fixed the dark theme: headings and list text were black on the dark background and could not be read.",

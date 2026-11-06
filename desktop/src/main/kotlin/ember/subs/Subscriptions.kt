@@ -24,6 +24,9 @@ data class SubscriptionUsage(val uploaded: Long, val downloaded: Long, val total
 /** What the last speed test measured for one server. [pingMs] null means the server did not answer. */
 data class NodeResult(val pingMs: Int?, val mbps: Double?, val testedAtMs: Long)
 
+/** Name of the subscription that holds the Cloudflare WARP servers. */
+const val WARP_NAME = "Cloudflare WARP"
+
 /** Stored as the selected server when Connect should pick the fastest tested one. */
 const val AUTO_NODE = "auto"
 
@@ -124,6 +127,20 @@ class SubscriptionStore(private val file: File) {
             nodes = fetched.nodes,
             usage = fetched.usage,
             updatedAtMs = System.currentTimeMillis(),
+        )
+        _subscriptions.value = _subscriptions.value + subscription
+        save()
+        return subscription
+    }
+
+    /** Registers a free Cloudflare WARP device and adds its servers (one per port). */
+    suspend fun addWarp(): Subscription {
+        require(_subscriptions.value.none { it.name == WARP_NAME }) { "Cloudflare WARP is already in your list." }
+        val registration = Warp.register()
+        val nodes = Warp.configs(registration).map { (name, text) -> ConfigFiles.wireGuard(text, name) }
+        val subscription = Subscription(
+            id = java.util.UUID.randomUUID().toString().take(8), name = WARP_NAME, url = "", nodes = nodes,
+            usage = null, updatedAtMs = System.currentTimeMillis(),
         )
         _subscriptions.value = _subscriptions.value + subscription
         save()

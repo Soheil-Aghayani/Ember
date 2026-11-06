@@ -185,6 +185,8 @@ data class Strings(
     val checkButton: String,
     val siteSummary: (String, Int, Int) -> String,
     val clearCheck: String,
+    val addWarp: String,
+    val warpRegistering: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -370,6 +372,8 @@ val EnglishStrings = Strings(
     checkButton = "Check",
     siteSummary = { site, ok, total -> "$site: $ok of $total servers work" },
     clearCheck = "Clear the check",
+    addWarp = "Add Cloudflare WARP (free)",
+    warpRegistering = "Registering with Cloudflare…",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -555,6 +559,8 @@ val PersianStrings = Strings(
     checkButton = "بررسی",
     siteSummary = { site, ok, total -> "\u2066$site\u2069: $ok از $total سرور کار می‌کند" },
     clearCheck = "پاک کردن نتیجه",
+    addWarp = "افزودن Cloudflare WARP (رایگان)",
+    warpRegistering = "در حال ثبت در Cloudflare…",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 
