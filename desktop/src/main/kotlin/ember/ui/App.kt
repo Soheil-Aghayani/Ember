@@ -145,9 +145,13 @@ fun EmberApp(
             engine.connectSelected()
         }
     }
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        MainShell(engine, theme, onThemeChange, language, onLanguageChange)
-        CredentialDialog(engine)
+    val toaster = remember { Toaster() }
+    CompositionLocalProvider(LocalToaster provides toaster) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            MainShell(engine, theme, onThemeChange, language, onLanguageChange)
+            CredentialDialog(engine)
+            ToastHost(toaster)
+        }
     }
 }
 
@@ -576,6 +580,7 @@ private fun LogsPage() {
     val entries by AppLogger.entries.collectAsState()
     var filter by remember { mutableStateOf(LogFilter.All) }
     val clipboard = LocalClipboardManager.current
+    val toaster = LocalToaster.current
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US) }
     val lines = remember(entries, filter) {
         entries.asReversed().filter {
@@ -598,14 +603,17 @@ private fun LogsPage() {
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconAction("copy", strings.copy, onClick = { clipboard.setText(AnnotatedString(lines.joinToString("\n"))) }, enabled = lines.isNotEmpty())
+        IconAction("copy", strings.copy, onClick = {
+            clipboard.setText(AnnotatedString(lines.joinToString("\n")))
+            toaster.show(strings.copied, ToastKind.Success)
+        }, enabled = lines.isNotEmpty())
         IconAction("trash", strings.clear, onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty())
     }
     Spacer(Modifier.height(12.dp))
     Card {
         SelectionContainer {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (lines.isEmpty()) Text(strings.emptyLogs, style = MaterialTheme.typography.bodySmall)
+                if (lines.isEmpty()) EmptyState("logs", strings.emptyLogsTitle, strings.emptyLogs)
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (line in lines) Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)

@@ -120,7 +120,7 @@ internal fun AppRulesSettings(engine: EmberEngine) {
         }
         Card {
             if (apps.isEmpty()) {
-                Text(strings.noApps, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EmptyState("shield-check", strings.emptyAppsTitle, strings.noApps)
             } else {
                 Column {
                     apps.forEachIndexed { index, name ->

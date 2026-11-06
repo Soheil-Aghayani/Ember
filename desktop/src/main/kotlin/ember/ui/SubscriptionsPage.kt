@@ -86,7 +86,40 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     var addMenu by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Subscription?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
+    val toaster = LocalToaster.current
+
+    fun addFromClipboard() {
+        val text = clipboard.getText()?.text.orEmpty().trim()
+        if (text.isEmpty()) {
+            toaster.show(strings.clipboardEmpty)
+            return
+        }
+        scope.launch {
+            runCatching { engine.subscriptions.add(text, "") }
+                .onSuccess { toaster.show(strings.serversAdded(it.nodes.count { node -> !node.isInfo }), ToastKind.Success) }
+                .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
+        }
+    }
+
+    fun importFiles() {
+        scope.launch {
+            val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
+            val problems = mutableListOf<String>()
+            var added = 0
+            for (file in chosen) {
+                // A server file is small; anything bigger is not one.
+                if (file.length() > 2_000_000) {
+                    problems += strings.fileTooLarge(file.name)
+                    continue
+                }
+                runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
+                    .onSuccess { added += it.nodes.count { node -> !node.isInfo } }
+                    .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
+            }
+            if (added > 0) toaster.show(strings.serversAdded(added), ToastKind.Success)
+            if (problems.isNotEmpty()) toaster.show(problems.joinToString("\n"), ToastKind.Error)
+        }
+    }
 
     if (showAdd) AddSubscriptionDialog(engine, null, onClose = { showAdd = false })
     editing?.let { current -> AddSubscriptionDialog(engine, current, onClose = { editing = null }) }
@@ -108,53 +141,27 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                 DropdownMenuItem(
                     text = { Text(strings.pasteFromClipboard) },
                     leadingIcon = { EmberIcon("clipboard", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
-                    onClick = {
-                        addMenu = false
-                        val text = clipboard.getText()?.text.orEmpty().trim()
-                        if (text.isEmpty()) {
-                            message = strings.clipboardEmpty
-                        } else {
-                            message = null
-                            scope.launch { runCatching { engine.subscriptions.add(text, "") }.onFailure { message = it.message ?: strings.signInFailed } }
-                        }
-                    },
+                    onClick = { addMenu = false; addFromClipboard() },
                 )
                 DropdownMenuItem(
                     text = { Text(strings.importFile) },
                     leadingIcon = { EmberIcon("import-file", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
-                    onClick = {
-                        addMenu = false
-                        scope.launch {
-                            val chosen = withContext(Dispatchers.IO) { chooseServerFiles(strings.chooseFileTitle) }
-                            if (chosen.isNotEmpty()) message = null
-                            val problems = mutableListOf<String>()
-                            for (file in chosen) {
-                                // A server file is small; anything bigger is not one.
-                                if (file.length() > 2_000_000) {
-                                    problems += strings.fileTooLarge(file.name)
-                                    continue
-                                }
-                                runCatching { engine.subscriptions.add(withContext(Dispatchers.IO) { readServerFile(file) }, file.nameWithoutExtension) }
-                                    .onFailure { problems += "${file.name}: ${it.message ?: strings.signInFailed}" }
-                            }
-                            if (problems.isNotEmpty()) message = problems.joinToString("\n")
-                        }
-                    },
+                    onClick = { addMenu = false; importFiles() },
                 )
             }
         }
     }
     Spacer(Modifier.height(8.dp))
     Text(strings.subscriptionsHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    message?.let {
-        Spacer(Modifier.height(8.dp))
-        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-    }
     Spacer(Modifier.height(16.dp))
 
     if (subscriptions.isEmpty()) {
         Card {
-            Text(strings.noSubscriptions, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+            EmptyState("subscriptions", strings.emptyServersTitle, strings.noSubscriptions) {
+                Button(onClick = { showAdd = true }, shape = RoundedCornerShape(12.dp)) { Text(strings.addSubscription) }
+                IconAction("clipboard", strings.pasteFromClipboard, onClick = { addFromClipboard() })
+                IconAction("import-file", strings.importFile, onClick = { importFiles() })
+            }
         }
         return
     }
@@ -174,9 +181,10 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
             onStopTest = { engine.cancelTest() },
             onRefresh = {
                 busyId = subscription.id
-                message = null
                 scope.launch {
-                    runCatching { engine.subscriptions.refresh(subscription.id) }.onFailure { message = it.message ?: strings.signInFailed }
+                    runCatching { engine.subscriptions.refresh(subscription.id) }
+                        .onSuccess { toaster.show(strings.updated, ToastKind.Success) }
+                        .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
                     busyId = null
                 }
             },

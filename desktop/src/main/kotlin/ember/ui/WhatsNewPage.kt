@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.82",
+        listOf(
+            "Short messages (toasts) slide up from the bottom for things like \"Added 17 servers\", \"Copied\" and errors, instead of a red line on the page.",
+            "Empty lists now show a floating mark, what is missing and what to do: the Servers page offers Add link, clipboard and file; Logs and Apps have their own.",
+        ),
+        listOf(
+            "پیام‌های کوتاه از پایین پنجره بالا می‌آیند، مثل «۱۷ سرور اضافه شد»، «کپی شد» و خطاها، به جای یک خط قرمز در صفحه.",
+            "فهرست‌های خالی حالا یک نشان شناور، توضیح کمبود و کار بعدی را نشان می‌دهند: صفحهٔ سرورها افزودن لینک، کلیپ‌بورد و فایل را پیشنهاد می‌دهد؛ گزارش‌ها و برنامه‌ها هم نمای خودشان را دارند.",
+        ),
+    ),
+    Release(
         "1.0.81",
         listOf(
             "Dark theme polish (Settings > Appearance > Dark, or System): warm surface tones for dialogs, menus, switches and text fields in both themes, and the colours glide when you change theme.",

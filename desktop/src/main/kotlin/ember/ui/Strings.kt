@@ -172,6 +172,12 @@ data class Strings(
     val noApps: String,
     val removeApp: String,
     val chooseAppTitle: String,
+    val serversAdded: (Int) -> String,
+    val copied: String,
+    val updated: String,
+    val emptyServersTitle: String,
+    val emptyLogsTitle: String,
+    val emptyAppsTitle: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -344,6 +350,12 @@ val EnglishStrings = Strings(
     noApps = "No apps yet. Add Firefox, for example.",
     removeApp = "Remove",
     chooseAppTitle = "Choose a program",
+    serversAdded = { if (it == 1) "Added 1 server" else "Added $it servers" },
+    copied = "Copied",
+    updated = "Updated",
+    emptyServersTitle = "No servers yet",
+    emptyLogsTitle = "Nothing logged yet",
+    emptyAppsTitle = "No apps in the list",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -516,6 +528,12 @@ val PersianStrings = Strings(
     noApps = "هنوز برنامه‌ای اضافه نشده. مثلاً Firefox را اضافه کنید.",
     removeApp = "حذف",
     chooseAppTitle = "انتخاب برنامه",
+    serversAdded = { "$it سرور اضافه شد" },
+    copied = "کپی شد",
+    updated = "به‌روز شد",
+    emptyServersTitle = "هنوز سروری نیست",
+    emptyLogsTitle = "هنوز گزارشی نیست",
+    emptyAppsTitle = "برنامه‌ای در فهرست نیست",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 
