@@ -3,7 +3,7 @@ mod net;
 mod process;
 
 use ember_helper::{
-    config::{self, StateConfig, UpConfig},
+    config::{self, GuardConfig, StateConfig, UpConfig},
     ip::{self, Cidr},
     network::{self, DefaultRoute},
     routes::{self, RouteRecord},
@@ -492,6 +492,48 @@ fn find_hev(root: &Path) -> Result<PathBuf> {
     Err("hev-socks5-tunnel.exe was not found next to this script".into())
 }
 
+/// A kill switch on its own: blocks the public internet on the real adapters except for the server addresses, while
+/// another program (OpenVPN) carries the traffic. It stays until asked to stop, and, like the tunnel's kill switch, it
+/// stays in place if Ember disappears, so nothing leaks.
+fn guard(value: &Value, state: &State) -> Result<()> {
+    let config = GuardConfig::parse(value, |s| state.log(s))?;
+    let firewall = Firewall::new()?;
+    state.cleanup(Some(&firewall), &[]);
+    state.remove("stop");
+    state.status("STARTING")?;
+    // The guard is set before the VPN program makes its adapter; adapters of that kind are never blocked.
+    let adapters = net::adapters()?;
+    let wanted: Vec<String> = net::active_names(&adapters, "")
+        .into_iter()
+        .filter(|name| !config::tunnel_like(name))
+        .collect();
+    let names = firewall.usable_interfaces(&wanted);
+    for skipped in wanted.iter().filter(|n| !names.contains(n)) {
+        state.log(&format!("kill switch: the firewall does not manage '{skipped}'; skipped"));
+    }
+    if names.is_empty() {
+        return Err("no active network adapter was found for the kill switch".into());
+    }
+    let ranges = ip::blocked_ranges(&config.edge_ips, &config.exclusions);
+    firewall.block("Ember kill switch", &ranges.join(","), 256, None, Some(&names))?;
+    state.log(&format!("kill switch (guard only) set on: {} ({} blocked ranges)", names.join(", "), ranges.len()));
+    state.status("UP")?;
+    loop {
+        sleep(Duration::from_secs(1));
+        if state.dir.join("stop").exists() {
+            state.cleanup(Some(&firewall), &[]);
+            state.status("DOWN")?;
+            state.log("guard stopped on request");
+            return Ok(());
+        }
+        if !process::alive(config.parent_pid)? {
+            state.status("BLOCKED: Ember closed unexpectedly; the kill switch is blocking traffic")?;
+            state.log("parent gone; kill switch left in place");
+            return Ok(());
+        }
+    }
+}
+
 fn run(mode: &str, value: &Value, state: &State) -> Result<()> {
     // Check before COM activation, process termination, or any network mutation, including restore.
     if !process::elevated()? {
@@ -502,6 +544,14 @@ fn run(mode: &str, value: &Value, state: &State) -> Result<()> {
         state.status("DOWN")?;
         state.log("restore complete");
         return Ok(());
+    }
+    if GuardConfig::requested(value) {
+        let result = guard(value, state);
+        if let Err(e) = &result {
+            state.log(&format!("error: {e}"));
+            state.cleanup(None, &[]);
+        }
+        return result;
     }
     let prepared = || -> Result<(UpConfig, PathBuf, Firewall)> {
         let config = UpConfig::parse(value, &state.dir, |s| state.log(s))?;

@@ -42,6 +42,54 @@ struct RawUpConfig {
     parent_pid: i32,
 }
 
+/// What a kill switch on its own needs: no tunnel of ours, only the addresses that may leave the real network.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawGuardConfig {
+    edge_ips: Vec<String>,
+    #[serde(default)]
+    exclude_cidrs: Value,
+    parent_pid: i32,
+}
+
+pub struct GuardConfig {
+    pub edge_ips: Vec<Ipv4Addr>,
+    pub exclusions: Vec<Cidr>,
+    pub parent_pid: i32,
+}
+
+impl GuardConfig {
+    /// The config asks for a kill switch only (used while another program, such as OpenVPN, carries the traffic).
+    pub fn requested(value: &Value) -> bool {
+        value.get("guardOnly").and_then(Value::as_bool) == Some(true)
+    }
+
+    pub fn parse(value: &Value, log: impl FnMut(&str)) -> Result<Self> {
+        let raw: RawGuardConfig = serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
+        let edge_ips = raw
+            .edge_ips
+            .iter()
+            .map(|s| ipv4(s).ok_or_else(|| format!("invalid address in config: {s}")))
+            .collect::<Result<Vec<_>>>()?;
+        if edge_ips.is_empty() {
+            return Err("the kill switch needs at least one server address".into());
+        }
+        Ok(Self {
+            edge_ips,
+            exclusions: exclusions(&raw.exclude_cidrs, log),
+            parent_pid: raw.parent_pid,
+        })
+    }
+}
+
+/// Adapters that a VPN program or tunnel makes (they carry the protected traffic and must not be blocked).
+pub fn tunnel_like(name: &str) -> bool {
+    let name = name.to_lowercase();
+    ["openvpn", "wintun", "tap-", "wireguard", "ember", "sing-tun", "tun"]
+        .iter()
+        .any(|part| name.contains(part))
+}
+
 pub struct UpConfig {
     pub adapter_name: String,
     pub tun_address: Ipv4Addr,
@@ -169,6 +217,28 @@ mod tests {
         assert_eq!(logs.len(), 4);
         assert_eq!(logs[0], "ignored invalid exclusion: 0.0.0.0/0");
         assert!(exclusions(&Value::Null, |_| panic!()).is_empty());
+    }
+
+    #[test]
+    fn a_guard_config_needs_a_server_address_and_ignores_bad_exclusions() {
+        let ok = json!({"guardOnly": true, "edgeIps": ["203.0.113.7"], "excludeCidrs": ["0.0.0.0/0", "10.1.2.3/24"], "parentPid": 7});
+        assert!(GuardConfig::requested(&ok));
+        let parsed = GuardConfig::parse(&ok, |_| {}).unwrap();
+        assert_eq!(parsed.edge_ips[0].to_string(), "203.0.113.7");
+        assert_eq!(parsed.exclusions.len(), 1);
+        assert!(!GuardConfig::requested(&json!({"edgeIps": ["203.0.113.7"]})));
+        assert!(GuardConfig::parse(&json!({"edgeIps": [], "parentPid": 7}), |_| {}).is_err());
+        assert!(GuardConfig::parse(&json!({"edgeIps": ["::1"], "parentPid": 7}), |_| {}).is_err());
+    }
+
+    #[test]
+    fn tunnel_adapters_are_recognised_by_name() {
+        for name in ["OpenVPN Wintun", "OpenVPN TAP-Windows6", "EmberTun", "EmberApps", "WireGuard Tunnel"] {
+            assert!(tunnel_like(name), "{name}");
+        }
+        for name in ["Ethernet", "Ethernet 2", "Wi-Fi", "Local Area Connection* 2", "Bluetooth Network Connection"] {
+            assert!(!tunnel_like(name), "{name}");
+        }
     }
 
     #[test]

@@ -145,6 +145,26 @@ class WindowsTunnel(dataDir: File) {
         }
     }
 
+    /**
+     * Starts only the kill switch (no tunnel of ours): the public internet is blocked on the real adapters except for
+     * [edgeIps], while another program (OpenVPN) carries the traffic. Needs the native helper.
+     */
+    suspend fun startGuard(edgeIps: List<String>, onProgress: (String) -> Unit = {}) {
+        val native = nativeHelper ?: error("The kill switch needs Ember's network helper, which is missing from this installation.")
+        stopStaleHelper()
+        val config = JSONObject()
+            .put("stateDir", stateDir.absolutePath)
+            .put("guardOnly", true)
+            .put("edgeIps", JSONArray(edgeIps))
+            .put("excludeCidrs", JSONArray())
+            .put("parentPid", ProcessHandle.current().pid())
+        try {
+            startWith(native, native = true, config, onProgress)
+        } catch (failure: HelperFailure) {
+            throw IllegalStateException(failure.message)
+        }
+    }
+
     private suspend fun startWith(helper: File, native: Boolean, config: JSONObject, onProgress: (String) -> Unit) {
         statusFile.delete()
         stopFile.delete()

@@ -106,6 +106,7 @@ class EmberEngine(private val dataDir: File) {
     private val rememberedCredentials = mutableMapOf<String, OpenVpnCredentials>()
 
     private val _usingOpenVpn = MutableStateFlow(false)
+    private var openVpnGuard = false
 
     private val _appRules = MutableStateFlow(false)
 
@@ -428,19 +429,32 @@ class EmberEngine(private val dataDir: File) {
                     xray.stop()
                     it.join()
                 }
+                var sessionProfile = profile
+                if (settings.killSwitch && tunnel.isAvailable) {
+                    // Block the real network except the server before OpenVPN starts, so nothing can leak if it drops.
+                    _progress.value = "Setting up the kill switch…"
+                    val pinned = OpenVpnProfile.remotes(profile)
+                        .mapNotNull { host -> runCatching { resolveIpv4(host) }.getOrNull()?.let { host to it } }.toMap()
+                    if (pinned.isEmpty()) error("Could not look up the OpenVPN server's address for the kill switch.")
+                    sessionProfile = OpenVpnProfile.pinRemotes(profile, pinned)
+                    tunnel.startGuard(pinned.values.distinct()) { _progress.value = it }
+                    openVpnGuard = true
+                }
                 if (!openVpn.taskReady(exe)) {
                     _progress.value = "Waiting for Windows permission (one time)…"
                     openVpn.installTask(exe)
                     _progress.value = "Connecting to " + node.title + "..."
                 }
                 openVpn.session(
-                    profile,
+                    sessionProfile,
                     askCredentials = { subject, askUser -> askForCredentials(node, subject, askUser) },
                     onProgress = { _progress.value = it },
                     onConnected = {
                         _connectedAtMs.value = System.currentTimeMillis()
                         _progress.value = null
                         _state.value = ConnectionState.CONNECTED
+                        // with the kill switch on, a crash or restart of Ember resumes the connection like whole-device mode
+                        settings.wasConnected = openVpnGuard
                         AppLogger.i(TAG, "connected via OpenVPN after ${elapsedMsSince(startedAtNanos)} ms")
                         checkExit()
                     },
@@ -806,6 +820,10 @@ class EmberEngine(private val dataDir: File) {
     private suspend fun teardown(helperAlreadyBlocked: Boolean = false) = withContext(NonCancellable) {
         if (_wholeDevice.value && !helperAlreadyBlocked) {
             runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the tunnel helper failed", it) }
+        }
+        if (openVpnGuard) {
+            runCatching { tunnel.stop() }.onFailure { AppLogger.w(TAG, "stopping the kill switch failed", it) }
+            openVpnGuard = false
         }
         if (_appRules.value) runCatching { appRouting.stop() }.onFailure { AppLogger.w(TAG, "stopping the app-rules program failed", it) }
         runCatching { xray.stop() }

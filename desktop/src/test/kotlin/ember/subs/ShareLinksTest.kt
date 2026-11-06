@@ -215,6 +215,16 @@ class ShareLinksTest {
     }
 
     @Test
+    fun anOpenVpnProfileCanBePinnedToTheAddressesTheKillSwitchAllows() {
+        val profile = OpenVpnProfile.prepare("client\ndev tun\nremote vpn.example.com 443 udp\nremote 198.51.100.4 1194\n<ca>\nremote not-a-line\n</ca>\n") { null }
+        assertEquals(listOf("vpn.example.com", "198.51.100.4"), OpenVpnProfile.remotes(profile))
+        val pinned = OpenVpnProfile.pinRemotes(profile, mapOf("vpn.example.com" to "203.0.113.9"))
+        assertTrue("remote 203.0.113.9 443 udp" in pinned)
+        assertTrue("remote 198.51.100.4 1194" in pinned)
+        assertTrue("remote not-a-line" in pinned) // text inside a certificate block is untouched
+    }
+
+    @Test
     fun anOpenVpnProfileNeedsItsFilesAndCannotUseP12() {
         assertTrue(assertFailsWith<IllegalStateException> { SubscriptionParser.parseNodes(ovpn) }.message!!.contains("ca.crt"))
         assertTrue(assertFailsWith<IllegalStateException> { OpenVpnProfile.prepare("pkcs12 x.p12") { null } }.message!!.contains(".p12"))

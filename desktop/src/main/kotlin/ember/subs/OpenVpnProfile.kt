@@ -87,6 +87,36 @@ object OpenVpnProfile {
         return result
     }
 
+    /** The server names or addresses of every `remote` line. */
+    fun remotes(profile: String): List<String> = directives(profile).filter { it[0] == "remote" && it.size >= 2 }.map { it[1] }.distinct()
+
+    /**
+     * [profile] with each `remote` host replaced by the address in [addresses]. Used while the kill switch is on, which
+     * only lets those addresses through, so OpenVPN must not need a name lookup of its own.
+     */
+    fun pinRemotes(profile: String, addresses: Map<String, String>): String {
+        var block: String? = null
+        return profile.lines().joinToString("\n") { line ->
+            val trimmed = line.trim()
+            val open = block
+            when {
+                open != null -> {
+                    if (trimmed.equals("</$open>", ignoreCase = true)) block = null
+                    line
+                }
+                trimmed.startsWith("<") && trimmed.endsWith(">") && !trimmed.startsWith("</") -> {
+                    block = trimmed.trim('<', '>').lowercase()
+                    line
+                }
+                else -> {
+                    val tokens = trimmed.split(Regex("\\s+"))
+                    val ip = if (tokens.size >= 2 && tokens[0].equals("remote", ignoreCase = true)) addresses[tokens[1]] else null
+                    if (ip != null) (listOf("remote", ip) + tokens.drop(2)).joinToString(" ") else line
+                }
+            }
+        }
+    }
+
     /** True when connecting needs a user name and password from the user. */
     fun needsCredentials(profile: String): Boolean = directives(profile).any { it[0] == "auth-user-pass" }
 

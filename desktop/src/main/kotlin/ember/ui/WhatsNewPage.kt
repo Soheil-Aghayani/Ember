@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.87",
+        listOf(
+            "Kill switch for OpenVPN servers: before OpenVPN starts, Ember blocks the real network except for the server's address, and lifts it when you disconnect. It stays in place if Ember closes by accident, like in whole-device mode.",
+            "App rules (Apps setting) fail closed: if the VPN stops, the apps that use it lose their connection instead of leaking. A firewall kill switch cannot be used there because it would also block the apps you skipped.",
+        ),
+        listOf(
+            "محافظ قطع اتصال برای سرورهای OpenVPN: پیش از شروع OpenVPN، Ember شبکهٔ واقعی را جز آدرس سرور مسدود می‌کند و با قطع اتصال برمی‌دارد. اگر Ember ناخواسته بسته شود، مثل حالت کل دستگاه سر جایش می‌ماند.",
+            "قوانین برنامه‌ها (تنظیم برنامه‌ها) امن‌شکست‌اند: اگر VPN قطع شود، برنامه‌هایی که از آن استفاده می‌کنند به جای نشت اطلاعات اتصالشان قطع می‌شود. محافظ فایروال در آنجا ممکن نیست چون برنامه‌های ردشده را هم مسدود می‌کرد.",
+        ),
+    ),
+    Release(
         "1.0.86",
         listOf(
             "Automatic failover: if the connected server stops passing traffic for about a minute, Ember switches to the next-fastest server by itself (up to three times) and tells you. Turn it off in Settings > Connection > Protection.",

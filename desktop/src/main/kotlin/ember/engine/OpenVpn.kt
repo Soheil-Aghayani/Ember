@@ -97,6 +97,16 @@ class OpenVpnRunner(dataDir: File, private val privileged: PrivilegedTask) {
         onConnected: () -> Unit,
     ) = withContext(Dispatchers.IO) {
         dir.mkdirs()
+        if (isRunning()) {
+            // an OpenVPN left running by an earlier Ember (it holds the old management password): end it first
+            AppLogger.w(TAG, "ending an OpenVPN that was already running")
+            run("schtasks.exe", "/end", "/tn", TASK)
+            var waited = 0
+            while (waited < 4_000 && isRunning()) {
+                delay(300)
+                waited += 300
+            }
+        }
         val secret = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
         profileFile.writeText(profile)
         passwordFile.writeText(secret)
