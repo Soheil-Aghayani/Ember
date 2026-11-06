@@ -195,6 +195,9 @@ data class Strings(
     val qrTooLong: String,
     val copyLink: String,
     val close: String,
+    val addWarpChain: String,
+    val warpChainTitle: String,
+    val warpChainHelp: String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -390,6 +393,9 @@ val EnglishStrings = Strings(
     qrTooLong = "This server's link is too long for a QR code. Copy the link instead.",
     copyLink = "Copy link",
     close = "Close",
+    addWarpChain = "Add WARP through one of my servers…",
+    warpChainTitle = "Which server should carry WARP?",
+    warpChainHelp = "Use this when your network blocks Cloudflare directly. WARP travels inside the connection to the server you pick (it must carry UDP), and your traffic leaves from Cloudflare.",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -585,6 +591,9 @@ val PersianStrings = Strings(
     qrTooLong = "لینک این سرور برای کد QR بیش از حد بلند است. به جایش لینک را کپی کنید.",
     copyLink = "کپی لینک",
     close = "بستن",
+    addWarpChain = "افزودن WARP از طریق یکی از سرورهای من…",
+    warpChainTitle = "کدام سرور WARP را حمل کند؟",
+    warpChainHelp = "وقتی شبکه‌تان مستقیم به Cloudflare دسترسی نمی‌دهد از این استفاده کنید. WARP درون اتصال به سروری که انتخاب می‌کنید می‌رود (باید UDP را عبور دهد) و ترافیک شما از Cloudflare خارج می‌شود.",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 

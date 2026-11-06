@@ -147,6 +147,19 @@ class SubscriptionStore(private val file: File) {
         return subscription
     }
 
+    /**
+     * Adds Cloudflare WARP carried through [carrier] (a server of the user's), for networks that drop WireGuard to
+     * Cloudflare. Registers a WARP device first when there is none yet.
+     */
+    suspend fun addWarpChain(carrier: ProxyNode): ProxyNode {
+        val warp = _subscriptions.value.firstOrNull { it.name == WARP_NAME } ?: addWarp()
+        val wireGuard = warp.nodes.first { it.protocol == "wireguard" }
+        val chain = WarpChain.create(carrier, JSONObject(wireGuard.raw.removePrefix(ShareLinks.JSON_PREFIX)))
+        require(warp.nodes.none { it.id == chain.id }) { "WARP through this server is already in your list." }
+        replace(warp.copy(nodes = warp.nodes + chain))
+        return chain
+    }
+
     /** Server links pasted directly (one per line): kept as a list without a link to refresh. */
     private fun addPasted(text: String, name: String): Subscription {
         val nodes = try {

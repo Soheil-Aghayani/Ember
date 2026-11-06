@@ -319,6 +319,31 @@ class ShareLinksTest {
     }
 
     @Test
+    fun warpCarriedThroughAServerBecomesTwoLinkedOutbounds() {
+        val carrier = ShareLinks.parse("vless://$uuid@vl.example.com:443?type=tcp#🇩🇪 Germany")!!
+        val registration = Warp.parseRegistration(warpAnswer, Warp.newKeyPair().first)
+        val wireGuard = ConfigFiles.wireGuard(Warp.configs(registration).first().second, "x")
+        val chain = WarpChain.create(carrier, JSONObject(wireGuard.raw.removePrefix(ShareLinks.JSON_PREFIX)))
+        assertEquals("warp", chain.protocol)
+        assertEquals("vl.example.com", chain.host) // the network sees the carrier, not Cloudflare
+        assertEquals(443, chain.port)
+        assertEquals("🇩🇪 WARP via Germany", chain.name)
+        assertEquals("de", chain.flagCode)
+        val back = ShareLinks.parse(chain.raw)!!
+        assertEquals(chain.id, back.id)
+        assertEquals(chain.name, back.name)
+        val outbounds = ShareLinks.outbounds(chain.raw, "203.0.113.7", "out0")
+        assertEquals(listOf("wireguard", "vless"), outbounds.map { it.getString("protocol") })
+        assertEquals("out0-carrier", outbounds[0].getJSONObject("streamSettings").getJSONObject("sockopt").getString("dialerProxy"))
+        assertEquals("out0-carrier", outbounds[1].getString("tag"))
+        assertEquals("162.159.192.1:2408", outbounds[0].getJSONObject("settings").getJSONArray("peers").getJSONObject(0).getString("endpoint"))
+        assertEquals(1, ShareLinks.outbounds(carrier.raw, "203.0.113.7", "out1").size)
+        // both outbounds reach Xray's configuration, the first one being the one traffic is routed to
+        val config = XrayConfig.many(listOf(Triple(chain, "203.0.113.7", 21001)), java.io.File("x.log"))
+        assertEquals(listOf("out0", "out0-carrier"), (0 until config.getJSONArray("outbounds").length()).map { config.getJSONArray("outbounds").getJSONObject(it).getString("tag") })
+    }
+
+    @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
         val node = SubscriptionParser.parseNodes(json).single()

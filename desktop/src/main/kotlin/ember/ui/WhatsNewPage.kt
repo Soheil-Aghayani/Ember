@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.90",
+        listOf(
+            "WARP through one of your servers: for networks that block Cloudflare, the + menu can add WARP carried inside a connection to a server you pick. Your traffic leaves from Cloudflare. The server must carry UDP.",
+        ),
+        listOf(
+            "WARP از طریق یکی از سرورهای شما: برای شبکه‌هایی که Cloudflare را مسدود می‌کنند، منوی + می‌تواند WARP را درون اتصال به سروری که انتخاب می‌کنید اضافه کند. ترافیک شما از Cloudflare خارج می‌شود. سرور باید UDP را عبور دهد.",
+        ),
+    ),
+    Release(
         "1.0.89",
         listOf(
             "Fixed a wrong error (\"The coroutine scope left the composition\") that appeared when you left the Servers page while servers were being added or refreshed. The work now finishes in the background.",

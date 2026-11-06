@@ -80,12 +80,17 @@ object ShareLinks {
                 raw.startsWith("hy2://") -> hysteria2(raw, "hy2")
                 raw.startsWith(JSON_PREFIX) -> JSONObject(raw.removePrefix(JSON_PREFIX)).let { fromXrayOutbound(it, it.optString(NAME_KEY), raw) }
                 raw.startsWith(OpenVpnProfile.PREFIX) -> OpenVpnProfile.fromRaw(raw)
+                raw.startsWith(WarpChain.PREFIX) -> WarpChain.fromRaw(raw)
                 else -> null
             }
         } catch (_: Exception) {
             null
         }
     }
+
+    /** Every Xray outbound [raw] needs: one for most servers, two for WARP carried through a server. The first is the one to route to. */
+    fun outbounds(raw: String, address: String, tag: String): List<JSONObject> =
+        if (raw.startsWith(WarpChain.PREFIX)) WarpChain.outbounds(raw, address, tag) else listOf(outbound(raw, address, tag))
 
     /** The Xray outbound for [raw]. [address] replaces the host (an IP the caller resolved, so the route to it can be pinned). */
     fun outbound(raw: String, address: String, tag: String): JSONObject = when {

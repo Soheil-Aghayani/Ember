@@ -45,8 +45,8 @@ object XrayConfig {
         // QUIC (UDP 443) is dropped here: many servers carry no UDP, and a browser then waits for a QUIC attempt that
         // never answers before it falls back to TCP. Dropping it makes sites use TCP straight away.
         val outbounds = JSONArray()
-            .put(ShareLinks.outbound(node.raw, address, "proxy"))
-            .put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
+        ShareLinks.outbounds(node.raw, address, "proxy").forEach { outbounds.put(it) }
+        outbounds.put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
         val rules = JSONArray()
         val config = base(logFile, verbose)
         if (bypass.isNotEmpty()) {
@@ -71,7 +71,7 @@ object XrayConfig {
         val rules = JSONArray()
         entries.forEachIndexed { i, (node, address, port) ->
             inbounds.put(socksInbound("in$i", port))
-            outbounds.put(ShareLinks.outbound(node.raw, address, "out$i"))
+            ShareLinks.outbounds(node.raw, address, "out$i").forEach { outbounds.put(it) }
             rules.put(JSONObject().put("type", "field").put("inboundTag", JSONArray().put("in$i")).put("outboundTag", "out$i"))
         }
         return base(logFile).put("inbounds", inbounds).put("outbounds", outbounds)

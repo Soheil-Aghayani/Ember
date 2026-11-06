@@ -11,6 +11,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -94,6 +97,7 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
     val siteCheck by engine.siteCheck.collectAsState()
     var showCheck by remember { mutableStateOf(false) }
     var qrNode by remember { mutableStateOf<ProxyNode?>(null) }
+    var pickCarrier by remember { mutableStateOf(false) }
 
     fun addFromClipboard() {
         val text = clipboard.getText()?.text.orEmpty().trim()
@@ -137,6 +141,20 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
         }
     }
 
+    if (pickCarrier) {
+        val candidates = sortNodes(
+            subscriptions.flatMap { it.nodes }.filter { !it.isInfo && it.protocol !in setOf("openvpn", "wireguard", "warp") }, results, favorites,
+        )
+        WarpCarrierDialog(candidates, results, onPick = { carrier ->
+            pickCarrier = false
+            toaster.show(strings.warpRegistering)
+            scope.launch {
+                attempt { engine.subscriptions.addWarpChain(carrier) }
+                    .onSuccess { toaster.show(strings.serversAdded(1), ToastKind.Success) }
+                    .onFailure { toaster.show(it.message ?: strings.signInFailed, ToastKind.Error) }
+            }
+        }, onClose = { pickCarrier = false })
+    }
     qrNode?.let { QrDialog(it, onClose = { qrNode = null }) }
     if (showCheck) {
         SiteCheckDialog(
@@ -176,6 +194,12 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                     text = { Text(strings.addWarp) },
                     leadingIcon = { EmberIcon("cloud", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
                     onClick = { addMenu = false; addWarp() },
+                )
+                DropdownMenuItem(
+                    text = { Text(strings.addWarpChain) },
+                    leadingIcon = { EmberIcon("cloud", 20.dp, MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { addMenu = false; pickCarrier = true },
+                    enabled = subscriptions.any { sub -> sub.nodes.any { !it.isInfo && it.protocol !in setOf("openvpn", "wireguard", "warp") } },
                 )
                 DropdownMenuItem(
                     text = { Text(strings.importFile) },
@@ -577,5 +601,47 @@ private fun AddSubscriptionDialog(engine: EmberEngine, existing: Subscription?, 
             ) { Text(if (busy) (if (existing == null) strings.adding else strings.saving) else (if (existing == null) strings.addSubscription else strings.save)) }
         },
         dismissButton = { TextButton(onClick = onClose, enabled = !busy) { Text(strings.cancel) } },
+    )
+}
+
+/** Choose which of the user's servers carries WARP: the list is ordered like the Servers page (favourites, fastest first). */
+@Composable
+private fun WarpCarrierDialog(
+    servers: List<ProxyNode>,
+    results: Map<String, ember.subs.NodeResult>,
+    onPick: (ProxyNode) -> Unit,
+    onClose: () -> Unit,
+) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(strings.warpChainTitle) },
+        text = {
+            Column {
+                Text(strings.warpChainHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                    servers.forEach { node ->
+                        val result = results[node.id]
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).pointerHoverIcon(PointerIcon.Hand)
+                                .clickable(role = Role.Button) { onPick(node) }.padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            node.flagCode?.let {
+                                FlagIcon(it, 24.dp)
+                                Spacer(Modifier.width(12.dp))
+                            }
+                            Text(node.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            (result?.mbps?.let { String.format(Locale.US, "%.0f Mbps", it) } ?: result?.pingMs?.let { "$it ms" })?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onClose) { Text(strings.cancel) } },
     )
 }
