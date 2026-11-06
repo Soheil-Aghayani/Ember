@@ -18,7 +18,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import com.soheil.ember.data.model.ConnectionState
+import com.soheil.ember.engine.VpnState
 import com.soheil.ember.R
 import com.soheil.ember.engine.AndroidEngine
 import kotlinx.coroutines.launch
@@ -35,6 +38,15 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         notice?.let {
             say(it)
             engine.clearNotice()
+        }
+    }
+    val context = LocalContext.current
+    val phase by VpnState.phase.collectAsState()
+    LaunchedEffect(phase) {
+        // the first time the VPN comes up, offer the tile: one tap from the quick settings next time
+        if (phase == ConnectionState.CONNECTED && !engine.tileOffered) {
+            engine.tileOffered = true
+            requestQuickSettingsTile(context)
         }
     }
     val items = listOf(

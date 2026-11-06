@@ -74,6 +74,11 @@ class AndroidEngine(private val context: Context) {
         _notice.value = text
     }
 
+    /** True once the user has been offered the quick-settings tile (after the first connection). */
+    var tileOffered: Boolean
+        get() = prefs.getBoolean("tileOffered", false)
+        set(value) = prefs.edit().putBoolean("tileOffered", value).apply()
+
     private val _autoFailover = MutableStateFlow(prefs.getBoolean("failover", true))
 
     /** Switch to the next-best server by itself when the connected one stops passing traffic. */

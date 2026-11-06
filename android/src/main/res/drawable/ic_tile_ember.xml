@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Ember orb as one colour, for the quick-settings tile and the status bar (Android tints it to fit): a soft
+     disc with a brighter core toward the top left, like the lit sphere of the app icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M12,2.5 A9.5,9.5 0 1,0 12,21.5 A9.5,9.5 0 1,0 12,2.5 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10,5 A6,6 0 1,0 10,17 A6,6 0 1,0 10,5 Z" />
+</vector>

@@ -2,6 +2,7 @@ package com.soheil.ember.ui
 
 import android.content.Intent
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -151,6 +152,22 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                         }
                     }
                 }
+            }
+        }
+
+        Card(
+            Modifier.fillMaxWidth().clickable {
+                if (!requestQuickSettingsTile(context)) {
+                    Toast.makeText(context, "Pull the top of the screen down, tap the pencil, and drag Ember in.", Toast.LENGTH_LONG).show()
+                }
+            },
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Add Ember to Quick settings", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Connect and disconnect from the panel you pull down from the top of the screen.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 

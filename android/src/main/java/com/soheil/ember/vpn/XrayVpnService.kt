@@ -11,6 +11,7 @@ import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.soheil.ember.EmberVpnApp
 import com.soheil.ember.MainActivity
+import com.soheil.ember.R
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.engine.AndroidEngine
@@ -216,7 +217,7 @@ class XrayVpnService : VpnService() {
         val notification: Notification = NotificationCompat.Builder(this, EmberVpnApp.VPN_NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Ember")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setSmallIcon(R.drawable.ic_tile_ember)
             .setContentIntent(open)
             .addAction(0, "Disconnect", disconnect)
             .setOngoing(true)

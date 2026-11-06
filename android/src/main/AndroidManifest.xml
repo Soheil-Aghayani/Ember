@@ -63,7 +63,7 @@
 
         <service
             android:name=".vpn.QuickConnectTile"
-            android:icon="@drawable/ic_solar_power"
+            android:icon="@drawable/ic_tile_ember"
             android:label="Ember"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
