@@ -9,6 +9,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +30,13 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val say: (String) -> Unit = { text -> scope.launch { snackbar.showSnackbar(text) } }
+    val notice by engine.notice.collectAsState()
+    LaunchedEffect(notice) {
+        notice?.let {
+            say(it)
+            engine.clearNotice()
+        }
+    }
     val items = listOf(
         Triple("Home", R.drawable.ic_solar_power, 0),
         Triple("Servers", R.drawable.ic_solar_global, 1),
@@ -51,7 +60,7 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         when (tab) {
             0 -> HomeScreen(engine, onConnect, onDisconnect, onOpenServers = { tab = 1 }, modifier = modifier)
             1 -> ServersScreen(engine, say, modifier = modifier)
-            else -> AboutScreen(modifier = modifier)
+            else -> AboutScreen(engine, modifier = modifier)
         }
     }
 }

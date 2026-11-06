@@ -18,12 +18,43 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.soheil.ember.BuildConfig
+import com.soheil.ember.data.AppLogger
+import com.soheil.ember.engine.AndroidEngine
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Version, components and how to reach the developer. */
 @Composable
-fun AboutScreen(modifier: Modifier = Modifier) {
+fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var showLogs by remember { mutableStateOf(false) }
+    if (showLogs) {
+        val entries by AppLogger.entries.collectAsState()
+        val text = remember(entries) {
+            val format = SimpleDateFormat("HH:mm:ss", Locale.US)
+            entries.takeLast(80).joinToString("\n") { "${format.format(Date(it.timestampMillis))} ${it.level} ${it.tag}: ${it.message}" } +
+                "\n\nXray: " + engine.xrayOutput()
+        }
+        AlertDialog(
+            onDismissRequest = { showLogs = false },
+            title = { Text("Logs") },
+            text = { Text(text, Modifier.verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { clipboard.setText(AnnotatedString(text)) }) { Text("Copy") } },
+            dismissButton = { TextButton(onClick = { showLogs = false }) { Text("Close") } },
+        )
+    }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text("About", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
@@ -44,6 +75,10 @@ fun AboutScreen(modifier: Modifier = Modifier) {
                 Text("Contact", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Telegram  @env_soh", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(Modifier.fillMaxWidth().clickable { showLogs = true }) {
+            Text("Logs", Modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
         }
         Spacer(Modifier.height(12.dp))
         Text(

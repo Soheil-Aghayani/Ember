@@ -33,7 +33,7 @@ object VpnState {
 }
 
 /** The user's servers, what was measured about them, and what they chose; shared by the screens and the VPN service. */
-class AndroidEngine(context: Context) {
+class AndroidEngine(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val main = Handler(Looper.getMainLooper())
@@ -56,6 +56,15 @@ class AndroidEngine(context: Context) {
     /** Plain-language step of a running server test, or null when none runs. */
     val testProgress: StateFlow<String?> = _testProgress
     private var testJob: Job? = null
+
+    private val _notice = MutableStateFlow<String?>(null)
+
+    /** Something to tell the user once (shown as a message at the bottom); call [clearNotice] after showing it. */
+    val notice: StateFlow<String?> = _notice
+
+    fun clearNotice() {
+        _notice.value = null
+    }
 
     fun chooseServer(id: String) {
         prefs.edit().putString("selected", id).apply()
@@ -97,8 +106,14 @@ class AndroidEngine(context: Context) {
                     { node, result -> subscriptions.recordResult(node, result) },
                     { node, ip -> subscriptions.rememberAddress(node, ip) },
                 )
+                val answered = nodes.count { subscriptions.results.value[it.id]?.pingMs != null }
+                if (answered == 0) {
+                    AppLogger.w(TAG, "no server answered; Xray said: ${xrayOutput()}")
+                    _notice.value = "No server answered the test. Open About, then Logs, to see why."
+                }
             } catch (failure: Throwable) {
                 AppLogger.w(TAG, "the server test failed", failure)
+                _notice.value = "The test could not run: ${failure.message ?: failure.javaClass.simpleName}"
             } finally {
                 _testProgress.value = null
                 subscriptions.saveResults()
@@ -118,6 +133,10 @@ class AndroidEngine(context: Context) {
             .getOrElse { failure ->
                 subscriptions.rememberedAddress(node) ?: throw IllegalStateException("Could not look up ${node.host}.", failure)
             }
+
+    /** The last lines Xray wrote, for the logs. */
+    fun xrayOutput(): String =
+        runCatching { File(context.filesDir, "xray/xray.out").readLines().takeLast(8).joinToString(" | ") }.getOrDefault("(nothing)").take(700)
 
     /** A running test owns Xray; the VPN service ends it before it starts its own copy. */
     fun stopTestForConnect() {

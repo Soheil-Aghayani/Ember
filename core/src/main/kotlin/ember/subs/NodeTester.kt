@@ -27,7 +27,7 @@ private const val SPEED_TOP = 12
 /** An IPv4 address for [host], or null when it cannot be looked up. */
 fun resolveIpv4(host: String): String? = runCatching {
     InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
-}.getOrNull()
+}.onFailure { AppLogger.w(TAG, "could not look up $host (${it.javaClass.simpleName}: ${it.message})") }.getOrNull()
 
 /**
  * Tests every server of a subscription through one Xray process (one local port per server): first how fast each
@@ -36,12 +36,15 @@ fun resolveIpv4(host: String): String? = runCatching {
  */
 class NodeTester(private val xray: XrayProcess) {
 
+    @Volatile private var loggedPingFailure = false
+
     suspend fun run(
         nodes: List<ProxyNode>,
         onProgress: (String) -> Unit,
         onResult: (ProxyNode, NodeResult) -> Unit,
         onAddress: (ProxyNode, String) -> Unit = { _, _ -> },
     ) = withContext(Dispatchers.IO) {
+        loggedPingFailure = false
         val candidates = nodes.filterNot { it.isInfo }
         onProgress("Looking up the servers…")
         val resolved = coroutineScope {
@@ -50,6 +53,7 @@ class NodeTester(private val xray: XrayProcess) {
             }.awaitAll()
         }
         resolved.forEach { (node, ip) -> if (ip != null) onAddress(node, ip) }
+        AppLogger.i(TAG, "looked up ${resolved.count { it.second != null }} of ${resolved.size} servers")
         val reachable = resolved.mapNotNull { (node, ip) -> ip?.let { Triple(node, it, 0) } }
         resolved.filter { it.second == null }.forEach { (node, _) -> onResult(node, NodeResult(null, null, System.currentTimeMillis())) }
         if (reachable.isEmpty()) return@withContext
@@ -101,6 +105,11 @@ class NodeTester(private val xray: XrayProcess) {
                 val start = System.nanoTime()
                 runCatching {
                     client.newCall(Request.Builder().url(PING_URL).build()).execute().use { r -> r.body?.bytes(); r.code in 200..399 }
+                }.onFailure {
+                    if (!loggedPingFailure) {
+                        loggedPingFailure = true
+                        AppLogger.w(TAG, "a request through a server failed: ${it.javaClass.simpleName}: ${it.message}")
+                    }
                 }.getOrNull()?.takeIf { ok -> ok }?.let { ((System.nanoTime() - start) / 1_000_000L).toInt() }
             }
             times.minOrNull()
