@@ -121,36 +121,6 @@ fun main(args: Array<String>) = application {
                 with(density) { 560.dp.roundToPx() },
             )
         }
-        DisposableEffect(window, supportsRoundedWindow, density, showRoundedFrame) {
-            if (!supportsRoundedWindow || !showRoundedFrame) {
-                if (supportsRoundedWindow) window.shape = null
-                return@DisposableEffect onDispose {}
-            }
-            val cornerDiameter = with(density) { EmberDesktopMetrics.windowCornerRadius.toPx() * 2 }
-            fun updateWindowShape() {
-                if (window.width > 0 && window.height > 0) {
-                    runCatching {
-                        window.shape = RoundRectangle2D.Double(
-                            0.0,
-                            0.0,
-                            window.width.toDouble(),
-                            window.height.toDouble(),
-                            cornerDiameter.toDouble(),
-                            cornerDiameter.toDouble(),
-                        )
-                    }
-                }
-            }
-            val resizeListener = object : ComponentAdapter() {
-                override fun componentResized(event: ComponentEvent) = updateWindowShape()
-            }
-            window.addComponentListener(resizeListener)
-            updateWindowShape()
-            onDispose {
-                window.removeComponentListener(resizeListener)
-                window.shape = null
-            }
-        }
         EmberTheme(darkTheme = when (theme) {
             "Light" -> false
             "Dark" -> true

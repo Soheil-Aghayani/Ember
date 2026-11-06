@@ -8,6 +8,11 @@ import org.json.JSONObject
 
 private val INFO_HOSTS = setOf("0.0.0.0", "127.0.0.1", "localhost", "::1")
 
+private val SHARE_SCHEMES = listOf("vless://", "vmess://", "trojan://", "ss://", "hysteria2://", "hy2://")
+
+/** The link another app can import for this server, or null for kinds that have none (files, WireGuard, OpenVPN). */
+val ProxyNode.shareLink: String? get() = raw.takeIf { link -> SHARE_SCHEMES.any { link.startsWith(it) } }
+
 /** One server from a subscription. [raw] is the share link it came from, so the node can be rebuilt later. */
 data class ProxyNode(
     val id: String,

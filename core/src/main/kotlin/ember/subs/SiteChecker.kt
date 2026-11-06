@@ -53,7 +53,7 @@ fun normalizeSiteUrl(input: String): String? {
  * Asks every server for one website, all at the same time through one Xray process (the way [NodeTester] measures
  * speed), so the user can see which servers the site accepts. Must run while Ember is not connected.
  */
-class SiteChecker(private val xray: XrayRunner) {
+class SiteChecker(private val xray: XrayProcess) {
 
     suspend fun run(
         nodes: List<ProxyNode>,
@@ -71,7 +71,7 @@ class SiteChecker(private val xray: XrayRunner) {
         val reachable = resolved.mapNotNull { (node, ip) -> ip?.let { node to it } }
         if (reachable.isEmpty()) return@withContext
 
-        val ports = XrayRunner.freePorts(reachable.size)
+        val ports = freePorts(reachable.size)
         val entries = reachable.mapIndexed { i, (node, ip) -> Triple(node, ip, ports[i]) }
         try {
             xray.start(XrayConfig.many(entries, xray.logFile))

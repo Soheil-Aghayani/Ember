@@ -34,7 +34,7 @@ internal fun resolveIpv4(host: String): String? = runCatching {
  * answers, then the download speed of the quickest ones one after another so they do not share the bandwidth.
  * Must run while Ember is not connected, otherwise the traffic would go through the tunnel.
  */
-class NodeTester(private val xray: XrayRunner) {
+class NodeTester(private val xray: XrayProcess) {
 
     suspend fun run(
         nodes: List<ProxyNode>,
@@ -54,7 +54,7 @@ class NodeTester(private val xray: XrayRunner) {
         resolved.filter { it.second == null }.forEach { (node, _) -> onResult(node, NodeResult(null, null, System.currentTimeMillis())) }
         if (reachable.isEmpty()) return@withContext
 
-        val ports = XrayRunner.freePorts(reachable.size)
+        val ports = freePorts(reachable.size)
         val entries = reachable.mapIndexed { i, (node, ip, _) -> Triple(node, ip, ports[i]) }
         try {
             xray.start(XrayConfig.many(entries, xray.logFile))

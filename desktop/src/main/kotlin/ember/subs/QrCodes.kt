@@ -14,11 +14,6 @@ import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 
-private val SHARE_SCHEMES = listOf("vless://", "vmess://", "trojan://", "ss://", "hysteria2://", "hy2://")
-
-/** The link another app can import for this server, or null for kinds that have none (files, WireGuard, OpenVPN). */
-val ProxyNode.shareLink: String? get() = raw.takeIf { link -> SHARE_SCHEMES.any { link.startsWith(it) } }
-
 /** QR codes: drawing a link as one, and reading one out of a picture (for example a screenshot from a phone). */
 object QrCodes {
 

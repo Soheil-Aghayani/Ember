@@ -464,7 +464,8 @@ private fun ServerRow(
         if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface, tween(250), label = "selected",
     )
     val speedBar = remember { Animatable(0f) }
-    val barTarget = if (result?.mbps != null && fastest > 0) (result.mbps / fastest).toFloat().coerceIn(0.04f, 1f) else 0f
+    val measured = result?.mbps
+    val barTarget = if (measured != null && fastest > 0) (measured / fastest).toFloat().coerceIn(0.04f, 1f) else 0f
     LaunchedEffect(barTarget) { speedBar.animateTo(barTarget, tween(700, easing = FastOutSlowInEasing)) }
     val pop = remember { Animatable(1f) }
     var firstStar by remember { mutableStateOf(true) }
