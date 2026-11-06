@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -29,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.soheil.ember.R
+import ember.subs.SitePresets
+import ember.subs.normalizeSiteUrl
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
@@ -60,7 +66,7 @@ import java.util.Locale
 
 /** Subscriptions and servers: add them (link, clipboard, QR code, file, WARP), test them, and pick the one Connect uses. */
 @Composable
-fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val subscriptions by engine.subscriptions.subscriptions.collectAsState()
@@ -71,6 +77,8 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
     val phase by VpnState.phase.collectAsState()
     var menu by remember { mutableStateOf(false) }
     var askLink by remember { mutableStateOf(false) }
+    var askSite by remember { mutableStateOf(false) }
+    val siteCheck by engine.siteCheck.collectAsState()
 
     fun report(result: Result<Subscription>) {
         result.onSuccess { say("Added ${it.nodes.count { node -> !node.isInfo }} servers") }
@@ -104,6 +112,42 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
         )
     }
 
+    if (askSite) {
+        var input by remember { mutableStateOf("") }
+        var picked by remember { mutableStateOf<String?>(null) }
+        val url = normalizeSiteUrl(input)
+        AlertDialog(
+            onDismissRequest = { askSite = false },
+            title = { Text("Which servers reach a website?") },
+            text = {
+                Column {
+                    Text(
+                        "Some sites refuse certain servers. Ember asks every server for the site and marks the ones it accepts. Disconnect first.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((name, address) in SitePresets.list) {
+                            FilterChip(selected = picked == name, onClick = { picked = name; input = address }, label = { Text(name) })
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = input, onValueChange = { input = it; picked = null }, label = { Text("Website, e.g. open.spotify.com") },
+                        singleLine = true, isError = input.isNotBlank() && url == null, modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(enabled = url != null, onClick = {
+                    askSite = false
+                    engine.checkSite(subscriptions.flatMap { it.nodes }, picked ?: runCatching { java.net.URI(url!!).host.removePrefix("www.") }.getOrDefault(url!!), url!!)
+                }) { Text("Check") }
+            },
+            dismissButton = { TextButton(onClick = { askSite = false }) { Text("Cancel") } },
+        )
+    }
+
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -117,6 +161,10 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
                         onClick = { engine.testNodes(subscriptions.flatMap { it.nodes }) },
                     ) { Text("Test speed") }
                 }
+                IconButton(
+                    enabled = phase == ConnectionState.DISCONNECTED && testing == null && subscriptions.isNotEmpty(),
+                    onClick = { askSite = true },
+                ) { Icon(painterResource(R.drawable.ic_solar_magnifier), contentDescription = "Check a website") }
                 Box {
                     FilledIconButton(onClick = { menu = true }) { Icon(Icons.Filled.Add, contentDescription = "Add servers") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -131,12 +179,44 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
                             scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false)
                                 .setPrompt("Point the camera at a server's QR code"))
                         })
+                        DropdownMenuItem(text = { Text("WARP through the chosen server") }, onClick = {
+                            menu = false
+                            val carrier = engine.selectedNode()?.takeIf { it.protocol !in setOf("openvpn", "wireguard", "warp") }
+                            if (carrier == null) say("Choose one of your servers first.") else {
+                                say("Registering with Cloudflare…")
+                                engine.work({ engine.subscriptions.addWarpChain(carrier) }) { r ->
+                                    r.onSuccess { say("Added WARP through ${carrier.title}") }.onFailure { say(it.message ?: "Could not add that.") }
+                                }
+                            }
+                        })
                         DropdownMenuItem(text = { Text("From a file") }, onClick = { menu = false; pickFile.launch("*/*") })
                         DropdownMenuItem(text = { Text("Cloudflare WARP (free)") }, onClick = {
                             menu = false
                             say("Registering with Cloudflare…")
                             engine.work({ engine.subscriptions.addWarp() }, ::report)
                         })
+                    }
+                }
+            }
+        }
+        siteCheck?.let { check ->
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${check.label}: ${check.results.values.count { it.ok }} of ${check.results.size} servers work",
+                            Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                        )
+                        val best = sortNodes(
+                            subscriptions.flatMap { it.nodes }.filter { n -> check.results[n.id]?.ok == true }, results, favorites,
+                        ).firstOrNull()
+                        TextButton(enabled = best != null && testing == null && phase == ConnectionState.DISCONNECTED, onClick = {
+                            best?.let {
+                                engine.chooseServer(it.id)
+                                onConnect()
+                            }
+                        }) { Text("Connect") }
+                        IconButton(onClick = { engine.clearSiteCheck() }) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
                     }
                 }
             }
@@ -176,7 +256,10 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
                             engine.subscriptions.remove(subscription.id)
                         }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
                     }
-                    for (node in sortNodes(servers, results, favorites)) {
+                    val ordered = sortNodes(servers, results, favorites)
+                    // after a website check the servers that reached it come first, then the ones not asked, then the refused ones
+                    val shown = siteCheck?.let { check -> ordered.sortedBy { n -> check.results[n.id]?.let { if (it.ok) 0 else 2 } ?: 1 } } ?: ordered
+                    for (node in shown) {
                         val result = results[node.id]
                         val selected = node.id == selectedId
                         Row(
@@ -196,6 +279,14 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, modifier: Modifi
                                 Text(
                                     speed ?: result.pingMs?.let { "$it ms" } ?: "No answer", style = MaterialTheme.typography.bodyMedium,
                                     color = if (result.pingMs == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            siteCheck?.results?.get(node.id)?.let { site ->
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (site.ok) "✓ ${site.ms} ms" else "✗ ${site.code ?: "no answer"}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (site.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                                 )
                             }
                             IconButton(onClick = { engine.toggleFavorite(node) }) {

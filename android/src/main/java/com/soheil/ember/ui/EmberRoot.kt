@@ -40,7 +40,8 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
     val items = listOf(
         Triple("Home", R.drawable.ic_solar_power, 0),
         Triple("Servers", R.drawable.ic_solar_global, 1),
-        Triple("About", R.drawable.ic_solar_info_circle, 2),
+        Triple("Settings", R.drawable.ic_solar_settings, 2),
+        Triple("About", R.drawable.ic_solar_info_circle, 3),
     )
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -59,7 +60,8 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         val modifier = Modifier.padding(padding)
         when (tab) {
             0 -> HomeScreen(engine, onConnect, onDisconnect, onOpenServers = { tab = 1 }, modifier = modifier)
-            1 -> ServersScreen(engine, say, modifier = modifier)
+            1 -> ServersScreen(engine, say, onConnect, modifier = modifier)
+            2 -> SettingsScreen(engine, modifier = modifier)
             else -> AboutScreen(engine, modifier = modifier)
         }
     }

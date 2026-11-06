@@ -8,6 +8,8 @@ import com.soheil.ember.data.model.ConnectionState
 import ember.subs.AUTO_NODE
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
+import ember.subs.SiteChecker
+import ember.subs.SiteResult
 import ember.subs.SubscriptionStore
 import ember.subs.resolveIpv4
 import java.io.File
@@ -42,6 +44,7 @@ class AndroidEngine(private val context: Context) {
     val xray = XrayAndroid(context)
     val subscriptions = SubscriptionStore(File(context.filesDir, "subscriptions.json"))
     private val nodeTester = NodeTester(xray)
+    private val siteChecker = SiteChecker(xray)
 
     private val _selectedId = MutableStateFlow(prefs.getString("selected", AUTO_NODE) ?: AUTO_NODE)
 
@@ -64,6 +67,68 @@ class AndroidEngine(private val context: Context) {
 
     fun clearNotice() {
         _notice.value = null
+    }
+
+    /** Tells the user something the app did by itself (switching servers). */
+    fun announce(text: String) {
+        _notice.value = text
+    }
+
+    private val _autoFailover = MutableStateFlow(prefs.getBoolean("failover", true))
+
+    /** Switch to the next-best server by itself when the connected one stops passing traffic. */
+    val autoFailover: StateFlow<Boolean> = _autoFailover
+
+    fun setAutoFailover(on: Boolean) {
+        prefs.edit().putBoolean("failover", on).apply()
+        _autoFailover.value = on
+    }
+
+    private val _appMode = MutableStateFlow(prefs.getString("appMode", "off") ?: "off")
+
+    /** What the list of apps does: "off", "skip" (they bypass the VPN) or "only" (just they use it). */
+    val appMode: StateFlow<String> = _appMode
+
+    fun setAppMode(mode: String) {
+        prefs.edit().putString("appMode", mode).apply()
+        _appMode.value = mode
+    }
+
+    private val _appPackages = MutableStateFlow(prefs.getStringSet("appPackages", emptySet())?.toSet() ?: emptySet())
+    val appPackages: StateFlow<Set<String>> = _appPackages
+
+    fun setAppPackages(packages: Set<String>) {
+        prefs.edit().putStringSet("appPackages", packages).apply()
+        _appPackages.value = packages
+    }
+
+    /** What each server answered when asked for [label]'s website (kept until cleared; not saved). */
+    data class SiteCheckState(val label: String, val results: Map<String, SiteResult>)
+
+    private val _siteCheck = MutableStateFlow<SiteCheckState?>(null)
+    val siteCheck: StateFlow<SiteCheckState?> = _siteCheck
+
+    fun clearSiteCheck() {
+        _siteCheck.value = null
+    }
+
+    /** Asks every server in [all] for [url]. Only while disconnected, like a speed test. */
+    fun checkSite(all: List<ProxyNode>, label: String, url: String) {
+        if (VpnState.phase.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
+        _siteCheck.value = SiteCheckState(label, emptyMap())
+        _testProgress.value = "Starting…"
+        testJob = scope.launch {
+            try {
+                siteChecker.run(all, url, { _testProgress.value = it }) { node, result ->
+                    _siteCheck.value = _siteCheck.value?.let { it.copy(results = it.results + (node.id to result)) }
+                }
+            } catch (failure: Throwable) {
+                AppLogger.w(TAG, "the website check failed", failure)
+                _notice.value = "The check could not run: ${failure.message ?: failure.javaClass.simpleName}"
+            } finally {
+                _testProgress.value = null
+            }
+        }
     }
 
     fun chooseServer(id: String) {

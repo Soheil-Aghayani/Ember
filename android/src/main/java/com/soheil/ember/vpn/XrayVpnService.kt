@@ -13,11 +13,14 @@ import com.soheil.ember.EmberVpnApp
 import com.soheil.ember.MainActivity
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.model.ConnectionState
+import com.soheil.ember.engine.AndroidEngine
 import com.soheil.ember.engine.SOCKS_PORT
 import com.soheil.ember.engine.VpnState
 import com.soheil.ember.vpn.tun.HevSocks5Tunnel
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
+import ember.subs.ProxyNode
 import ember.subs.XrayConfig
+import ember.subs.pickFailover
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
@@ -35,11 +38,26 @@ import okhttp3.Request
 private const val TAG = "XrayVpnService"
 private const val NOTIFICATION_ID = 7
 private const val TCP_BUFFER_BYTES = 524_288
+private const val CHECK_EVERY_SECONDS = 15
+private const val FAILURES_BEFORE_SWITCH = 3
+private const val MAX_FAILOVERS = 3
+
+/** How the apps the user listed are treated (see [AndroidEngine.appMode]). */
+object AppMode {
+    const val OFF = "off"
+
+    /** The listed apps go straight to the internet; everything else uses the VPN. */
+    const val SKIP = "skip"
+
+    /** Only the listed apps use the VPN. */
+    const val ONLY = "only"
+}
 
 /**
  * The whole phone through one server: Xray carries the traffic as a local SOCKS5 proxy, and hev-socks5-tunnel feeds
- * the phone's traffic from the VPN interface into it. This app is excluded from the VPN, so Xray's own connection to
- * the server (a child process of the app) goes out directly instead of looping back into the tunnel.
+ * the phone's traffic from the VPN interface into it. This app is never inside the VPN, so Xray's own connection to
+ * the server (a child process of the app) goes out directly instead of looping back into the tunnel. Android itself
+ * decides per app what the VPN carries, which is how the Apps setting works.
  */
 class XrayVpnService : VpnService() {
 
@@ -64,18 +82,16 @@ class XrayVpnService : VpnService() {
         job = scope.launch {
             try {
                 val engine = (application as EmberVpnApp).engine
-                val node = (nodeId?.let { engine.subscriptions.nodeById(it) } ?: engine.selectedNode())
+                var node = (nodeId?.let { engine.subscriptions.nodeById(it) } ?: engine.selectedNode())
                     ?: error("Choose a server first.")
                 if (node.protocol == "openvpn") error("OpenVPN servers are not supported on Android yet.")
                 VpnState.node.value = node
                 engine.stopTestForConnect()
-                val address = engine.resolveAddress(node)
-                engine.xray.start(XrayConfig.single(node, address, SOCKS_PORT, null, engine.xray.logFile))
-                engine.xray.awaitListening(SOCKS_PORT)
+                startXray(engine, node)
                 VpnState.progress.value = "Checking the server…"
                 if (!passesTraffic()) error("This server did not answer. Try another server.")
                 VpnState.progress.value = "Starting the VPN…"
-                val fd = establishTun() ?: error("Android did not allow the VPN. Open Ember and try again.")
+                val fd = establishTun(engine) ?: error("Android did not allow the VPN. Open Ember and try again.")
                 tun = fd
                 val config = HevSocks5TunnelConfig.write(filesDir, SOCKS_PORT, useMapDns = true, tcpBufferSize = TCP_BUFFER_BYTES)
                 if (!HevSocks5Tunnel.start(config, fd.fd)) error("The tunnel program did not start.")
@@ -84,9 +100,35 @@ class XrayVpnService : VpnService() {
                 VpnState.phase.value = ConnectionState.CONNECTED
                 startForegroundNow("Connected · ${node.title}")
                 AppLogger.i(TAG, "connected via a ${node.protocol} server")
+
+                // Xray can be running while the server behind it has stopped passing traffic: every few seconds a tiny
+                // request goes through it, and when several in a row fail the connection moves to the next-best server.
+                val failed = mutableSetOf<String>()
+                var switches = 0
+                var failures = 0
+                var waited = 0
                 while (isActive) {
                     delay(2_000)
                     if (!engine.xray.isRunning()) error("The connection program stopped.")
+                    waited += 2
+                    if (!engine.autoFailover.value || waited < CHECK_EVERY_SECONDS) continue
+                    waited = 0
+                    failures = if (passesTraffic()) 0 else failures + 1
+                    if (failures < FAILURES_BEFORE_SWITCH) continue
+                    failures = 0
+                    failed += node.id
+                    val all = engine.subscriptions.subscriptions.value.flatMap { it.nodes }
+                    val next = if (switches < MAX_FAILOVERS) {
+                        pickFailover(all, node, failed, engine.subscriptions.results.value, engine.favorites.value)
+                    } else null
+                    if (next == null) error("This server stopped passing traffic. Pick another server.")
+                    switches++
+                    AppLogger.w(TAG, "${node.title} stopped passing traffic; switching to ${next.title}")
+                    engine.announce("${node.title} stopped answering. Switching to ${next.title}.")
+                    startXray(engine, next) // the tunnel stays up; only the server behind the local proxy changes
+                    node = next
+                    VpnState.node.value = next
+                    startForegroundNow("Connected · ${next.title}")
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -97,6 +139,12 @@ class XrayVpnService : VpnService() {
                 stopSelf()
             }
         }
+    }
+
+    private suspend fun startXray(engine: AndroidEngine, node: ProxyNode) {
+        val address = engine.resolveAddress(node)
+        engine.xray.start(XrayConfig.single(node, address, SOCKS_PORT, null, engine.xray.logFile))
+        engine.xray.awaitListening(SOCKS_PORT)
     }
 
     private fun disconnect() {
@@ -113,20 +161,32 @@ class XrayVpnService : VpnService() {
         client.newCall(Request.Builder().url("http://cp.cloudflare.com/generate_204").build()).execute().use { it.code in 200..399 }
     }.getOrDefault(false)
 
-    private fun establishTun(): ParcelFileDescriptor? = Builder()
-        .setSession("Ember")
-        .addAddress(HevSocks5TunnelConfig.TUN_ADDRESS, 32)
-        .addRoute("0.0.0.0", 0)
-        // IPv6 is claimed too, so it cannot go around the tunnel; with no address on the interface it is simply dropped
-        .apply { runCatching { addRoute("::", 0) } }
-        .addDnsServer(HevSocks5TunnelConfig.MAPDNS_ADDRESS)
-        .setMtu(HevSocks5TunnelConfig.TUN_MTU)
-        .setBlocking(true)
-        .apply {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) runCatching { setMetered(false) }
-            runCatching { addDisallowedApplication(packageName) }
-        }
-        .establish()
+    private fun establishTun(engine: AndroidEngine): ParcelFileDescriptor? {
+        val mode = engine.appMode.value
+        val apps = engine.appPackages.value.filter { it != packageName }
+        return Builder()
+            .setSession("Ember")
+            .addAddress(HevSocks5TunnelConfig.TUN_ADDRESS, 32)
+            .addRoute("0.0.0.0", 0)
+            // IPv6 is claimed too, so it cannot go around the tunnel; with no address on the interface it is simply dropped
+            .apply { runCatching { addRoute("::", 0) } }
+            .addDnsServer(HevSocks5TunnelConfig.MAPDNS_ADDRESS)
+            .setMtu(HevSocks5TunnelConfig.TUN_MTU)
+            .setBlocking(true)
+            .apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) runCatching { setMetered(false) }
+                if (mode == AppMode.ONLY && apps.isNotEmpty()) {
+                    // only these apps use the VPN; this app is not among them, so Xray stays outside it
+                    apps.forEach { runCatching { addAllowedApplication(it) }.onFailure { e -> AppLogger.w(TAG, "could not include $it: ${e.message}") } }
+                } else {
+                    runCatching { addDisallowedApplication(packageName) }
+                    if (mode == AppMode.SKIP) {
+                        apps.forEach { runCatching { addDisallowedApplication(it) }.onFailure { e -> AppLogger.w(TAG, "could not skip $it: ${e.message}") } }
+                    }
+                }
+            }
+            .establish()
+    }
 
     private fun teardown() {
         runCatching { HevSocks5Tunnel.stop() }
@@ -150,11 +210,15 @@ class XrayVpnService : VpnService() {
 
     private fun startForegroundNow(text: String) {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val disconnect = PendingIntent.getService(
+            this, 1, Intent(this, XrayVpnService::class.java).setAction(ACTION_DISCONNECT), PendingIntent.FLAG_IMMUTABLE,
+        )
         val notification: Notification = NotificationCompat.Builder(this, EmberVpnApp.VPN_NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Ember")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(open)
+            .addAction(0, "Disconnect", disconnect)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
