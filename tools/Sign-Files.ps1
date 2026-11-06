@@ -19,6 +19,11 @@ function Get-SigningCertificate {
     if ($PfxPath) {
         if (-not (Test-Path $PfxPath)) { throw "The certificate file was not found: $PfxPath" }
         $password = $env:EMBER_PFX_PASSWORD
+        $saved = [System.IO.Path]::ChangeExtension((Resolve-Path $PfxPath).Path, 'pwd')
+        if (-not $password -and (Test-Path $saved)) {
+            # a password saved for this Windows user only (see New-SigningCertificate.ps1 -SavePassword)
+            $password = [System.Net.NetworkCredential]::new('', (Get-Content $saved | ConvertTo-SecureString)).Password
+        }
         if (-not $password) {
             $secure = Read-Host -AsSecureString 'Certificate password'
             $password = [System.Net.NetworkCredential]::new('', $secure).Password
@@ -42,6 +47,9 @@ if (-not ($cert.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq '1.3.6.1.5
     throw 'That certificate is not meant for code signing.'
 }
 foreach ($file in $Files) {
+    # jpackage writes its programs read-only; signing has to rewrite the file
+    $item = Get-Item $file
+    if ($item.IsReadOnly) { $item.IsReadOnly = $false }
     $args = @{ FilePath = $file; Certificate = $cert; HashAlgorithm = 'SHA256' }
     if ($TimestampServer) { $args.TimestampServer = $TimestampServer }
     $result = Set-AuthenticodeSignature @args

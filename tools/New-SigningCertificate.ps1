@@ -11,7 +11,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$OutDir,
     [string]$Subject = 'CN=Ember, O=Ember',
-    [int]$Years = 3
+    [int]$Years = 3,
+    # Keep the password in a file next to the .pfx that only this Windows user can decrypt, so signing needs no prompt.
+    [switch]$SavePassword
 )
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -37,5 +39,8 @@ $pfx = Join-Path $OutDir 'ember-signing.pfx'
 $cer = Join-Path $OutDir 'ember-signing.cer'
 [System.IO.File]::WriteAllBytes($pfx, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $password))
 [System.IO.File]::WriteAllBytes($cer, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+if ($SavePassword) {
+    ConvertTo-SecureString $password -AsPlainText -Force | ConvertFrom-SecureString | Set-Content ([System.IO.Path]::ChangeExtension($pfx, 'pwd'))
+}
 Write-Host "Wrote $pfx (keep it private) and $cer."
 Write-Host "Thumbprint: $($cert.Thumbprint)"
