@@ -32,6 +32,30 @@ tasks.matching { it.name.startsWith("externalNativeBuild") || it.name.contains("
 tasks.named("preBuild").configure { dependsOn(fetchHevSocks5Tunnel) }
 
 // Xray-core for Android: the official 64-bit ARM build, checked against a pinned SHA-256, packaged as libxray.so.
+// Testing on the Android emulator (x86): `gradle -Pemulator :android:assembleDebug` adds an x86_64 build with the Linux
+// Xray. The emulator's ARM translation cannot run Xray (a Go program), so this is the only way to try the whole VPN there.
+// It never goes into a release build.
+val forEmulator = project.hasProperty("emulator")
+val emulatorLibsDir = layout.buildDirectory.dir("emulator-libs").get().asFile
+val fetchXrayEmulator = tasks.register("fetchXrayEmulator") {
+    val target = File(emulatorLibsDir, "x86_64/libxray.so")
+    outputs.file(target)
+    onlyIf { forEmulator && !target.exists() }
+    doLast {
+        val zip = layout.buildDirectory.file("xray-android/Xray-linux-64.zip").get().asFile.apply { parentFile.mkdirs() }
+        URL("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip").openStream()
+            .use { input -> zip.outputStream().use { input.copyTo(it) } }
+        val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
+        check(actual == "e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214") { "Checksum mismatch for the Xray download: $actual" }
+        copy {
+            from(zipTree(zip)) { include("xray") }
+            into(File(emulatorLibsDir, "x86_64"))
+            rename("xray", "libxray.so")
+        }
+    }
+}
+if (forEmulator) tasks.named("preBuild").configure { dependsOn(fetchXrayEmulator) }
+
 val xrayAndroidDir = file("src/main/jniLibs/arm64-v8a")
 val fetchXrayAndroid = tasks.register("fetchXrayAndroid") {
     val target = File(xrayAndroidDir, "libxray.so")
@@ -72,13 +96,13 @@ android {
         applicationId = "com.soheil.ember"
         minSdk = 26
         targetSdk = 35
-        versionCode = 102
-        versionName = "2.0.2"
+        versionCode = 103
+        versionName = "2.0.3"
 
         externalNativeBuild {
             ndkBuild {
                 // Xray is packaged for 64-bit ARM phones (nearly all phones and Android TVs made in the last years)
-                abiFilters += listOf("arm64-v8a")
+                abiFilters += if (project.hasProperty("emulator")) listOf("arm64-v8a", "x86_64") else listOf("arm64-v8a")
                 arguments += listOf(
 
                     "APP_PLATFORM=android-26",
@@ -104,6 +128,10 @@ android {
                 keyPassword = releaseKeyPassword
             }
         }
+    }
+
+    sourceSets {
+        if (forEmulator) getByName("debug").jniLibs.srcDir(emulatorLibsDir)
     }
 
     buildTypes {
@@ -150,6 +178,8 @@ android {
             // libxray.so is a program, not a library: it must be unpacked on install and left as it is
             useLegacyPackaging = true
             keepDebugSymbols += "**/libxray.so"
+            // Xray is only packaged for 64-bit ARM, so other processors' copies of the support libraries are left out
+            if (!forEmulator) excludes += listOf("**/armeabi-v7a/**", "**/x86/**", "**/x86_64/**")
         }
     }
 }
