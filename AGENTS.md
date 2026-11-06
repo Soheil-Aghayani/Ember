@@ -44,6 +44,8 @@ Source of truth: `design/tokens.json` (colours, Inter type scale from Apple's HI
 
 ## Versions and releases
 
+`tools/release.ps1 -Version 1.0.<n>` builds, tests, signs (when given a certificate) and copies the installer; see `docs/RELEASING.md`.
+
 Desktop installer versions are set with the `EMBER_VERSION` environment variable (`1.0.<n>`, counting up from the last installer in `C:\Users\Soheil\Downloads\Programs`). Finished installers are copied to that folder, and release notes plus checksums live in `D:\Programming\Ember-releases`.
 
 ## Good tasks for an agent

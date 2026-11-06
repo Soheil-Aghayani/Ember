@@ -22,3 +22,9 @@ desktop/build/
 
 desktop/appResources/windows-x64/ember-helper.exe
 helper/target/
+
+# Signing keys never belong in the repository
+*.pfx
+*.p12
+*.cer
+signing/
