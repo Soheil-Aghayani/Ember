@@ -147,6 +147,13 @@ fun EmberApp(
         }
     }
     val toaster = remember { Toaster() }
+    val notice by engine.notice.collectAsState()
+    LaunchedEffect(notice) {
+        notice?.let {
+            toaster.show(it)
+            engine.clearNotice()
+        }
+    }
     CompositionLocalProvider(LocalToaster provides toaster) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             MainShell(engine, theme, onThemeChange, language, onLanguageChange)

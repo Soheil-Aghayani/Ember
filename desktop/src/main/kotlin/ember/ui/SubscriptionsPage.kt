@@ -189,6 +189,19 @@ internal fun SubscriptionsPage(engine: EmberEngine) {
                     strings.siteSummary(check.label, check.results.values.count { it.ok }, check.results.size),
                     Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
                 )
+                val best = sortNodes(
+                    subscriptions.flatMap { it.nodes }.filter { n -> check.results[n.id]?.ok == true }, results, favorites,
+                ).firstOrNull()
+                IconAction(
+                    "bolt", strings.connectForSite(check.label),
+                    onClick = {
+                        best?.let {
+                            engine.chooseServer(it.id)
+                            if (state == ConnectionState.DISCONNECTED) engine.connectSelected()
+                        }
+                    },
+                    enabled = best != null && testing == null, tint = MaterialTheme.colorScheme.primary,
+                )
                 IconAction("close", strings.clearCheck, onClick = { engine.clearSiteCheck() })
             }
         }

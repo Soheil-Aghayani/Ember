@@ -7,6 +7,7 @@ import com.soheil.ember.vpn.IpLocationInfo
 import ember.subs.AUTO_NODE
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
+import ember.subs.pickFailover
 import ember.subs.SiteChecker
 import ember.subs.SiteResult
 import ember.subs.SubscriptionStore
@@ -40,6 +41,7 @@ private fun elapsedMsSince(startedAtNanos: Long): Long =
     (System.nanoTime() - startedAtNanos) / 1_000_000L
 
 const val SOCKS_PORT = 10808
+private const val MAX_FAILOVERS = 3
 const val HTTP_PORT = 10809
 const val LOCAL_BIND = "127.0.0.1"
 
@@ -82,6 +84,7 @@ class EmberEngine(private val dataDir: File) {
      * server straight away.
      */
     fun chooseServer(id: String) {
+        resetFailover()
         settings.selectedNodeId = id
         _selectedId.value = id
         if (_state.value == ConnectionState.DISCONNECTED) return
@@ -196,6 +199,24 @@ class EmberEngine(private val dataDir: File) {
     private var testJob: Job? = null
     private var xrayWatchJob: Job? = null
     private var watchJob: Job? = null
+    private var healthJob: Job? = null
+    private var failoverCount = 0
+    private val failedNodes = mutableSetOf<String>()
+
+    private val _notice = MutableStateFlow<String?>(null)
+
+    /** A short message about something Ember did by itself (switching servers); show it once, then [clearNotice]. */
+    val notice: StateFlow<String?> = _notice
+
+    fun clearNotice() {
+        _notice.value = null
+    }
+
+    /** A connection the user started: the failover budget and the list of servers that just failed start over. */
+    private fun resetFailover() {
+        failoverCount = 0
+        failedNodes.clear()
+    }
     private var netWatchJob: Job? = null
 
     init {
@@ -272,6 +293,7 @@ class EmberEngine(private val dataDir: File) {
 
     /** Connects to the picked server. */
     fun connectSelected() {
+        resetFailover()
         val node = selectedNode()
         if (node == null) {
             _lastError.value = "Choose a server first."
@@ -366,6 +388,7 @@ class EmberEngine(private val dataDir: File) {
                 AppLogger.i(TAG, "connected via a ${node.protocol} server (wholeDevice=$wholeDevice) after ${elapsedMsSince(startedAtNanos)} ms")
                 watchXray()
                 startNetworkWatch()
+                startHealthWatch()
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (failure: Throwable) {
@@ -483,6 +506,7 @@ class EmberEngine(private val dataDir: File) {
     }
 
     fun disconnect() {
+        resetFailover()
         settings.wasConnected = false
         val job = connectJob
         // OpenVPN needs a moment to close; the next connection must not start before it has.
@@ -615,6 +639,55 @@ class EmberEngine(private val dataDir: File) {
         (System.nanoTime() - start) / 1_000_000L
     }.onFailure { AppLogger.w(TAG, "connection check (proxied=$proxied) failed: ${it.javaClass.simpleName} ${it.message}") }.getOrNull()
 
+    /**
+     * Xray can be running while the server behind it has stopped passing traffic. Every 15 seconds a tiny request goes
+     * through it; when three in a row fail the connection moves to the next-best server (if the user allows it).
+     */
+    private fun startHealthWatch() {
+        healthJob?.cancel()
+        if (!settings.autoFailover) return
+        healthJob = scope.launch {
+            delay(20_000) // let the connection settle
+            var failures = 0
+            var lastTick = System.currentTimeMillis()
+            while (true) {
+                delay(15_000)
+                val now = System.currentTimeMillis()
+                val slept = now - lastTick > 45_000 // the computer was asleep: the old numbers mean nothing
+                lastTick = now
+                if (_state.value != ConnectionState.CONNECTED) return@launch
+                if (slept) {
+                    failures = 0
+                    continue
+                }
+                failures = if (probe(proxied = true) != null) 0 else failures + 1
+                if (failures >= 3) {
+                    failOver()
+                    return@launch
+                }
+            }
+        }
+    }
+
+    private fun failOver() {
+        val current = _connectedNode.value ?: return
+        failedNodes += current.id
+        val all = subscriptions.subscriptions.value.flatMap { it.nodes }
+        val next = if (failoverCount < MAX_FAILOVERS) pickFailover(all, current, failedNodes, subscriptions.results.value, _favorites.value) else null
+        if (next == null) {
+            AppLogger.w(TAG, "${current.title} stopped passing traffic and there is no other server to switch to")
+            _lastError.value = "This server stopped passing traffic. Pick another server."
+            return
+        }
+        failoverCount++
+        AppLogger.w(TAG, "${current.title} stopped passing traffic; switching to ${next.title}")
+        _notice.value = "${current.title} stopped answering. Switching to ${next.title}."
+        scope.launch {
+            teardown()
+            connect(next)
+        }
+    }
+
     /** Ends the connection if the Xray process dies. */
     private fun watchXray() {
         xrayWatchJob?.cancel()
@@ -738,6 +811,8 @@ class EmberEngine(private val dataDir: File) {
         runCatching { xray.stop() }
         xrayWatchJob?.cancel()
         xrayWatchJob = null
+        healthJob?.cancel()
+        healthJob = null
         watchJob?.cancel()
         watchJob = null
         netWatchJob?.cancel()

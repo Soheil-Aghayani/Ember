@@ -276,6 +276,22 @@ class ShareLinksTest {
     }
 
     @Test
+    fun failsOverToTheBestServerThatHasNotJustFailed() {
+        val a = ShareLinks.parse("vless://$uuid@a.example.com:443?type=tcp#A")!!
+        val b = ShareLinks.parse("vless://$uuid@b.example.com:443?type=tcp#B")!!
+        val c = ShareLinks.parse("vless://$uuid@c.example.com:443?type=tcp#C")!!
+        val d = ShareLinks.parse("vless://$uuid@d.example.com:443?type=tcp#D")!!
+        val all = listOf(a, b, c, d)
+        val results = mapOf(a.id to NodeResult(50, 10.0, 0), b.id to NodeResult(60, 90.0, 0), c.id to NodeResult(null, null, 0), d.id to NodeResult(70, 40.0, 0))
+        // the fastest other server, never the current one and never one a test found dead
+        assertEquals("B", pickFailover(all, a, emptySet(), results, emptySet())?.name)
+        assertEquals("D", pickFailover(all, a, setOf(b.id), results, emptySet())?.name)
+        assertNull(pickFailover(all, a, setOf(b.id, d.id), results, emptySet()))
+        // with nothing tested, servers never tested are tried
+        assertEquals("B", pickFailover(all, a, emptySet(), emptyMap(), setOf(b.id))?.name)
+    }
+
+    @Test
     fun readsABareXrayOutbound() {
         val json = """{"protocol":"vless","tag":"mine","settings":{"vnext":[{"address":"b.example.com","port":443,"users":[{"id":"$uuid","encryption":"none"}]}]}}"""
         val node = SubscriptionParser.parseNodes(json).single()

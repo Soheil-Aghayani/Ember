@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.86",
+        listOf(
+            "Automatic failover: if the connected server stops passing traffic for about a minute, Ember switches to the next-fastest server by itself (up to three times) and tells you. Turn it off in Settings > Connection > Protection.",
+            "After a website check, a bolt button connects to the best server that reached the site.",
+        ),
+        listOf(
+            "تعویض خودکار سرور: اگر سرور متصل حدود یک دقیقه ترافیک عبور ندهد، Ember خودش به سریع‌ترین سرور بعدی می‌رود (تا سه بار) و به شما خبر می‌دهد. از تنظیمات ← اتصال ← محافظت خاموشش کنید.",
+            "بعد از بررسی وب‌سایت، یک دکمهٔ رعد به بهترین سروری که به آن سایت رسید وصل می‌شود.",
+        ),
+    ),
+    Release(
         "1.0.85",
         listOf(
             "Cloudflare WARP: the + menu on the Servers page can register a free WARP device and add its servers (three ports), ready to test and connect like any other. It has one exit that follows your location, and only works if your network does not block Cloudflare.",

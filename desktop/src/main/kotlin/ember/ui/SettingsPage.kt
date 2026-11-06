@@ -237,6 +237,7 @@ private fun ProtectionSettings(engine: EmberEngine) {
     var whole by remember { mutableStateOf(engine.settings.wholeDevice) }
     var killSwitch by remember { mutableStateOf(engine.settings.killSwitch) }
     var ipv6 by remember { mutableStateOf(engine.settings.ipv6) }
+    var failover by remember { mutableStateOf(engine.settings.autoFailover) }
     val available = engine.tunnel.isAvailable
     val scope = rememberCoroutineScope()
     var noPrompt by remember { mutableStateOf(false) }
@@ -266,6 +267,11 @@ private fun ProtectionSettings(engine: EmberEngine) {
             SwitchRow(strings.ipv6, strings.ipv6Help, ipv6, enabled = available) {
                 ipv6 = it
                 engine.settings.ipv6 = it
+            }
+            RowDivider()
+            SwitchRow(strings.autoFailover, strings.autoFailoverHelp, failover) {
+                failover = it
+                engine.settings.autoFailover = it
             }
             RowDivider()
             SwitchRow(strings.noPrompts, strings.noPromptsHelp, noPrompt, enabled = available && !noPromptBusy) { wanted ->

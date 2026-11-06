@@ -107,6 +107,11 @@ class DesktopSettings(private val file: File) {
         get() = props.getProperty("adminNoticeSeen", "false").toBoolean()
         set(value) = put("adminNoticeSeen", value.toString())
 
+    /** Switch to the next-best server by itself when the connected one stops passing traffic. */
+    var autoFailover: Boolean
+        get() = props.getProperty("autoFailover", "true").toBoolean()
+        set(value) = put("autoFailover", value.toString())
+
     var killSwitch: Boolean
         get() = props.getProperty("killSwitch", "true").toBoolean()
         set(value) = put("killSwitch", value.toString())

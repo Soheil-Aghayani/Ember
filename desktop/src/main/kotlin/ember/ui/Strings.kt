@@ -187,6 +187,9 @@ data class Strings(
     val clearCheck: String,
     val addWarp: String,
     val warpRegistering: String,
+    val autoFailover: String,
+    val autoFailoverHelp: String,
+    val connectForSite: (String) -> String,
     val mtuValidation: (Int, Int) -> String,
 )
 
@@ -374,6 +377,9 @@ val EnglishStrings = Strings(
     clearCheck = "Clear the check",
     addWarp = "Add Cloudflare WARP (free)",
     warpRegistering = "Registering with Cloudflare…",
+    autoFailover = "Switch servers automatically",
+    autoFailoverHelp = "If the connected server stops passing traffic for about a minute, Ember connects to the next-fastest one. The connection is briefly interrupted.",
+    connectForSite = { "Connect to the best server for $it" },
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
 )
 
@@ -561,6 +567,9 @@ val PersianStrings = Strings(
     clearCheck = "پاک کردن نتیجه",
     addWarp = "افزودن Cloudflare WARP (رایگان)",
     warpRegistering = "در حال ثبت در Cloudflare…",
+    autoFailover = "تعویض خودکار سرور",
+    autoFailoverHelp = "اگر سرور متصل حدود یک دقیقه ترافیک عبور ندهد، Ember به سریع‌ترین سرور بعدی وصل می‌شود. اتصال لحظه‌ای قطع می‌شود.",
+    connectForSite = { "اتصال به بهترین سرور برای $it" },
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
 )
 
