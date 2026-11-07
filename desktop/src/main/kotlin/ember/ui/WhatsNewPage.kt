@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.92",
+        listOf(
+            "A new frosted-glass look: translucent panels and a soft coloured backdrop, in light and dark.",
+        ),
+        listOf(
+            "ظاهر شیشه‌ای تازه: پنل‌های نیمه‌شفاف و پس‌زمینهٔ رنگی نرم، در حالت روشن و تاریک.",
+        ),
+    ),
+    Release(
         "1.0.91",
         listOf(
             "The window's rounded corners are smooth now: the hard cut-out that made them look jagged is gone.",
