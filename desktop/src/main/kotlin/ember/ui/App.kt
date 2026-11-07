@@ -332,19 +332,6 @@ private fun HomePage(
         }
     }
 
-    val ring by animateColorAsState(when (state) {
-        ConnectionState.CONNECTED -> MaterialTheme.colorScheme.tertiary
-        ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondary
-        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
-    }, tween(500))
-    val connectedScale = remember { Animatable(1f) }
-    LaunchedEffect(state) {
-        if (state == ConnectionState.CONNECTED) {
-            connectedScale.snapTo(0.97f)
-            connectedScale.animateTo(1f, tween(200))
-        } else connectedScale.snapTo(1f)
-    }
-
     if (showAdminNotice) {
         AlertDialog(
             onDismissRequest = { showAdminNotice = false },
@@ -365,8 +352,6 @@ private fun HomePage(
         Spacer(Modifier.height(24.dp))
         ConnectOrb(
             state = state,
-            ring = ring,
-            popScale = connectedScale.value,
             label = when (state) {
                 ConnectionState.DISCONNECTED -> strings.connect
                 ConnectionState.CONNECTING -> strings.cancel

@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -64,7 +66,7 @@ class RenderPreviewTest {
             }
             for (state in ConnectionState.entries) {
                 render(dir, "orb-${state.name.lowercase()}-$theme", dark, width = 420, height = 360) {
-                    ConnectOrb(state, MaterialTheme.colorScheme.primary, 1f, "Connect") {}
+                    ConnectOrb(state, "Connect") {}
                 }
             }
             render(dir, "toast-$theme", dark, height = 220) {
@@ -100,6 +102,41 @@ class RenderPreviewTest {
             var settled = during
             for (step in 1..8) settled = scene.render(200_000_000L + step * 250_000_000L)
             File(dir, "sidebar-settled-${if (dark) "dark" else "light"}.png").writeBytes(settled.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            scene.close()
+        }
+    }
+
+    /** The orb through a connect and a disconnect: off, warming up, just connected, settled, draining. */
+    @Test
+    fun drawsOrbThroughAConnection() {
+        val dir = System.getenv("RENDER_DIR")?.let(::File) ?: return
+        dir.mkdirs()
+        for (dark in listOf(true, false)) {
+            var state by androidx.compose.runtime.mutableStateOf(ConnectionState.DISCONNECTED)
+            val scene = ImageComposeScene(300, 300, Density(1f)) {
+                EmberTheme(darkTheme = dark) {
+                    CompositionLocalProvider(LocalStrings provides EnglishStrings) {
+                        GlassBackground { ConnectOrb(state, "Connect") {} }
+                    }
+                }
+            }
+            var t = 0L
+            fun advance(seconds: Double) { repeat((seconds * 20).toInt()) { t += 50_000_000L; scene.render(t) } }
+            fun shot(name: String) {
+                val image = scene.render(t + 1_000_000L)
+                File(dir, "orb-seq-${if (dark) "dark" else "light"}-$name.png").writeBytes(image.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            }
+            scene.render(0)
+            advance(1.0); shot("1-off")
+            state = ConnectionState.CONNECTING
+            advance(0.5); shot("2-connecting-a")
+            advance(1.0); shot("3-connecting-b")
+            state = ConnectionState.CONNECTED
+            advance(0.45); shot("4-connected-ripple")
+            advance(3.0); shot("5-connected")
+            state = ConnectionState.DISCONNECTED
+            advance(0.55); shot("6-draining")
+            advance(2.0); shot("7-off-again")
             scene.close()
         }
     }

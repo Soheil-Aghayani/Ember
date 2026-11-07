@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.95",
+        listOf(
+            "The orb is now drawn live and animated: it warms up with a running arc while connecting, ripples when the connection comes up, and drains its colour when you disconnect. The pale halo around it is gone.",
+        ),
+        listOf(
+            "گوی حالا به‌صورت زنده کشیده و متحرک می‌شود: هنگام اتصال گرم می‌شود و کمانی دورش می‌چرخد، وقتی وصل شد موجی از آن بیرون می‌رود و هنگام قطع، رنگش محو می‌شود. هالهٔ کم‌رنگ دور آن حذف شد.",
+        ),
+    ),
+    Release(
         "1.0.94",
         listOf(
             "Hovering over the menu and the server list now fades in and out smoothly, with no grey patches when the mouse moves fast.",

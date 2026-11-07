@@ -1,5 +1,6 @@
 package com.soheil.ember.ui
 
+import com.soheil.ember.ui.components.GlassOrb
 import com.soheil.ember.ui.components.glassEdge
 import com.soheil.ember.ui.components.glassFill
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import com.soheil.ember.R
 import androidx.compose.ui.text.style.TextAlign
@@ -140,42 +142,17 @@ fun HomeScreen(
     }
 }
 
-/**
- * The big glass orb: dim when idle, ripening to full colour while connecting and once connected, and breathing slowly
- * when connected. A tap connects or disconnects.
- */
+/** The animated glass orb (see [GlassOrb]) with a power mark in the middle; a tap connects or disconnects. */
 @Composable
 private fun Orb(phase: ConnectionState, onClick: () -> Unit) {
-    val transition = rememberInfiniteTransition(label = "orb")
-    val breathe by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
-    val pulse by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
     val s = LocalStrings.current
-    val scale = when (phase) {
-        ConnectionState.CONNECTED -> 1f + 0.035f * breathe
-        ConnectionState.CONNECTING -> 1f + 0.05f * pulse
-        ConnectionState.DISCONNECTED -> 1f
-    }
     val action = when (phase) {
         ConnectionState.DISCONNECTED -> s.connect
         ConnectionState.CONNECTING -> s.cancel
         ConnectionState.CONNECTED -> s.disconnect
     }
-    Box(
-        Modifier.size(300.dp).scale(scale).clip(CircleShape).clickable(onClickLabel = action, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Crossfade(phase, animationSpec = tween(450), label = "orb-picture") { shown ->
-            Image(
-                painterResource(
-                    when (shown) {
-                        ConnectionState.CONNECTED -> R.drawable.orb_on
-                        ConnectionState.CONNECTING -> R.drawable.orb_connecting
-                        ConnectionState.DISCONNECTED -> R.drawable.orb_off
-                    },
-                ),
-                contentDescription = action, modifier = Modifier.fillMaxSize(),
-            )
-        }
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    GlassOrb(phase, action, Modifier.size(300.dp), if (dark) Color.White else Color(0xFF7A5BC0), onClick) {
         Icon(painterResource(R.drawable.ic_solar_power), contentDescription = null, tint = Color.White.copy(alpha = 0.92f), modifier = Modifier.size(56.dp))
     }
 }

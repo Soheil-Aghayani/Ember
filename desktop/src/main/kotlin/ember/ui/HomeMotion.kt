@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -55,72 +56,12 @@ import com.soheil.ember.data.formatBytesPerSecond
 import com.soheil.ember.data.model.ConnectionState
 import ember.engine.TrafficStats
 
-/**
- * The big glass orb. Idle it is dim and still; while connecting it pulses and ripens to full colour; once connected it
- * breathes slowly, and a single ripple leaves it the moment the connection comes up.
- */
+/** The animated glass orb (see [GlassOrb]) with a power mark in the middle; a click connects or disconnects. */
 @Composable
-internal fun ConnectOrb(
-    state: ConnectionState,
-    ring: Color,
-    popScale: Float,
-    label: String,
-    onClick: () -> Unit,
-) {
-    val transition = rememberInfiniteTransition(label = "orb")
-    val breathe by transition.animateFloat(
-        0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe",
-    )
-    val pulse by transition.animateFloat(
-        0f, 1f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse",
-    )
-    val connected = state == ConnectionState.CONNECTED
-    // 0 → 1 is the ripple leaving the orb; 1 means it is gone.
-    val ripple = remember { Animatable(1f) }
-    LaunchedEffect(state) {
-        if (connected) {
-            ripple.snapTo(0f)
-            ripple.animateTo(1f, tween(1000, easing = FastOutSlowInEasing))
-        } else {
-            ripple.snapTo(1f)
-        }
-    }
-    val motion = when (state) {
-        ConnectionState.CONNECTED -> 1f + 0.035f * breathe
-        ConnectionState.CONNECTING -> 1f + 0.05f * pulse
-        ConnectionState.DISCONNECTED -> 1f
-    }
-
-    Box(
-        Modifier.size(260.dp)
-            .drawBehind {
-                if (ripple.value < 1f) {
-                    val radius = size.minDimension / 2 * (0.78f + 0.45f * ripple.value)
-                    drawCircle(ring.copy(alpha = 0.4f * (1f - ripple.value)), radius, style = Stroke(3.dp.toPx()))
-                }
-            }
-            .scale(popScale * motion),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier.fillMaxSize().clip(CircleShape)
-                .pointerHoverIcon(PointerIcon.Hand).clickable(role = Role.Button, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Crossfade(state, animationSpec = tween(450), label = "orb-picture") { shown ->
-                Image(
-                    painterResource(
-                        when (shown) {
-                            ConnectionState.CONNECTED -> "art/orb-on.webp"
-                            ConnectionState.CONNECTING -> "art/orb-connecting.webp"
-                            ConnectionState.DISCONNECTED -> "art/orb-off.webp"
-                        },
-                    ),
-                    contentDescription = label, modifier = Modifier.fillMaxSize(),
-                )
-            }
-            EmberIcon("power", size = 44.dp, tint = Color.White.copy(alpha = 0.92f))
-        }
+internal fun ConnectOrb(state: ConnectionState, label: String, onClick: () -> Unit) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    GlassOrb(state, label, Modifier.size(260.dp).pointerHoverIcon(PointerIcon.Hand), if (dark) Color.White else Color(0xFF7A5BC0), onClick) {
+        EmberIcon("power", size = 44.dp, tint = Color.White.copy(alpha = 0.92f))
     }
 }
 
