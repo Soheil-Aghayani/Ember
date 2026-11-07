@@ -80,6 +80,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -124,7 +126,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 
 /** [bottom] pages sit at the bottom of the sidebar, apart from the main ones. */
-private enum class Page(val icon: String, val bottom: Boolean = false) {
+internal enum class Page(val icon: String, val bottom: Boolean = false) {
     Home("home"),
     Servers("subscriptions"),
     Settings("settings"),
@@ -204,7 +206,7 @@ private fun MainShell(
 
     Row(Modifier.fillMaxSize()) {
         Sidebar(page) { page = it }
-        Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+        Box(Modifier.width(1.dp).fillMaxHeight().background(glassDivider()))
         AnimatedContent(
             targetState = page,
             modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -236,10 +238,10 @@ private fun MainShell(
 }
 
 @Composable
-private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
+internal fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
     val strings = LocalStrings.current
     Column(
-        Modifier.width(220.dp).fillMaxHeight().background(glassFill()).padding(16.dp),
+        Modifier.width(220.dp).fillMaxHeight().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.padding(start = 8.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -252,27 +254,28 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
             val active = p == selected
             val interaction = remember { MutableInteractionSource() }
             val hovered by interaction.collectIsHoveredAsState()
-            val background by animateColorAsState(
-                when {
-                    active -> MaterialTheme.colorScheme.primaryContainer
-                    hovered -> MaterialTheme.colorScheme.surfaceVariant
-                    else -> Color.Transparent
-                },
-                tween(220),
-            )
+            // the highlights are drawn as see-through tints whose strength is read while drawing, so a fast sweep of the
+            // mouse fades each item in and out on its own without redrawing the window or leaving a grey patch behind
+            val hoverStrength = animateFloatAsState(if (hovered && !active) 1f else 0f, tween(if (hovered) 110 else 280, easing = FastOutSlowInEasing))
+            val activeStrength = animateFloatAsState(if (active) 1f else 0f, tween(260, easing = FastOutSlowInEasing))
+            val hoverTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+            val activeTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
             Box(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(background)
+                    .drawBehind {
+                        drawRect(hoverTint.copy(alpha = hoverTint.alpha * hoverStrength.value))
+                        drawRect(activeTint.copy(alpha = activeTint.alpha * activeStrength.value))
+                    }
                     .hoverable(interaction)
                     .pointerHoverIcon(PointerIcon.Hand)
                     .clickable(role = Role.Button) { onSelect(p) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
                 val contentColor by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                    tween(220),
+                    if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    tween(200),
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     EmberIcon(p.icon, 20.dp, contentColor)

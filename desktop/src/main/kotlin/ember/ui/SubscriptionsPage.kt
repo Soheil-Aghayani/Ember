@@ -58,6 +58,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -460,9 +462,11 @@ private fun ServerRow(
             slide.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
         }
     }
-    val background by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface, tween(250), label = "selected",
-    )
+    // see-through tints drawn while painting, like the sidebar's, so the glass shows through and fast sweeps stay smooth
+    val selectedStrength = animateFloatAsState(if (selected) 1f else 0f, tween(250, easing = FastOutSlowInEasing), label = "selected")
+    val hoverStrength = animateFloatAsState(if (hovered && !selected) 1f else 0f, tween(if (hovered) 110 else 280, easing = FastOutSlowInEasing), label = "hover")
+    val selectedTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    val hoverTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     val speedBar = remember { Animatable(0f) }
     val measured = result?.mbps
     val barTarget = if (measured != null && fastest > 0) (measured / fastest).toFloat().coerceIn(0.04f, 1f) else 0f
@@ -489,7 +493,10 @@ private fun ServerRow(
         if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Row(
             Modifier.fillMaxWidth()
-                .background(background)
+                .drawBehind {
+                    drawRect(hoverTint.copy(alpha = hoverTint.alpha * hoverStrength.value))
+                    drawRect(selectedTint.copy(alpha = selectedTint.alpha * selectedStrength.value))
+                }
                 .hoverable(interaction)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(role = Role.RadioButton, onClick = onSelect)

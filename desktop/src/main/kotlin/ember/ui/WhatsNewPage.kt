@@ -21,6 +21,19 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.94",
+        listOf(
+            "Hovering over the menu and the server list now fades in and out smoothly, with no grey patches when the mouse moves fast.",
+            "The side menu now shares the window's background instead of being a separate panel, and the colours behind the glass drift slowly.",
+            "A cleaner Ember icon, and the real Telegram icon on the About page.",
+        ),
+        listOf(
+            "حالا نشانگر روی منو و فهرست سرورها نرم ظاهر و محو می‌شود و با حرکت سریع ماوس لکه‌ٔ خاکستری باقی نمی‌ماند.",
+            "منوی کناری حالا همان پس‌زمینهٔ پنجره را دارد و جدا نیست، و رنگ‌های پشت شیشه به‌آرامی حرکت می‌کنند.",
+            "نماد ساده‌تر Ember و نماد واقعی تلگرام در صفحهٔ درباره.",
+        ),
+    ),
+    Release(
         "1.0.93",
         listOf(
             "The Connect button is now a glass orb that dims when idle and glows when connected, and the window has a soft picture behind it.",

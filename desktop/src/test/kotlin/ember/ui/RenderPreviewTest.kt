@@ -74,4 +74,33 @@ class RenderPreviewTest {
             }
         }
     }
+
+    /** The sidebar on the glass backdrop, with the pointer sweeping over its items, to see the hover fade and the divider. */
+    @Test
+    fun drawsSidebarHover() {
+        val dir = System.getenv("RENDER_DIR")?.let(::File) ?: return
+        dir.mkdirs()
+        for (dark in listOf(false, true)) {
+            val scene = ImageComposeScene(520, 420, Density(1f)) {
+                EmberTheme(darkTheme = dark) {
+                    CompositionLocalProvider(LocalStrings provides EnglishStrings) {
+                        GlassBackground { androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) { Sidebar(Page.Home) {} } }
+                    }
+                }
+            }
+            scene.render(0)
+            // a fast sweep down the list ends on "Settings"; read the picture straight after, then once the fades are over
+            scene.sendPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Enter, androidx.compose.ui.geometry.Offset(100f, 100f))
+            for ((i, y) in listOf(100f, 140f, 188f, 230f).withIndex()) {
+                scene.sendPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Move, androidx.compose.ui.geometry.Offset(100f, y))
+                scene.render((i + 1) * 20_000_000L)
+            }
+            val during = scene.render(6 * 20_000_000L + 30_000_000L)
+            File(dir, "sidebar-sweep-${if (dark) "dark" else "light"}.png").writeBytes(during.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            var settled = during
+            for (step in 1..8) settled = scene.render(200_000_000L + step * 250_000_000L)
+            File(dir, "sidebar-settled-${if (dark) "dark" else "light"}.png").writeBytes(settled.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            scene.close()
+        }
+    }
 }

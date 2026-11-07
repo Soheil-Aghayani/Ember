@@ -76,7 +76,7 @@ internal fun AboutPage() {
                 }.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                EmberIcon("contact", 20.dp, MaterialTheme.colorScheme.primary)
+                EmberIcon("telegram", 24.dp, MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(strings.aboutContact, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

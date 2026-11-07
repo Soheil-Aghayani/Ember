@@ -4,6 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import com.soheil.ember.R
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,9 +76,13 @@ fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/env_soh"))) }
             },
         ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(s.contact, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Telegram  @env_soh", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+            androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(painterResource(R.drawable.ic_telegram), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(s.contact, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Telegram  @env_soh", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
