@@ -96,8 +96,8 @@ android {
         applicationId = "com.soheil.ember"
         minSdk = 26
         targetSdk = 35
-        versionCode = 170
-        versionName = "2.7.0"
+        versionCode = 171
+        versionName = "2.7.1"
 
         externalNativeBuild {
             ndkBuild {

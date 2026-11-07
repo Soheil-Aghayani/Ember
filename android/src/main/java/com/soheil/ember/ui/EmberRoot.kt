@@ -66,7 +66,7 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
             contentColor = MaterialTheme.colorScheme.onBackground,
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Color.White.copy(alpha = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) 0.07f else 0.55f)) {
+                NavigationBar(containerColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF110D18).copy(alpha = 0.78f) else Color.White.copy(alpha = 0.72f)) {
                     for ((label, icon, index) in items) {
                         NavigationBarItem(
                             selected = tab == index, onClick = { tab = index },

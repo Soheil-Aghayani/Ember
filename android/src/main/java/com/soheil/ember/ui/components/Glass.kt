@@ -48,6 +48,8 @@ fun GlassBackground(modifier: Modifier = Modifier, content: @Composable () -> Un
             painterResource(if (dark) R.drawable.bg_dark else R.drawable.bg_light), contentDescription = null,
             modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
         )
+        // the bright coloured spots in the dark picture would wash out text laid over them, so the picture is dimmed
+        if (dark) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.30f)))
         LivingLight()
         content()
     }
@@ -69,7 +71,7 @@ private fun LivingLight() {
         }
     }
     val violet = if (dark) Color(0xFF7A55E0).copy(alpha = 0.34f) else Color(0xFFB79CFF).copy(alpha = 0.40f)
-    val ember = if (dark) Color(0xFFFF7139).copy(alpha = 0.26f) else Color(0xFFFFA070).copy(alpha = 0.38f)
+    val ember = if (dark) Color(0xFFFF7139).copy(alpha = 0.20f) else Color(0xFFFFA070).copy(alpha = 0.38f)
     val rose = if (dark) Color(0xFFE0207F).copy(alpha = 0.16f) else Color(0xFFFF9AC0).copy(alpha = 0.26f)
     Box(
         Modifier.fillMaxSize().drawBehind {
@@ -84,14 +86,18 @@ private fun LivingLight() {
     )
 }
 
-/** The tint of a glass panel: lighter at the top, with the same white fading down the edge. */
+/**
+ * The tint of a glass panel. In dark mode it is a deep violet, so text on a panel never sits on a bright patch of the
+ * backdrop; in light mode it is mostly white. Either way the thin edge (see [glassEdge]) is what makes it read as glass.
+ */
 @Composable
 fun glassFill(strong: Boolean = false): Brush {
     val dark = isDarkGlass()
-    val top = if (dark) 0.12f else 0.72f
-    val bottom = if (dark) 0.05f else 0.46f
-    val k = if (strong) 1.25f else 1f
-    return Brush.verticalGradient(listOf(Color.White.copy(alpha = (top * k).coerceAtMost(1f)), Color.White.copy(alpha = (bottom * k).coerceAtMost(1f))))
+    return if (dark) {
+        Brush.verticalGradient(listOf(Color(0xFF2A2238).copy(alpha = 0.55f), Color(0xFF15101E).copy(alpha = 0.64f)))
+    } else {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.80f), Color.White.copy(alpha = 0.64f)))
+    }
 }
 
 @Composable

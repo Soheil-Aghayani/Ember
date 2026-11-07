@@ -49,7 +49,7 @@ private val EmberTypography = Typography(
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFC4400A), onPrimary = Color(0xFFFFFFFF),
+    primary = Color(0xFF9C3107), onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFFBE6DA), onPrimaryContainer = Color(0xFF5A1C00),
     secondary = Color(0xFF6A3BD1), onSecondary = Color(0xFFFFFFFF),
     secondaryContainer = Color(0xFFECE5FA), onSecondaryContainer = Color(0xFF2A1566),
@@ -57,7 +57,7 @@ private val LightColors = lightColorScheme(
     error = Color(0xFFBA1A1A),
     background = Color(0xFFFAF7F2), onBackground = Color(0xFF1F1B16),
     surface = Color(0xFFFFFFFF), onSurface = Color(0xFF1F1B16),
-    surfaceVariant = Color(0xFFF1ECE3), onSurfaceVariant = Color(0xFF6B645B),
+    surfaceVariant = Color(0xFFF1ECE3), onSurfaceVariant = Color(0xFF534C44),
     outline = Color(0xFF8A8277), outlineVariant = Color(0xFFE4DDD1),
     onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFDDF1E2), onTertiaryContainer = Color(0xFF0B3A1B),
     errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
@@ -67,7 +67,7 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFFF7139), onPrimary = Color(0xFF1A1714),
+    primary = Color(0xFFFF8D5C), onPrimary = Color(0xFF1A1714),
     primaryContainer = Color(0xFF3A2218), onPrimaryContainer = Color(0xFFFFD9C7),
     secondary = Color(0xFFB79CFF), onSecondary = Color(0xFF2A1566),
     secondaryContainer = Color(0xFF2C2540), onSecondaryContainer = Color(0xFFE6DCFF),
@@ -75,7 +75,7 @@ private val DarkColors = darkColorScheme(
     error = Color(0xFFFFB4AB),
     background = Color(0xFF1A1714), onBackground = Color(0xFFF3EEE6),
     surface = Color(0xFF24201C), onSurface = Color(0xFFF3EEE6),
-    surfaceVariant = Color(0xFF3A342D), onSurfaceVariant = Color(0xFFA39B90),
+    surfaceVariant = Color(0xFF3A342D), onSurfaceVariant = Color(0xFFCDC5BA),
     outline = Color(0xFF80786C), outlineVariant = Color(0xFF3A342D),
     onTertiary = Color(0xFF0B3A1B), tertiaryContainer = Color(0xFF14301D), onTertiaryContainer = Color(0xFFBFEBCB),
     errorContainer = Color(0xFF5C1A14), onErrorContainer = Color(0xFFFFDAD6),

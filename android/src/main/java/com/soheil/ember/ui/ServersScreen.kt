@@ -300,7 +300,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                             IconButton(onClick = { engine.toggleFavorite(node) }) {
                                 Icon(
                                     Icons.Filled.Star, contentDescription = s.favourite,
-                                    tint = if (node.id in favorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                    tint = if (node.id in favorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                 )
                             }
                             if (selected) Icon(Icons.Filled.Check, contentDescription = s.selected, tint = MaterialTheme.colorScheme.primary)
