@@ -31,7 +31,7 @@ class RenderPreviewTest {
         val scene = ImageComposeScene(width, height, Density(1f)) {
             EmberTheme(darkTheme = dark) {
                 CompositionLocalProvider(LocalStrings provides EnglishStrings) {
-                    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp)) { content() }
+                    GlassBackground { Column(Modifier.fillMaxSize().padding(24.dp)) { content() } }
                 }
             }
         }

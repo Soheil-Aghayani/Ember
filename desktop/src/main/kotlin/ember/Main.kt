@@ -37,6 +37,7 @@ import ember.ui.EmberApp
 import ember.ui.EmberDesktopMetrics
 import ember.ui.EmberMacWindowTitleBar
 import ember.ui.EmberTheme
+import ember.ui.GlassBackground
 import ember.ui.EnglishStrings
 import ember.ui.LocalStrings
 import ember.ui.PersianStrings
@@ -128,10 +129,8 @@ fun main(args: Array<String>) = application {
         }) {
             CompositionLocalProvider(LocalStrings provides strings) {
                 val frameShape = RoundedCornerShape(EmberDesktopMetrics.windowCornerRadius)
-                Box(Modifier.fillMaxSize()) {
-                    Column(
-                        Modifier.fillMaxSize().then(if (showRoundedFrame) Modifier.clip(frameShape) else Modifier),
-                    ) {
+                GlassBackground(if (showRoundedFrame) Modifier.clip(frameShape) else Modifier) {
+                    Column(Modifier.fillMaxSize()) {
                         if (useMacStyleChrome) {
                             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                                 EmberMacWindowTitleBar(

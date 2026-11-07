@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.soheil.ember.ui.components.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,6 +61,7 @@ import com.soheil.ember.engine.AndroidEngine
 import com.soheil.ember.engine.VpnState
 import com.soheil.ember.ui.components.FlagIcon
 import ember.subs.Subscription
+import ember.subs.shareLink
 import ember.subs.sortNodes
 import java.util.Locale
 
@@ -79,6 +80,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
     var menu by remember { mutableStateOf(false) }
     var askLink by remember { mutableStateOf(false) }
     var askSite by remember { mutableStateOf(false) }
+    var qrNode by remember { mutableStateOf<ember.subs.ProxyNode?>(null) }
     val siteCheck by engine.siteCheck.collectAsState()
 
     fun report(result: Result<Subscription>) {
@@ -112,6 +114,8 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
             dismissButton = { TextButton(onClick = { askLink = false }) { Text(s.cancel) } },
         )
     }
+
+    qrNode?.let { QrDialog(it, say, onClose = { qrNode = null }) }
 
     if (askSite) {
         var input by remember { mutableStateOf("") }
@@ -289,6 +293,9 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                                     style = MaterialTheme.typography.labelMedium,
                                     color = if (site.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                                 )
+                            }
+                            if (selected && node.shareLink != null) {
+                                IconButton(onClick = { qrNode = node }) { Icon(painterResource(R.drawable.ic_solar_qr), contentDescription = s.showQr) }
                             }
                             IconButton(onClick = { engine.toggleFavorite(node) }) {
                                 Icon(

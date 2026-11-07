@@ -45,7 +45,7 @@ fun WindowScope.EmberMacWindowTitleBar(
 ) {
     val strings = LocalStrings.current
     WindowDraggableArea(Modifier.fillMaxWidth().height(EmberDesktopMetrics.titleBarHeight)) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(Modifier.fillMaxSize()) {
             Row(
                 Modifier.align(Alignment.CenterStart).padding(start = EmberDesktopMetrics.windowControlInset),
                 horizontalArrangement = Arrangement.spacedBy(EmberDesktopMetrics.windowControlGap),

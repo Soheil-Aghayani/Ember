@@ -1,5 +1,7 @@
 package com.soheil.ember.ui
 
+import com.soheil.ember.ui.components.glassEdge
+import com.soheil.ember.ui.components.glassFill
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -117,8 +119,8 @@ fun HomeScreen(
         Spacer(Modifier.height(32.dp))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .background(glassFill())
+                .border(1.dp, glassEdge(), RoundedCornerShape(16.dp))
                 .clickable(enabled = phase == ConnectionState.DISCONNECTED, onClick = onOpenServers)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,

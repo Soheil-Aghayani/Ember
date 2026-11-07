@@ -2,6 +2,10 @@ package com.soheil.ember.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.soheil.ember.ui.components.GlassBackground
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -56,26 +60,30 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         Triple(s.settings, R.drawable.ic_solar_settings, 2),
         Triple(s.about, R.drawable.ic_solar_info_circle, 3),
     )
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = {
-            NavigationBar {
-                for ((label, icon, index) in items) {
-                    NavigationBarItem(
-                        selected = tab == index, onClick = { tab = index },
-                        icon = { Icon(painterResource(icon), contentDescription = label) },
-                        label = { Text(label) },
-                    )
+    GlassBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            snackbarHost = { SnackbarHost(snackbar) },
+            bottomBar = {
+                NavigationBar(containerColor = Color.White.copy(alpha = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) 0.07f else 0.55f)) {
+                    for ((label, icon, index) in items) {
+                        NavigationBarItem(
+                            selected = tab == index, onClick = { tab = index },
+                            icon = { Icon(painterResource(icon), contentDescription = label) },
+                            label = { Text(label) },
+                        )
+                    }
                 }
+            },
+        ) { padding ->
+            val modifier = Modifier.padding(padding)
+            when (tab) {
+                0 -> HomeScreen(engine, onConnect, onDisconnect, onOpenServers = { tab = 1 }, modifier = modifier)
+                1 -> ServersScreen(engine, say, onConnect, modifier = modifier)
+                2 -> SettingsScreen(engine, modifier = modifier)
+                else -> AboutScreen(engine, modifier = modifier)
             }
-        },
-    ) { padding ->
-        val modifier = Modifier.padding(padding)
-        when (tab) {
-            0 -> HomeScreen(engine, onConnect, onDisconnect, onOpenServers = { tab = 1 }, modifier = modifier)
-            1 -> ServersScreen(engine, say, onConnect, modifier = modifier)
-            2 -> SettingsScreen(engine, modifier = modifier)
-            else -> AboutScreen(engine, modifier = modifier)
         }
     }
 }

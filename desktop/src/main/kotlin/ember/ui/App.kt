@@ -24,6 +24,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -172,7 +173,7 @@ fun EmberApp(
         }
     }
     CompositionLocalProvider(LocalToaster provides toaster, LocalAppScope provides appScope) {
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(Modifier.fillMaxSize()) {
             MainShell(engine, theme, onThemeChange, language, onLanguageChange)
             CredentialDialog(engine)
             ToastHost(toaster)
@@ -186,8 +187,8 @@ internal fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit
         modifier
             .fillMaxWidth()
             .clip(CardShape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), CardShape),
+            .background(glassFill())
+            .border(BorderStroke(1.dp, glassEdge()), CardShape),
     ) { CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) { content() } }
 }
 
@@ -238,7 +239,7 @@ private fun MainShell(
 private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
     val strings = LocalStrings.current
     Column(
-        Modifier.width(220.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(16.dp),
+        Modifier.width(220.dp).fillMaxHeight().background(glassFill()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.padding(start = 8.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -255,7 +256,7 @@ private fun Sidebar(selected: Page, onSelect: (Page) -> Unit) {
                 when {
                     active -> MaterialTheme.colorScheme.primaryContainer
                     hovered -> MaterialTheme.colorScheme.surfaceVariant
-                    else -> MaterialTheme.colorScheme.surface
+                    else -> Color.Transparent
                 },
                 tween(220),
             )
