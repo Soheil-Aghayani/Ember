@@ -16,7 +16,7 @@ import com.soheil.ember.engine.VpnState
 import com.soheil.ember.vpn.XrayVpnService
 
 /**
- * A 2x2 home-screen widget: the Ember orb, "Connected" or "Disconnected", and the server. One tap connects or
+ * A 2x2 home-screen widget: "Connected" or "Disconnected" and the server on a black card, with the Ember orb at the bottom. One tap connects or
  * disconnects; if Android's VPN permission or a chosen server is missing, the tap opens Ember instead.
  */
 class ConnectWidget : AppWidgetProvider() {
@@ -45,8 +45,9 @@ class ConnectWidget : AppWidgetProvider() {
                 },
             )
             views.setTextViewText(R.id.widget_server, (VpnState.node.value ?: engine.selectedNode())?.title.orEmpty())
-            views.setInt(R.id.widget_root, "setBackgroundResource", if (connected) R.drawable.widget_bg_on else R.drawable.widget_bg_off)
-            views.setInt(R.id.widget_orb, "setImageAlpha", if (phase == ConnectionState.DISCONNECTED) 130 else 255)
+            // the orb glows while connecting or connected and dims when off
+            views.setInt(R.id.widget_orb, "setImageAlpha", if (phase == ConnectionState.DISCONNECTED) 70 else 255)
+            views.setInt(R.id.widget_power, "setImageAlpha", if (connected) 255 else 140)
 
             val immutable = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             val tap = when {

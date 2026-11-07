@@ -1,37 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The home-screen widget: the Ember orb, what the VPN is doing, and the server. A tap connects or disconnects. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The home-screen widget: what the VPN is doing and the server at the top, a power button, and the Ember orb rising from the bottom. A tap connects or disconnects. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_off"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="12dp">
+    android:background="@drawable/widget_bg"
+    android:clipToOutline="true"
+    android:outlineProvider="background">
 
     <ImageView
         android:id="@+id/widget_orb"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:adjustViewBounds="true"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/ember_logo" />
+        android:scaleType="fitEnd"
+        android:src="@drawable/widget_orb" />
 
-    <TextView
-        android:id="@+id/widget_status"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:maxLines="1"
-        android:textColor="@color/widget_text"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="64dp">
 
-    <TextView
-        android:id="@+id/widget_server"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/widget_text_dim"
-        android:textSize="12sp" />
-</LinearLayout>
+        <TextView
+            android:id="@+id/widget_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_server"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FF9A9AA0"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/widget_power"
+        android:layout_width="48dp"
+        android:layout_height="32dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/widget_power_bg"
+        android:contentDescription="@string/app_name"
+        android:padding="6dp"
+        android:src="@drawable/ic_solar_power"
+        android:tint="#FFFFFFFF" />
+</FrameLayout>

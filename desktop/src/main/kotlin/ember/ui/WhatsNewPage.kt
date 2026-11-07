@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.93",
+        listOf(
+            "The Connect button is now a glass orb that dims when idle and glows when connected, and the window has a soft picture behind it.",
+            "The Android app has the same look, a QR code for sharing a server, and a new home-screen widget.",
+        ),
+        listOf(
+            "دکمهٔ اتصال حالا یک گوی شیشه‌ای است که در حالت آماده کم‌نور و هنگام اتصال درخشان می‌شود، و پشت پنجره یک تصویر نرم قرار دارد.",
+            "برنامهٔ اندروید همین ظاهر را دارد، به‌علاوهٔ کد QR برای اشتراک‌گذاری سرور و یک ویجت تازهٔ صفحهٔ اصلی.",
+        ),
+    ),
+    Release(
         "1.0.92",
         listOf(
             "A new frosted-glass look: translucent panels and a soft coloured backdrop, in light and dark.",

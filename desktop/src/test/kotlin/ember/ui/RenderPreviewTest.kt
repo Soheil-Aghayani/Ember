@@ -16,6 +16,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.soheil.ember.data.model.ConnectionState
 import java.io.File
 import kotlin.test.Test
 import org.jetbrains.skia.EncodedImageFormat
@@ -60,6 +61,11 @@ class RenderPreviewTest {
                     contentDescription = null, filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
                     modifier = Modifier.size(260.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color.White).padding(6.dp),
                 )
+            }
+            for (state in ConnectionState.entries) {
+                render(dir, "orb-${state.name.lowercase()}-$theme", dark, width = 420, height = 360) {
+                    ConnectOrb(state, MaterialTheme.colorScheme.primary, 1f, "Connect") {}
+                }
             }
             render(dir, "toast-$theme", dark, height = 220) {
                 val toaster = androidx.compose.runtime.remember { Toaster().apply { show("Added 17 servers", ToastKind.Success); show("Could not read that file", ToastKind.Error) } }

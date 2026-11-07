@@ -19,7 +19,7 @@ Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A 
 | `android/` | Android phone and Android TV app (Kotlin, Jetpack Compose, Material 3). Package `com.soheil.ember`; TV UI is selected from the Leanback device feature. |
 | `core/` | JVM-only code. The Windows app uses only its logging, connection-check and tunnel-config helpers; the Firefox sign-in, proxy pass and HTTP/2 tunnel belong to the older Android client. No Android APIs allowed here. |
 | `desktop/` | Compose Desktop app for Windows. `desktop/.../subs/` reads subscriptions and runs Xray; `desktop/.../engine/` owns the connection; `desktop/appResources/windows-x64/ember-tunnel.ps1` is the fallback elevated tunnel helper. |
-| `design/` | Design tokens (`tokens.json`), brand assets, store graphics. |
+| `design/` | Design tokens (`tokens.json`), brand assets, store graphics, and the orb and background pictures (`orb-*.png`, `bg-*.png`, `widget-orb.png`, made in GPT). The apps use converted copies: `android/.../res/drawable-nodpi/*.webp` and `desktop/.../resources/art/*.webp`; the orbs there have real transparency (alpha from brightness). |
 | `docs/` | Project map, platform status, and contributor-facing architecture notes. |
 | `helper/` | Native Rust helper for Windows whole-device tunnel setup. Do not run it. |
 | `tools/` | Repository utilities and asset-conversion scripts. |

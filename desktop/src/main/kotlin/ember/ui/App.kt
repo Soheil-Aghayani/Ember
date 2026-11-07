@@ -363,7 +363,6 @@ private fun HomePage(
         ConnectOrb(
             state = state,
             ring = ring,
-            ringAlpha = connectingRingAlpha(state),
             popScale = connectedScale.value,
             label = when (state) {
                 ConnectionState.DISCONNECTED -> strings.connect
@@ -663,15 +662,4 @@ private fun EmberFilterChip(
         label = label,
         elevation = FilterChipDefaults.filterChipElevation(hoveredElevation = 0.dp),
     )
-}
-
-@Composable
-private fun connectingRingAlpha(state: ConnectionState): Float {
-    if (state != ConnectionState.CONNECTING) return 0.15f
-    val transition = rememberInfiniteTransition()
-    val alpha by transition.animateFloat(
-        initialValue = 0.12f, targetValue = 0.20f,
-        animationSpec = infiniteRepeatable(tween(300), RepeatMode.Reverse),
-    )
-    return alpha
 }

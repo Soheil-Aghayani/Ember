@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="widget_off_bg">#FFFAF7F2</color>
-    <color name="widget_on_bg">#FFDDF1E2</color>
-    <color name="widget_outline">#FFE4DDD1</color>
-    <color name="widget_text">#FF1F1B16</color>
-    <color name="widget_text_dim">#FF6B645B</color>
-</resources>

@@ -3,13 +3,13 @@ package com.soheil.ember.ui
 import com.soheil.ember.ui.components.glassEdge
 import com.soheil.ember.ui.components.glassFill
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,10 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.soheil.ember.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.soheil.ember.data.model.ConnectionState
@@ -53,7 +53,7 @@ import ember.subs.AUTO_NODE
 import java.util.Locale
 import kotlinx.coroutines.delay
 
-/** The Connect button, how long the connection has been up, and the server it uses. */
+/** The orb you tap to connect, how long the connection has been up, and the server it uses. */
 @Composable
 fun HomeScreen(
     engine: AndroidEngine,
@@ -84,13 +84,8 @@ fun HomeScreen(
         } else elapsed = 0
     }
 
-    val ring = when (phase) {
-        ConnectionState.CONNECTED -> MaterialTheme.colorScheme.tertiary
-        ConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondary
-        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.primary
-    }
     Column(modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Orb(phase, ring) {
+        Orb(phase) {
             when {
                 phase != ConnectionState.DISCONNECTED -> onDisconnect()
                 node == null -> onOpenServers()
@@ -145,39 +140,42 @@ fun HomeScreen(
     }
 }
 
-/** The big round button: still when idle, an arc runs around it while connecting, and it breathes once connected. */
+/**
+ * The big glass orb: dim when idle, ripening to full colour while connecting and once connected, and breathing slowly
+ * when connected. A tap connects or disconnects.
+ */
 @Composable
-private fun Orb(phase: ConnectionState, ring: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+private fun Orb(phase: ConnectionState, onClick: () -> Unit) {
     val transition = rememberInfiniteTransition(label = "orb")
     val breathe by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
-    val spin by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "spin")
+    val pulse by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
     val s = LocalStrings.current
-    val scale = if (phase == ConnectionState.CONNECTED) 1f + 0.035f * breathe else 1f
-    Box(Modifier.size(200.dp).scale(scale), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.fillMaxSize().clip(CircleShape).background(ring.copy(alpha = 0.15f)).clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(156.dp).clip(CircleShape).background(ring.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
-                Text(
-                    when (phase) {
-                        ConnectionState.DISCONNECTED -> s.connect
-                        ConnectionState.CONNECTING -> s.cancel
-                        ConnectionState.CONNECTED -> s.disconnect
+    val scale = when (phase) {
+        ConnectionState.CONNECTED -> 1f + 0.035f * breathe
+        ConnectionState.CONNECTING -> 1f + 0.05f * pulse
+        ConnectionState.DISCONNECTED -> 1f
+    }
+    val action = when (phase) {
+        ConnectionState.DISCONNECTED -> s.connect
+        ConnectionState.CONNECTING -> s.cancel
+        ConnectionState.CONNECTED -> s.disconnect
+    }
+    Box(
+        Modifier.size(300.dp).scale(scale).clip(CircleShape).clickable(onClickLabel = action, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Crossfade(phase, animationSpec = tween(450), label = "orb-picture") { shown ->
+            Image(
+                painterResource(
+                    when (shown) {
+                        ConnectionState.CONNECTED -> R.drawable.orb_on
+                        ConnectionState.CONNECTING -> R.drawable.orb_connecting
+                        ConnectionState.DISCONNECTED -> R.drawable.orb_off
                     },
-                    style = MaterialTheme.typography.titleMedium, color = ring,
-                )
-            }
+                ),
+                contentDescription = action, modifier = Modifier.fillMaxSize(),
+            )
         }
-        if (phase == ConnectionState.CONNECTING) {
-            Canvas(Modifier.fillMaxSize()) {
-                val stroke = 4.dp.toPx()
-                drawArc(
-                    color = ring, startAngle = spin, sweepAngle = 100f, useCenter = false,
-                    topLeft = Offset(stroke / 2, stroke / 2), size = Size(size.width - stroke, size.height - stroke),
-                    style = Stroke(stroke, cap = StrokeCap.Round),
-                )
-            }
-        }
+        Icon(painterResource(R.drawable.ic_solar_power), contentDescription = null, tint = Color.White.copy(alpha = 0.92f), modifier = Modifier.size(56.dp))
     }
 }

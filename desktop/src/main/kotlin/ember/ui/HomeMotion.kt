@@ -9,7 +9,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -45,6 +47,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -53,14 +56,13 @@ import com.soheil.ember.data.model.ConnectionState
 import ember.engine.TrafficStats
 
 /**
- * The big Connect button. Idle it is still; while connecting a short arc runs around it; once connected it breathes
- * slowly, and a single ripple leaves it the moment the connection comes up.
+ * The big glass orb. Idle it is dim and still; while connecting it pulses and ripens to full colour; once connected it
+ * breathes slowly, and a single ripple leaves it the moment the connection comes up.
  */
 @Composable
 internal fun ConnectOrb(
     state: ConnectionState,
     ring: Color,
-    ringAlpha: Float,
     popScale: Float,
     label: String,
     onClick: () -> Unit,
@@ -69,11 +71,11 @@ internal fun ConnectOrb(
     val breathe by transition.animateFloat(
         0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe",
     )
-    val spin by transition.animateFloat(
-        0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "spin",
+    val pulse by transition.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse",
     )
     val connected = state == ConnectionState.CONNECTED
-    // 0 → 1 is the ripple leaving the button; 1 means it is gone.
+    // 0 → 1 is the ripple leaving the orb; 1 means it is gone.
     val ripple = remember { Animatable(1f) }
     LaunchedEffect(state) {
         if (connected) {
@@ -83,37 +85,41 @@ internal fun ConnectOrb(
             ripple.snapTo(1f)
         }
     }
-    val breathing = if (connected) 1f + 0.035f * breathe else 1f
+    val motion = when (state) {
+        ConnectionState.CONNECTED -> 1f + 0.035f * breathe
+        ConnectionState.CONNECTING -> 1f + 0.05f * pulse
+        ConnectionState.DISCONNECTED -> 1f
+    }
 
     Box(
-        Modifier.size(180.dp)
+        Modifier.size(260.dp)
             .drawBehind {
                 if (ripple.value < 1f) {
-                    val radius = size.minDimension / 2 * (1f + 0.45f * ripple.value)
+                    val radius = size.minDimension / 2 * (0.78f + 0.45f * ripple.value)
                     drawCircle(ring.copy(alpha = 0.4f * (1f - ripple.value)), radius, style = Stroke(3.dp.toPx()))
                 }
             }
-            .scale(popScale * breathing),
+            .scale(popScale * motion),
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.fillMaxSize().clip(CircleShape).background(ring.copy(alpha = ringAlpha))
+            Modifier.fillMaxSize().clip(CircleShape)
                 .pointerHoverIcon(PointerIcon.Hand).clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(140.dp).clip(CircleShape).background(ring.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
-                Text(label, style = MaterialTheme.typography.titleMedium, color = ring)
-            }
-        }
-        if (state == ConnectionState.CONNECTING) {
-            Canvas(Modifier.fillMaxSize()) {
-                val stroke = 4.dp.toPx()
-                drawArc(
-                    color = ring, startAngle = spin, sweepAngle = 100f, useCenter = false,
-                    topLeft = Offset(stroke / 2, stroke / 2), size = Size(size.width - stroke, size.height - stroke),
-                    style = Stroke(stroke, cap = StrokeCap.Round),
+            Crossfade(state, animationSpec = tween(450), label = "orb-picture") { shown ->
+                Image(
+                    painterResource(
+                        when (shown) {
+                            ConnectionState.CONNECTED -> "art/orb-on.webp"
+                            ConnectionState.CONNECTING -> "art/orb-connecting.webp"
+                            ConnectionState.DISCONNECTED -> "art/orb-off.webp"
+                        },
+                    ),
+                    contentDescription = label, modifier = Modifier.fillMaxSize(),
                 )
             }
+            EmberIcon("power", size = 44.dp, tint = Color.White.copy(alpha = 0.92f))
         }
     }
 }
