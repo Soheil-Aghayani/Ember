@@ -232,7 +232,7 @@ class XrayVpnService : VpnService() {
     }
 
     companion object {
-        private const val ACTION_DISCONNECT = "com.soheil.ember.DISCONNECT"
+        const val ACTION_DISCONNECT = "com.soheil.ember.DISCONNECT"
         private const val EXTRA_NODE = "node"
 
         /** Starts the VPN for [nodeId] (or the server the user chose). Android's VPN permission must already be granted. */

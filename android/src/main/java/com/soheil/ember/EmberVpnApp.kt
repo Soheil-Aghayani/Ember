@@ -8,6 +8,13 @@ import android.util.Log
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.LogSink
 import com.soheil.ember.engine.AndroidEngine
+import com.soheil.ember.engine.VpnState
+import com.soheil.ember.widget.ConnectWidget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 class EmberVpnApp : Application() {
 
@@ -18,6 +25,10 @@ class EmberVpnApp : Application() {
         super.onCreate()
         AppLogger.sink = AndroidLogSink
         createNotificationChannel()
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            combine(VpnState.phase, VpnState.node, engine.language) { phase, node, language -> Triple(phase, node?.id, language) }
+                .collect { ConnectWidget.refresh(this@EmberVpnApp) }
+        }
     }
 
     private fun createNotificationChannel() {

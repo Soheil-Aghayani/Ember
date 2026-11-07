@@ -192,6 +192,17 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
 
         Card(
             Modifier.fillMaxWidth().clickable {
+                if (!requestHomeScreenWidget(context)) Toast.makeText(context, s.addWidgetManual, Toast.LENGTH_LONG).show()
+            },
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(s.addWidgetTitle, style = MaterialTheme.typography.bodyLarge)
+                Text(s.addWidgetHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Card(
+            Modifier.fillMaxWidth().clickable {
                 runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             },
         ) {

@@ -24,3 +24,13 @@ fun requestQuickSettingsTile(context: Context): Boolean {
     ) { }
     return true
 }
+
+/**
+ * Asks the launcher to place Ember's widget on the home screen (it shows its own "Add?" question). Returns false when
+ * the launcher cannot be asked: the widget is then added by hand from the widget list (touch and hold the home screen).
+ */
+fun requestHomeScreenWidget(context: Context): Boolean {
+    val manager = android.appwidget.AppWidgetManager.getInstance(context)
+    if (!manager.isRequestPinAppWidgetSupported) return false
+    return manager.requestPinAppWidget(ComponentName(context, com.soheil.ember.widget.ConnectWidget::class.java), null, null)
+}
