@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import com.soheil.ember.data.AppLogger
 import com.soheil.ember.data.model.ConnectionState
+import com.soheil.ember.ui.Strings
+import com.soheil.ember.ui.stringsFor
 import ember.subs.AUTO_NODE
 import ember.subs.NodeTester
 import ember.subs.ProxyNode
@@ -79,6 +81,19 @@ class AndroidEngine(private val context: Context) {
         get() = prefs.getBoolean("tileOffered", false)
         set(value) = prefs.edit().putBoolean("tileOffered", value).apply()
 
+    private val _language = MutableStateFlow(prefs.getString("language", "system") ?: "system")
+
+    /** "system" (follow the phone), "en" or "fa". */
+    val language: StateFlow<String> = _language
+
+    fun setLanguage(code: String) {
+        prefs.edit().putString("language", code).apply()
+        _language.value = code
+    }
+
+    /** The words for the language in use; the service and this engine write their messages with it. */
+    val strings: Strings get() = stringsFor(_language.value)
+
     private val _autoFailover = MutableStateFlow(prefs.getBoolean("failover", true))
 
     /** Switch to the next-best server by itself when the connected one stops passing traffic. */
@@ -121,7 +136,7 @@ class AndroidEngine(private val context: Context) {
     fun checkSite(all: List<ProxyNode>, label: String, url: String) {
         if (VpnState.phase.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
         _siteCheck.value = SiteCheckState(label, emptyMap())
-        _testProgress.value = "Starting…"
+        _testProgress.value = strings.testStarting
         testJob = scope.launch {
             try {
                 siteChecker.run(all, url, { _testProgress.value = it }) { node, result ->
@@ -129,7 +144,7 @@ class AndroidEngine(private val context: Context) {
                 }
             } catch (failure: Throwable) {
                 AppLogger.w(TAG, "the website check failed", failure)
-                _notice.value = "The check could not run: ${failure.message ?: failure.javaClass.simpleName}"
+                _notice.value = strings.checkFailed(failure.message ?: failure.javaClass.simpleName)
             } finally {
                 _testProgress.value = null
             }
@@ -167,7 +182,7 @@ class AndroidEngine(private val context: Context) {
     /** Measures delay and speed of [nodes]. Only while disconnected, or the test would go through the VPN. */
     fun testNodes(nodes: List<ProxyNode>) {
         if (VpnState.phase.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
-        _testProgress.value = "Starting…"
+        _testProgress.value = strings.testStarting
         testJob = scope.launch {
             try {
                 nodeTester.run(
@@ -179,11 +194,11 @@ class AndroidEngine(private val context: Context) {
                 val answered = nodes.count { subscriptions.results.value[it.id]?.pingMs != null }
                 if (answered == 0) {
                     AppLogger.w(TAG, "no server answered; Xray said: ${xrayOutput()}")
-                    _notice.value = "No server answered the test. Open About, then Logs, to see why."
+                    _notice.value = strings.noServerAnswered
                 }
             } catch (failure: Throwable) {
                 AppLogger.w(TAG, "the server test failed", failure)
-                _notice.value = "The test could not run: ${failure.message ?: failure.javaClass.simpleName}"
+                _notice.value = strings.testFailed(failure.message ?: failure.javaClass.simpleName)
             } finally {
                 _testProgress.value = null
                 subscriptions.saveResults()
@@ -201,7 +216,7 @@ class AndroidEngine(private val context: Context) {
         runCatching { resolveIpv4(node.host) ?: error("no address") }
             .onSuccess { subscriptions.rememberAddress(node, it) }
             .getOrElse { failure ->
-                subscriptions.rememberedAddress(node) ?: throw IllegalStateException("Could not look up ${node.host}.", failure)
+                subscriptions.rememberedAddress(node) ?: throw IllegalStateException(strings.lookupFailed(node.host), failure)
             }
 
     /** The last lines Xray wrote, for the logs. */

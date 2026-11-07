@@ -7,6 +7,7 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.graphics.drawable.Icon
+import com.soheil.ember.EmberVpnApp
 import com.soheil.ember.MainActivity
 import com.soheil.ember.R
 import com.soheil.ember.data.model.ConnectionState
@@ -26,15 +27,16 @@ class QuickConnectTile : TileService() {
     override fun onStartListening() {
         job = scope.launch {
             combine(VpnState.phase, VpnState.node) { phase, node -> phase to node }.collect { (phase, node) ->
+                val words = (application as EmberVpnApp).engine.strings
                 qsTile?.apply {
                     state = if (phase == ConnectionState.DISCONNECTED) Tile.STATE_INACTIVE else Tile.STATE_ACTIVE
                     label = "Ember"
                     icon = Icon.createWithResource(this@QuickConnectTile, R.drawable.ic_tile_ember)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         subtitle = when (phase) {
-                            ConnectionState.CONNECTED -> node?.title ?: "Connected"
-                            ConnectionState.CONNECTING -> "Connecting…"
-                            ConnectionState.DISCONNECTED -> "Off"
+                            ConnectionState.CONNECTED -> node?.title ?: words.connected
+                            ConnectionState.CONNECTING -> words.connecting
+                            ConnectionState.DISCONNECTED -> words.tileOff
                         }
                     }
                     updateTile()

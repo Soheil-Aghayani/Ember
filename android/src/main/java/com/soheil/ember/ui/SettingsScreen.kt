@@ -54,6 +54,8 @@ private class InstalledApp(val packageName: String, val label: String)
 @Composable
 fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val s = LocalStrings.current
+    val language by engine.language.collectAsState()
     val failover by engine.autoFailover.collectAsState()
     val mode by engine.appMode.collectAsState()
     val packages by engine.appPackages.collectAsState()
@@ -72,10 +74,10 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
         val choices = installed.filter { it.packageName !in packages && it.label.contains(query, ignoreCase = true) }
         AlertDialog(
             onDismissRequest = { picking = false },
-            title = { Text("Add an app") },
+            title = { Text(s.addApp) },
             text = {
                 Column {
-                    OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(s.search) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(Modifier.heightIn(max = 360.dp)) {
                         items(choices, key = { it.packageName }) { app ->
@@ -91,19 +93,36 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text(s.cancel) } },
         )
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium)
+        Text(s.settings, style = MaterialTheme.typography.headlineMedium)
+
+        Text(s.languageTitle, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Card(Modifier.fillMaxWidth()) {
+            Column {
+                for ((code, name) in listOf("system" to s.languageSystem, "en" to "English", "fa" to "فارسی")) {
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = language == code, role = Role.RadioButton) { engine.setLanguage(code) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = language == code, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(name, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        }
 
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Switch servers automatically", style = MaterialTheme.typography.bodyLarge)
+                    Text(s.autoSwitch, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "If the connected server stops passing traffic for about a minute, Ember connects to the next-fastest one.",
+                        s.autoSwitchHelp,
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -112,13 +131,13 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
             }
         }
 
-        Text("Apps", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(s.appsHeader, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Card(Modifier.fillMaxWidth()) {
             Column {
                 val options = listOf(
-                    Triple(AppMode.OFF, "All apps use the VPN", null),
-                    Triple(AppMode.SKIP, "VPN off for the apps below", "Those apps go straight to the internet."),
-                    Triple(AppMode.ONLY, "VPN only for the apps below", "Everything else goes straight to the internet."),
+                    Triple(AppMode.OFF, s.appsAll, null),
+                    Triple(AppMode.SKIP, s.appsSkip, s.appsSkipHelp),
+                    Triple(AppMode.ONLY, s.appsOnly, s.appsOnlyHelp),
                 )
                 for ((value, title, help) in options) {
                     Row(
@@ -135,20 +154,20 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                 }
             }
         }
-        Text("Changes apply the next time you connect.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(s.appsApply, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Apps in the list", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FilledIconButton(onClick = { picking = true }) { Icon(Icons.Filled.Add, contentDescription = "Add an app") }
+            Text(s.appsInList, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FilledIconButton(onClick = { picking = true }) { Icon(Icons.Filled.Add, contentDescription = s.addApp) }
         }
         Card(Modifier.fillMaxWidth()) {
             if (packages.isEmpty()) {
-                Text("No apps yet. Add Firefox, for example.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(s.noApps, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Column {
                     for (packageName in packages.sortedBy { label(it).lowercase() }) {
                         Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(label(packageName), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                            IconButton(onClick = { engine.setAppPackages(packages - packageName) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
+                            IconButton(onClick = { engine.setAppPackages(packages - packageName) }) { Icon(Icons.Filled.Delete, contentDescription = s.remove) }
                         }
                     }
                 }
@@ -158,14 +177,14 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
         Card(
             Modifier.fillMaxWidth().clickable {
                 if (!requestQuickSettingsTile(context)) {
-                    Toast.makeText(context, "Pull the top of the screen down, tap the pencil, and drag Ember in.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, s.addTileManual, Toast.LENGTH_LONG).show()
                 }
             },
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Add Ember to Quick settings", style = MaterialTheme.typography.bodyLarge)
+                Text(s.addTileTitle, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "Connect and disconnect from the panel you pull down from the top of the screen.",
+                    s.addTileHelp,
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -177,9 +196,9 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
             },
         ) {
             Column(Modifier.padding(16.dp)) {
-                Text("Keep running in the background", style = MaterialTheme.typography.bodyLarge)
+                Text(s.keepBgTitle, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "If the connection drops when the screen is locked, set Ember to \"Unrestricted\" or \"Don't optimise\" here.",
+                    s.keepBgHelp,
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

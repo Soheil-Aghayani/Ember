@@ -76,30 +76,31 @@ class XrayVpnService : VpnService() {
 
     private fun connect(nodeId: String?) {
         if (job?.isActive == true) return
-        startForegroundNow("Connecting…")
+        val words = (application as EmberVpnApp).engine.strings
+        startForegroundNow(words.connecting)
         VpnState.error.value = null
         VpnState.phase.value = ConnectionState.CONNECTING
-        VpnState.progress.value = "Connecting…"
+        VpnState.progress.value = words.connecting
         job = scope.launch {
             try {
                 val engine = (application as EmberVpnApp).engine
                 var node = (nodeId?.let { engine.subscriptions.nodeById(it) } ?: engine.selectedNode())
-                    ?: error("Choose a server first.")
-                if (node.protocol == "openvpn") error("OpenVPN servers are not supported on Android yet.")
+                    ?: error(words.errChooseServer)
+                if (node.protocol == "openvpn") error(words.errOpenVpn)
                 VpnState.node.value = node
                 engine.stopTestForConnect()
                 startXray(engine, node)
-                VpnState.progress.value = "Checking the server…"
-                if (!passesTraffic()) error("This server did not answer. Try another server.")
-                VpnState.progress.value = "Starting the VPN…"
-                val fd = establishTun(engine) ?: error("Android did not allow the VPN. Open Ember and try again.")
+                VpnState.progress.value = words.checkingServer
+                if (!passesTraffic()) error(words.errServerNoAnswer)
+                VpnState.progress.value = words.startingVpn
+                val fd = establishTun(engine) ?: error(words.errVpnDenied)
                 tun = fd
                 val config = HevSocks5TunnelConfig.write(filesDir, SOCKS_PORT, useMapDns = true, tcpBufferSize = TCP_BUFFER_BYTES)
-                if (!HevSocks5Tunnel.start(config, fd.fd)) error("The tunnel program did not start.")
+                if (!HevSocks5Tunnel.start(config, fd.fd)) error(words.errTunnel)
                 VpnState.connectedAt.value = System.currentTimeMillis()
                 VpnState.progress.value = null
                 VpnState.phase.value = ConnectionState.CONNECTED
-                startForegroundNow("Connected · ${node.title}")
+                startForegroundNow("${words.connected} · ${node.title}")
                 AppLogger.i(TAG, "connected via a ${node.protocol} server")
 
                 // Xray can be running while the server behind it has stopped passing traffic: every few seconds a tiny
@@ -110,7 +111,7 @@ class XrayVpnService : VpnService() {
                 var waited = 0
                 while (isActive) {
                     delay(2_000)
-                    if (!engine.xray.isRunning()) error("The connection program stopped.")
+                    if (!engine.xray.isRunning()) error(words.errXrayStopped)
                     waited += 2
                     if (!engine.autoFailover.value || waited < CHECK_EVERY_SECONDS) continue
                     waited = 0
@@ -122,14 +123,14 @@ class XrayVpnService : VpnService() {
                     val next = if (switches < MAX_FAILOVERS) {
                         pickFailover(all, node, failed, engine.subscriptions.results.value, engine.favorites.value)
                     } else null
-                    if (next == null) error("This server stopped passing traffic. Pick another server.")
+                    if (next == null) error(words.errStoppedPassing)
                     switches++
                     AppLogger.w(TAG, "${node.title} stopped passing traffic; switching to ${next.title}")
-                    engine.announce("${node.title} stopped answering. Switching to ${next.title}.")
+                    engine.announce(words.switching(node.title, next.title))
                     startXray(engine, next) // the tunnel stays up; only the server behind the local proxy changes
                     node = next
                     VpnState.node.value = next
-                    startForegroundNow("Connected · ${next.title}")
+                    startForegroundNow("${words.connected} · ${next.title}")
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -219,7 +220,7 @@ class XrayVpnService : VpnService() {
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_tile_ember)
             .setContentIntent(open)
-            .addAction(0, "Disconnect", disconnect)
+            .addAction(0, (application as EmberVpnApp).engine.strings.disconnect, disconnect)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()

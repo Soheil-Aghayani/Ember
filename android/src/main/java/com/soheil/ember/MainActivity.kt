@@ -10,7 +10,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.soheil.ember.engine.VpnState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.LayoutDirection
 import com.soheil.ember.ui.EmberRoot
+import com.soheil.ember.ui.LocalStrings
+import com.soheil.ember.ui.PersianStrings
+import com.soheil.ember.ui.stringsFor
 import com.soheil.ember.ui.theme.EmberVpnTheme
 import com.soheil.ember.vpn.XrayVpnService
 
@@ -20,7 +27,7 @@ class MainActivity : ComponentActivity() {
 
     private val vpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) startVpn()
-        else VpnState.error.value = "Ember needs Android's VPN permission to protect this phone."
+        else VpnState.error.value = engine.strings.vpnPermission
     }
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -42,8 +49,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            EmberVpnTheme {
-                EmberRoot(engine, onConnect = ::connect, onDisconnect = { XrayVpnService.stop(this) })
+            val language by engine.language.collectAsState()
+            val words = stringsFor(language)
+            EmberVpnTheme(layoutDirection = if (words === PersianStrings) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                CompositionLocalProvider(LocalStrings provides words) {
+                    EmberRoot(engine, onConnect = ::connect, onDisconnect = { XrayVpnService.stop(this) })
+                }
             }
         }
     }

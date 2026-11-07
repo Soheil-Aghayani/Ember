@@ -100,6 +100,7 @@ private val DarkColors = darkColorScheme(
 fun EmberVpnTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     content: @Composable () -> Unit,
 ) {
     val systemInDarkTheme = isSystemInDarkTheme()
@@ -130,7 +131,7 @@ fun EmberVpnTheme(
 
     CompositionLocalProvider(
         LocalEmberStatusColors provides if (darkTheme) DarkStatusColors else LightStatusColors,
-        LocalLayoutDirection provides LayoutDirection.Ltr,
+        LocalLayoutDirection provides layoutDirection,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,

@@ -60,6 +60,7 @@ fun HomeScreen(
     onOpenServers: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     val phase by VpnState.phase.collectAsState()
     val progress by VpnState.progress.collectAsState()
     val error by VpnState.error.collectAsState()
@@ -97,9 +98,9 @@ fun HomeScreen(
         Spacer(Modifier.height(24.dp))
         Text(
             when (phase) {
-                ConnectionState.CONNECTED -> "Connected"
-                ConnectionState.CONNECTING -> "Connecting…"
-                ConnectionState.DISCONNECTED -> "Disconnected"
+                ConnectionState.CONNECTED -> s.connected
+                ConnectionState.CONNECTING -> s.connecting
+                ConnectionState.DISCONNECTED -> s.disconnected
             },
             style = MaterialTheme.typography.headlineMedium,
         )
@@ -128,14 +129,14 @@ fun HomeScreen(
             }
             Text(
                 when {
-                    node == null -> "Choose a server"
-                    selectedId == AUTO_NODE && phase == ConnectionState.DISCONNECTED -> "Fastest · ${node.title}"
+                    node == null -> s.chooseServer
+                    selectedId == AUTO_NODE && phase == ConnectionState.DISCONNECTED -> s.fastestWithServer(node.title)
                     else -> node.title
                 },
                 Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1,
             )
             val result = node?.let { results[it.id] }
-            (result?.mbps?.let { String.format(Locale.US, "%.1f Mbps", it) } ?: result?.pingMs?.let { "$it ms" })?.let {
+            (result?.mbps?.let { String.format(Locale.US, "⁦%.1f Mbps⁩", it) } ?: result?.pingMs?.let { "⁦$it ms⁩" })?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -148,6 +149,7 @@ private fun Orb(phase: ConnectionState, ring: androidx.compose.ui.graphics.Color
     val transition = rememberInfiniteTransition(label = "orb")
     val breathe by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "breathe")
     val spin by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "spin")
+    val s = LocalStrings.current
     val scale = if (phase == ConnectionState.CONNECTED) 1f + 0.035f * breathe else 1f
     Box(Modifier.size(200.dp).scale(scale), contentAlignment = Alignment.Center) {
         Box(
@@ -157,9 +159,9 @@ private fun Orb(phase: ConnectionState, ring: androidx.compose.ui.graphics.Color
             Box(Modifier.size(156.dp).clip(CircleShape).background(ring.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
                 Text(
                     when (phase) {
-                        ConnectionState.DISCONNECTED -> "Connect"
-                        ConnectionState.CONNECTING -> "Cancel"
-                        ConnectionState.CONNECTED -> "Disconnect"
+                        ConnectionState.DISCONNECTED -> s.connect
+                        ConnectionState.CONNECTING -> s.cancel
+                        ConnectionState.CONNECTED -> s.disconnect
                     },
                     style = MaterialTheme.typography.titleMedium, color = ring,
                 )

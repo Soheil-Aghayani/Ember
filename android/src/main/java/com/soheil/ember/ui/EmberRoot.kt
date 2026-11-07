@@ -41,6 +41,7 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         }
     }
     val context = LocalContext.current
+    val s = LocalStrings.current
     val phase by VpnState.phase.collectAsState()
     LaunchedEffect(phase) {
         // the first time the VPN comes up, offer the tile: one tap from the quick settings next time
@@ -50,10 +51,10 @@ fun EmberRoot(engine: AndroidEngine, onConnect: () -> Unit, onDisconnect: () -> 
         }
     }
     val items = listOf(
-        Triple("Home", R.drawable.ic_solar_power, 0),
-        Triple("Servers", R.drawable.ic_solar_global, 1),
-        Triple("Settings", R.drawable.ic_solar_settings, 2),
-        Triple("About", R.drawable.ic_solar_info_circle, 3),
+        Triple(s.home, R.drawable.ic_solar_power, 0),
+        Triple(s.servers, R.drawable.ic_solar_global, 1),
+        Triple(s.settings, R.drawable.ic_solar_settings, 2),
+        Triple(s.about, R.drawable.ic_solar_info_circle, 3),
     )
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },

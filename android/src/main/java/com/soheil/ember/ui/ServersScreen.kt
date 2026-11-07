@@ -68,6 +68,7 @@ import java.util.Locale
 @Composable
 fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val s = LocalStrings.current
     val clipboard = LocalClipboardManager.current
     val subscriptions by engine.subscriptions.subscriptions.collectAsState()
     val results by engine.subscriptions.results.collectAsState()
@@ -81,8 +82,8 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
     val siteCheck by engine.siteCheck.collectAsState()
 
     fun report(result: Result<Subscription>) {
-        result.onSuccess { say("Added ${it.nodes.count { node -> !node.isInfo }} servers") }
-            .onFailure { say(it.message ?: "Could not add that.") }
+        result.onSuccess { say(s.serversAdded(it.nodes.count { node -> !node.isInfo })) }
+            .onFailure { say(it.message ?: s.couldNotAdd) }
     }
     fun add(text: String, name: String) = engine.work({ engine.subscriptions.add(text, name) }, ::report)
 
@@ -92,7 +93,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
             val text = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes().take(2_000_000).toByteArray().decodeToString() }
             }.getOrNull()
-            if (text.isNullOrBlank()) say("That file could not be read.") else add(text, "")
+            if (text.isNullOrBlank()) say(s.fileUnreadable) else add(text, "")
         }
     }
 
@@ -100,15 +101,15 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
         var link by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { askLink = false },
-            title = { Text("Add a link") },
+            title = { Text(s.addLink) },
             text = {
                 OutlinedTextField(
-                    value = link, onValueChange = { link = it }, label = { Text("Subscription link or server link") },
+                    value = link, onValueChange = { link = it }, label = { Text(s.linkLabel) },
                     maxLines = 4, modifier = Modifier.fillMaxWidth(),
                 )
             },
-            confirmButton = { Button(enabled = link.isNotBlank(), onClick = { askLink = false; add(link, "") }) { Text("Add") } },
-            dismissButton = { TextButton(onClick = { askLink = false }) { Text("Cancel") } },
+            confirmButton = { Button(enabled = link.isNotBlank(), onClick = { askLink = false; add(link, "") }) { Text(s.add) } },
+            dismissButton = { TextButton(onClick = { askLink = false }) { Text(s.cancel) } },
         )
     }
 
@@ -118,11 +119,11 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
         val url = normalizeSiteUrl(input)
         AlertDialog(
             onDismissRequest = { askSite = false },
-            title = { Text("Which servers reach a website?") },
+            title = { Text(s.siteTitle) },
             text = {
                 Column {
                     Text(
-                        "Some sites refuse certain servers. Ember asks every server for the site and marks the ones it accepts. Disconnect first.",
+                        s.siteHelp,
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -133,7 +134,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = input, onValueChange = { input = it; picked = null }, label = { Text("Website, e.g. open.spotify.com") },
+                        value = input, onValueChange = { input = it; picked = null }, label = { Text(s.siteHint) },
                         singleLine = true, isError = input.isNotBlank() && url == null, modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -142,57 +143,57 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                 Button(enabled = url != null, onClick = {
                     askSite = false
                     engine.checkSite(subscriptions.flatMap { it.nodes }, picked ?: runCatching { java.net.URI(url!!).host.removePrefix("www.") }.getOrDefault(url!!), url!!)
-                }) { Text("Check") }
+                }) { Text(s.check) }
             },
-            dismissButton = { TextButton(onClick = { askSite = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { askSite = false }) { Text(s.cancel) } },
         )
     }
 
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Servers", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
+                Text(s.servers, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
                 if (testing != null) {
                     CircularProgressIndicator(Modifier.width(20.dp).height(20.dp), strokeWidth = 2.dp)
-                    TextButton(onClick = { engine.cancelTest() }) { Text("Stop") }
+                    TextButton(onClick = { engine.cancelTest() }) { Text(s.stop) }
                 } else {
                     TextButton(
                         enabled = phase == ConnectionState.DISCONNECTED && subscriptions.isNotEmpty(),
                         onClick = { engine.testNodes(subscriptions.flatMap { it.nodes }) },
-                    ) { Text("Test speed") }
+                    ) { Text(s.testSpeed) }
                 }
                 IconButton(
                     enabled = phase == ConnectionState.DISCONNECTED && testing == null && subscriptions.isNotEmpty(),
                     onClick = { askSite = true },
-                ) { Icon(painterResource(R.drawable.ic_solar_magnifier), contentDescription = "Check a website") }
+                ) { Icon(painterResource(R.drawable.ic_solar_magnifier), contentDescription = s.checkSite) }
                 Box {
-                    FilledIconButton(onClick = { menu = true }) { Icon(Icons.Filled.Add, contentDescription = "Add servers") }
+                    FilledIconButton(onClick = { menu = true }) { Icon(Icons.Filled.Add, contentDescription = s.addServers) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Add a link") }, onClick = { menu = false; askLink = true })
-                        DropdownMenuItem(text = { Text("From the clipboard") }, onClick = {
+                        DropdownMenuItem(text = { Text(s.addLink) }, onClick = { menu = false; askLink = true })
+                        DropdownMenuItem(text = { Text(s.fromClipboard) }, onClick = {
                             menu = false
                             val text = clipboard.getText()?.text.orEmpty().trim()
-                            if (text.isEmpty()) say("The clipboard is empty.") else add(text, "")
+                            if (text.isEmpty()) say(s.clipboardEmpty) else add(text, "")
                         })
-                        DropdownMenuItem(text = { Text("Scan a QR code") }, onClick = {
+                        DropdownMenuItem(text = { Text(s.scanQr) }, onClick = {
                             menu = false
                             scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false)
-                                .setPrompt("Point the camera at a server's QR code"))
+                                .setPrompt(s.qrPrompt))
                         })
-                        DropdownMenuItem(text = { Text("WARP through the chosen server") }, onClick = {
+                        DropdownMenuItem(text = { Text(s.warpThroughServer) }, onClick = {
                             menu = false
                             val carrier = engine.selectedNode()?.takeIf { it.protocol !in setOf("openvpn", "wireguard", "warp") }
-                            if (carrier == null) say("Choose one of your servers first.") else {
-                                say("Registering with Cloudflare…")
+                            if (carrier == null) say(s.chooseOwnServerFirst) else {
+                                say(s.registering)
                                 engine.work({ engine.subscriptions.addWarpChain(carrier) }) { r ->
-                                    r.onSuccess { say("Added WARP through ${carrier.title}") }.onFailure { say(it.message ?: "Could not add that.") }
+                                    r.onSuccess { say(s.warpAdded(carrier.title)) }.onFailure { say(it.message ?: s.couldNotAdd) }
                                 }
                             }
                         })
-                        DropdownMenuItem(text = { Text("From a file") }, onClick = { menu = false; pickFile.launch("*/*") })
-                        DropdownMenuItem(text = { Text("Cloudflare WARP (free)") }, onClick = {
+                        DropdownMenuItem(text = { Text(s.fromFile) }, onClick = { menu = false; pickFile.launch("*/*") })
+                        DropdownMenuItem(text = { Text(s.warpFree) }, onClick = {
                             menu = false
-                            say("Registering with Cloudflare…")
+                            say(s.registering)
                             engine.work({ engine.subscriptions.addWarp() }, ::report)
                         })
                     }
@@ -204,7 +205,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                 Card(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "${check.label}: ${check.results.values.count { it.ok }} of ${check.results.size} servers work",
+                            s.siteSummary(check.label, check.results.values.count { it.ok }, check.results.size),
                             Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
                         )
                         val best = sortNodes(
@@ -215,8 +216,8 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                                 engine.chooseServer(it.id)
                                 onConnect()
                             }
-                        }) { Text("Connect") }
-                        IconButton(onClick = { engine.clearSiteCheck() }) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
+                        }) { Text(s.connect) }
+                        IconButton(onClick = { engine.clearSiteCheck() }) { Icon(Icons.Filled.Close, contentDescription = s.clear) }
                     }
                 }
             }
@@ -225,7 +226,7 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Text(
-                        "Nothing here yet. Add the subscription link your VPN provider gave you (the + button), then test the servers to find the fastest one.",
+                        s.emptyServers,
                         Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -240,21 +241,21 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                             Text(subscription.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val usage = subscription.usage?.takeIf { it.total > 0 }
                             Text(
-                                "${servers.size} servers" + (usage?.let { " · ${formatBytes(it.used)} of ${formatBytes(it.total)}" } ?: ""),
+                                s.serversCount(servers.size) + (usage?.let { " · " + s.usageOf(formatBytes(it.used), formatBytes(it.total)) } ?: ""),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         if (subscription.url.isNotBlank()) {
                             IconButton(onClick = {
                                 engine.work({ engine.subscriptions.refresh(subscription.id) }) { r ->
-                                    r.onSuccess { say("Updated") }.onFailure { say(it.message ?: "Could not update.") }
+                                    r.onSuccess { say(s.updated) }.onFailure { say(it.message ?: s.couldNotUpdate) }
                                 }
-                            }) { Icon(Icons.Filled.Refresh, contentDescription = "Update") }
+                            }) { Icon(Icons.Filled.Refresh, contentDescription = s.update) }
                         }
                         IconButton(onClick = {
                             if (subscription.nodes.any { it.id == selectedId }) engine.chooseServer(ember.subs.AUTO_NODE)
                             engine.subscriptions.remove(subscription.id)
-                        }) { Icon(Icons.Filled.Delete, contentDescription = "Remove") }
+                        }) { Icon(Icons.Filled.Delete, contentDescription = s.remove) }
                     }
                     val ordered = sortNodes(servers, results, favorites)
                     // after a website check the servers that reached it come first, then the ones not asked, then the refused ones
@@ -275,27 +276,27 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                                 Text(node.protocol.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (result != null) {
-                                val speed = result.mbps?.let { String.format(Locale.US, "%.1f Mbps", it) }
+                                val speed = result.mbps?.let { String.format(Locale.US, "⁦%.1f Mbps⁩", it) }
                                 Text(
-                                    speed ?: result.pingMs?.let { "$it ms" } ?: "No answer", style = MaterialTheme.typography.bodyMedium,
+                                    speed ?: result.pingMs?.let { "⁦$it ms⁩" } ?: s.noAnswer, style = MaterialTheme.typography.bodyMedium,
                                     color = if (result.pingMs == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                             siteCheck?.results?.get(node.id)?.let { site ->
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    if (site.ok) "✓ ${site.ms} ms" else "✗ ${site.code ?: "no answer"}",
+                                    if (site.ok) "✓ ⁦${site.ms} ms⁩" else "✗ ${site.code ?: s.noAnswer}",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = if (site.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                                 )
                             }
                             IconButton(onClick = { engine.toggleFavorite(node) }) {
                                 Icon(
-                                    Icons.Filled.Star, contentDescription = "Favourite",
+                                    Icons.Filled.Star, contentDescription = s.favourite,
                                     tint = if (node.id in favorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                                 )
                             }
-                            if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                            if (selected) Icon(Icons.Filled.Check, contentDescription = s.selected, tint = MaterialTheme.colorScheme.primary)
                             else Spacer(Modifier.width(24.dp))
                         }
                     }
