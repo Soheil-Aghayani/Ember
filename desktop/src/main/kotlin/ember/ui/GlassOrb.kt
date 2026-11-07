@@ -74,8 +74,8 @@ internal fun GlassOrb(
             withFrameNanos { now ->
                 if (last != 0L) {
                     val dt = ((now - last) / 1e9f).coerceAtMost(0.1f)
-                    angle = (angle + dt * speedNow) % TWO_PI
-                    clock += dt
+                    angle = (angle + dt * speedNow) % LOOP
+                    clock = (clock + dt) % LOOP
                 }
                 last = now
             }
@@ -116,6 +116,13 @@ internal fun GlassOrb(
 }
 
 private const val TWO_PI = (2 * PI).toFloat()
+
+/**
+ * The animation clocks wrap round after ten full turns, not one: the second ring's dots move at 0.7 of the clock, the
+ * running arc at 0.9 and the breathing at 1.4, so only a multiple of ten turns brings every one of them back to exactly
+ * where it started. Wrapping after one turn made the second ring and the arc jump once in a while.
+ */
+private const val LOOP = (20 * PI).toFloat()
 
 private val OffStops = arrayOf(
     0f to Color(0xFF7A8292), 0.22f to Color(0xFF4A505C), 0.42f to Color(0xFF2B303B),

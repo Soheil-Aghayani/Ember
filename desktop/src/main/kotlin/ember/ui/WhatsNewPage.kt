@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.97",
+        listOf(
+            "The orb's animation now loops with no seam: the second ring's dots and the arc that runs round it while connecting no longer jump every so often.",
+        ),
+        listOf(
+            "انیمیشن گوی حالا بدون هیچ درزی تکرار می‌شود: نقطه‌های حلقهٔ دوم و کمانی که هنگام اتصال دورش می‌چرخد دیگر هر از چندگاهی نمی‌پرند.",
+        ),
+    ),
+    Release(
         "1.0.96",
         listOf(
             "Easier to read: secondary text, the orange links and the star icons are brighter or darker as needed, and the dark theme's panels and background are deeper so text never sits on a bright patch.",

@@ -140,4 +140,58 @@ class RenderPreviewTest {
             scene.close()
         }
     }
+
+    /**
+     * Renders the orb for a long stretch and measures how much the picture changes from one frame to the next. A seam in
+     * a looping animation (a dot or the running arc snapping to a new place) shows up as a spike far above the usual
+     * change. The result is written to orb-continuity.txt.
+     */
+    @Test
+    fun orbAnimationHasNoSeam() {
+        val dir = System.getenv("RENDER_DIR")?.let(::File) ?: return
+        dir.mkdirs()
+        val report = StringBuilder()
+        for ((state, seconds) in listOf(ConnectionState.CONNECTING to 45, ConnectionState.CONNECTED to 150)) {
+            val scene = ImageComposeScene(260, 260, Density(1f)) {
+                EmberTheme(darkTheme = true) {
+                    CompositionLocalProvider(LocalStrings provides EnglishStrings) { ConnectOrb(state, "Connect") {} }
+                }
+            }
+            var previous: IntArray? = null
+            val changes = ArrayList<Long>()
+            var t = 0L
+            scene.render(0)
+            repeat(seconds * 20) {
+                t += 50_000_000L
+                val pixels = scene.render(t).toComposeImageBitmap().let { bitmap ->
+                    IntArray(bitmap.width * bitmap.height).also { bitmap.readPixels(it) }
+                }
+                previous?.let { old ->
+                    var sum = 0L
+                    for (i in pixels.indices) {
+                        val a = pixels[i]; val b = old[i]
+                        sum += kotlin.math.abs((a shr 16 and 255) - (b shr 16 and 255)) + kotlin.math.abs((a shr 8 and 255) - (b shr 8 and 255)) + kotlin.math.abs((a and 255) - (b and 255))
+                    }
+                    changes += sum
+                }
+                previous = pixels
+            }
+            scene.close()
+            // skip the first seconds, when the orb is still warming up on purpose
+            val settled = changes.drop(60)
+            val sorted = settled.sorted()
+            val median = sorted[sorted.size / 2]
+            val max = settled.max()
+            // a seam is a frame that changes far more than the frames right around it
+            val local = settled.indices.drop(10).dropLast(10).map { i ->
+                val around = (i - 10..i + 10).filter { it != i }.map { settled[it] }.sorted()
+                i to settled[i].toDouble() / around[around.size / 2]
+            }.sortedByDescending { it.second }.take(3)
+            report.appendLine("$state: ${settled.size} frames, median change $median; sharpest local jumps (frame, times the neighbours): " +
+                local.joinToString { "${it.first + 60} x${"%.2f".format(it.second)}" })
+            // ordinary motion tops out near 3.7x here; a dot or the arc snapping measured 8x to 10x
+            check(local.first().second < 6.0) { "$state: the orb animation has a seam (frame ${local.first().first + 60})" }
+        }
+        File(dir, "orb-continuity.txt").writeText(report.toString())
+    }
 }
