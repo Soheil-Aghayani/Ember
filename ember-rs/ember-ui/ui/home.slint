@@ -1,6 +1,6 @@
 // The Home page. Port of HomePage in desktop/.../ui/App.kt (orb, status, server picker, notices).
-import { Palette, Type, Icons, Motion } from "theme.slint";
-import { Card, Label, IconAction } from "widgets.slint";
+import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
+import { Card, Label, IconAction, HRow } from "widgets.slint";
 import { Orb } from "orb.slint";
 
 export struct ServerRow {
@@ -25,13 +25,13 @@ export component HomePage inherits Rectangle {
     in property <[ServerRow]> servers;
     in property <string> caption;
     in property <string> error;
-    in property <string> test-label;
-    in property <string> fastest-label;
-    in property <string> manage-label;
+    in property <int> menu-request;        // bump to open the server menu from outside (debug flag --menu)
     callback orb-clicked();
     callback choose(string);
     callback open-servers();
     callback test-speed();
+
+    changed menu-request => { popup.show(); }
 
     VerticalLayout {
         alignment: start;
@@ -48,13 +48,13 @@ export component HomePage inherits Rectangle {
             }
             Image {
                 source: Icons.power; colorize: #ffffffeb; width: 44px; height: 44px;
-                x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+                x: (parent.width - self.width) / 2;
             }
         }
         Rectangle { height: 16px; }
-        HorizontalLayout {
+        HRow {
             alignment: center; height: 34px; spacing: 8px;
-            if state == 2 : Image { source: Icons.check; colorize: Palette.tertiary; width: 28px; height: 28px; y: 3px; }
+            if state == 2 : Image { source: Icons.check; colorize: Palette.tertiary; width: 28px; height: 28px; }
             Label { text: root.status; font-size: Type.headline-medium; font-weight: 600; }
         }
         if secondary != "" : Rectangle { height: 8px; }
@@ -65,13 +65,13 @@ export component HomePage inherits Rectangle {
             height: card.height;
             card := Card {
                 height: 58px;
-                HorizontalLayout {
-                    padding: 16px; spacing: 12px;
-                    if server-has-flag : Image { source: server-flag; width: 24px; height: 24px; y: (parent.height - self.height) / 2; image-fit: contain; }
-                    if !server-has-flag : Image { source: auto-selected ? Icons.bolt : Icons.subscriptions; colorize: Palette.on-variant; width: 24px; height: 24px; y: (parent.height - self.height) / 2; }
+                HRow {
+                    alignment: stretch; pad-start: 16px; pad-end: 16px; padding-top: 16px; padding-bottom: 16px; spacing: 12px;
+                    if server-has-flag : Image { source: server-flag; width: 24px; height: 24px; image-fit: contain; }
+                    if !server-has-flag : Image { source: auto-selected ? Icons.bolt : Icons.subscriptions; colorize: Palette.on-variant; width: 24px; height: 24px; }
                     Label { text: root.server-title; font-size: Type.body-large; overflow: elide; horizontal-stretch: 1; }
                     if !(state == 2) && server-detail != "" : Label { text: root.server-detail; muted: true; font-size: Type.body-small; }
-                    if can-pick : Image { source: Icons.chevron-down; colorize: Palette.on-variant; width: 16px; height: 16px; y: (parent.height - self.height) / 2; }
+                    if can-pick : Image { source: Icons.chevron-down; colorize: Palette.on-variant; width: 16px; height: 16px; }
                 }
                 Rectangle { background: card-touch.has-hover && can-pick ? Palette.on-surface.with-alpha(0.05) : transparent; }
                 card-touch := TouchArea {
@@ -88,38 +88,38 @@ export component HomePage inherits Rectangle {
                     Rectangle {
                         height: 44px; border-radius: 10px;
                         background: t0.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
-                        HorizontalLayout { padding-left: 12px; padding-right: 12px; spacing: 12px;
-                            Image { source: Icons.bolt; colorize: Palette.primary; width: 24px; height: 24px; y: (parent.height - self.height) / 2; }
-                            Label { text: root.fastest-label; horizontal-stretch: 1; }
-                            if auto-selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; y: (parent.height - self.height) / 2; }
+                        HRow { alignment: stretch; pad-start: 12px; pad-end: 12px; spacing: 12px;
+                            Image { source: Icons.bolt; colorize: Palette.primary; width: 24px; height: 24px; }
+                            Label { text: Tr.fastest-server; horizontal-stretch: 1; }
+                            if auto-selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; }
                         }
                         t0 := TouchArea { mouse-cursor: pointer; clicked => { root.choose("auto"); popup.close(); } }
                     }
                     for row in root.servers : Rectangle {
                         height: 44px; border-radius: 10px;
                         background: tr.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
-                        HorizontalLayout { padding-left: 12px; padding-right: 12px; spacing: 12px;
-                            if row.has-flag : Image { source: row.flag; width: 24px; height: 24px; y: (parent.height - self.height) / 2; image-fit: contain; }
-                            if !row.has-flag : Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 24px; height: 24px; y: (parent.height - self.height) / 2; }
+                        HRow { alignment: stretch; pad-start: 12px; pad-end: 12px; spacing: 12px;
+                            if row.has-flag : Image { source: row.flag; width: 24px; height: 24px; image-fit: contain; }
+                            if !row.has-flag : Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 24px; height: 24px; }
                             Label { text: row.title; overflow: elide; horizontal-stretch: 1; }
                             Label { text: row.detail; muted: true; font-size: Type.body-small; }
-                            if row.selected && !auto-selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; y: (parent.height - self.height) / 2; }
+                            if row.selected && !auto-selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; }
                         }
                         tr := TouchArea { mouse-cursor: pointer; clicked => { root.choose(row.id); popup.close(); } }
                     }
                     Rectangle {
                         height: 44px; border-radius: 10px;
                         background: tm.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
-                        Label { x: 12px; text: root.manage-label; }
+                        Label { x: 12px; width: parent.width - 24px; text: Tr.manage-servers; }
                         tm := TouchArea { mouse-cursor: pointer; clicked => { popup.close(); root.open-servers(); } }
                     }
                 }
             }
         }
         if can-pick && servers.length > 0 : Rectangle { height: 8px; }
-        if can-pick && servers.length > 0 : HorizontalLayout {
+        if can-pick && servers.length > 0 : HRow {
             alignment: start; height: 36px;
-            IconAction { icon: Icons.bolt; caption: root.test-label; clicked => { root.test-speed(); } }
+            IconAction { icon: Icons.bolt; caption: Tr.test-speed; clicked => { root.test-speed(); } }
         }
         if caption != "" : Rectangle { height: 12px; }
         if caption != "" : Label { text: root.caption; muted: true; font-size: Type.body-small; horizontal-alignment: center; wrap: word-wrap; }

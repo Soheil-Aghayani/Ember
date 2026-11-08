@@ -1,4 +1,5 @@
 mod sphere;
+mod strings;
 
 slint::include_modules!();
 
@@ -22,6 +23,7 @@ const SERVERS: [Server; 4] = [
 ];
 
 struct Model {
+    s: &'static strings::Strings,
     state: State, selected: String, since: Instant, connected_at: Option<Instant>,
     lit: f32, speed: f32, loader: f32, angle: f32, ripple: f32, pop: f32, last: Instant,
 }
@@ -41,6 +43,7 @@ fn find<'a>(id: &str) -> Option<&'a Server> { SERVERS.iter().find(|s| s.id == id
 fn duration(seconds: u64) -> String { format!("{:02}:{:02}:{:02}", seconds / 3600, seconds % 3600 / 60, seconds % 60) }
 
 fn refresh(app: &App, m: &Model) {
+    let s = m.s;
     let auto = m.selected == "auto";
     let node = if auto { SERVERS.iter().min_by_key(|s| s.detail.trim_end_matches(" ms").parse::<u32>().unwrap_or(9999)) } else { find(&m.selected) };
     let rows: Vec<ServerRow> = SERVERS.iter().map(|s| ServerRow {
@@ -50,22 +53,22 @@ fn refresh(app: &App, m: &Model) {
     app.set_servers(ModelRc::new(VecModel::from(rows)));
     app.set_auto_selected(auto);
     let title = match (auto, node) {
-        (true, Some(n)) if m.state != State::On => format!("Fastest server · {}", n.title),
+        (true, Some(n)) if m.state != State::On => format!("{} · {}", s.fastest_server, n.title),
         (_, Some(n)) => n.title.to_string(),
-        _ => "Choose a server".to_string(),
+        _ => s.choose_server.to_string(),
     };
     app.set_server_title(title.into());
     app.set_server_has_flag(!auto && node.is_some() || (auto && node.is_some()));
     if let Some(n) = node { if let Some(f) = flag(n.flag) { app.set_server_flag(f); } app.set_server_detail(n.detail.into()); }
     app.set_state(match m.state { State::Off => 0, State::Connecting => 1, State::On => 2 });
-    app.set_status(match m.state { State::Off => "Disconnected", State::Connecting => "Connecting", State::On => "Connected" }.into());
+    app.set_status(match m.state { State::Off => s.disconnected, State::Connecting => s.connecting, State::On => s.connected }.into());
     app.set_can_pick(m.state == State::Off);
     app.set_secondary(match m.state {
         State::Off => SharedString::new(),
-        State::Connecting => format!("Connecting to {}…", node.map(|n| n.title).unwrap_or("")).into(),
+        State::Connecting => s.connecting.into(),
         State::On => duration(m.connected_at.map(|t| t.elapsed().as_secs()).unwrap_or(0)).into(),
     });
-    app.set_caption(if m.state == State::On { "Proxy on 127.0.0.1:10808 (SOCKS) and 127.0.0.1:10809 (HTTP)".into() } else { SharedString::new() });
+    app.set_caption(if m.state == State::On { strings::fill(s.proxy_mode_caption, &[("socks", "127.0.0.1:10808"), ("http", "127.0.0.1:10809")]).into() } else { SharedString::new() });
 }
 
 fn main() {
@@ -73,10 +76,19 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let has = |a: &str| args.iter().any(|x| x == a);
     app.global::<Palette>().set_dark(!has("--light"));
+    let language = if has("--fa") { "fa" } else { "en" };
+    let s = strings::for_language(language);
+    app.global::<Palette>().set_rtl(language == "fa");
+    {
+        let tr = app.global::<Tr>();
+        tr.set_home(s.home.into()); tr.set_servers(s.servers.into()); tr.set_settings(s.settings.into());
+        tr.set_logs(s.logs.into()); tr.set_whats_new(s.whats_new.into()); tr.set_about(s.about.into());
+        tr.set_test_speed(s.test_speed.into()); tr.set_fastest_server(s.fastest_server.into()); tr.set_manage_servers(s.manage_servers.into());
+    }
     let now = Instant::now();
     let state = if has("--on") { State::On } else if has("--connecting") { State::Connecting } else { State::Off };
     let model = Rc::new(RefCell::new(Model {
-        state, selected: "1".into(), since: now, connected_at: if state == State::On { Some(now) } else { None },
+        s, state, selected: "1".into(), since: now, connected_at: if state == State::On { Some(now) } else { None },
         lit: match state { State::Off => 0.0, State::Connecting => 0.55, State::On => 1.0 },
         speed: 0.12, loader: if state == State::Connecting { 1.0 } else { 0.0 }, angle: 0.0, ripple: 1.0, pop: 1.0, last: now,
     }));
@@ -106,6 +118,7 @@ fn main() {
     let weak = app.as_weak();
     let mut tick = 0u32;
     let mut sprite_px = 0u32;
+    let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
     timer.start(slint::TimerMode::Repeated, Duration::from_millis(33), move || {
         let mut m = model.borrow_mut();
         let now = Instant::now();
@@ -118,6 +131,7 @@ fn main() {
             refresh(&app, &m);
         }
         tick += 1;
+        if menu_at != 0 && tick == menu_at { app.set_menu_request(1); }
         // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
         let px = (176.0 * app.window().scale_factor()).round() as u32;
         if px != sprite_px {

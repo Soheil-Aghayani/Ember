@@ -1,8 +1,8 @@
 // The window: backdrop, sidebar, the current page. Port of MainShell/Sidebar in desktop/.../ui/App.kt.
-import { Palette, Type, Icons, Motion } from "theme.slint";
-import { Label } from "widgets.slint";
+import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
+import { Label, HRow } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
-export { Palette, Motion, ServerRow }
+export { Palette, Motion, Tr, ServerRow }
 
 component NavItem inherits Rectangle {
     in property <image> icon;
@@ -12,9 +12,9 @@ component NavItem inherits Rectangle {
     height: 42px;
     border-radius: 10px;
     background: active ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.09) : transparent);
-    HorizontalLayout {
-        padding-left: 12px; spacing: 12px;
-        Image { source: icon; colorize: active ? Palette.primary : Palette.on-surface; width: 20px; height: 20px; y: (parent.height - self.height) / 2; }
+    HRow {
+        pad-start: 12px; spacing: 12px;
+        Image { source: icon; colorize: active ? Palette.primary : Palette.on-surface; width: 20px; height: 20px; }
         Label { text: root.text; font-size: Type.title-small; font-weight: 500; color: active ? Palette.primary : Palette.on-surface; }
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
@@ -35,15 +35,7 @@ export component App inherits Window {
     in property <[ServerRow]> servers;
     in property <string> caption;
     in property <string> error;
-    in property <string> t-home: "Home";
-    in property <string> t-servers: "Servers";
-    in property <string> t-settings: "Settings";
-    in property <string> t-logs: "Logs";
-    in property <string> t-whats-new: "What's new";
-    in property <string> t-about: "About";
-    in property <string> t-test: "Test speed";
-    in property <string> t-fastest: "Fastest server";
-    in property <string> t-manage: "Manage servers";
+    in property <int> menu-request;
     callback orb-clicked();
     callback choose(string);
     callback test-speed();
@@ -60,21 +52,22 @@ export component App inherits Window {
     }
     if Palette.dark : Rectangle { background: #0000004d; }
 
-    HorizontalLayout {
+    HRow {
+        alignment: stretch; cross-axis-alignment: stretch;
         VerticalLayout {
             width: 220px; padding: 16px; spacing: 4px; alignment: start;
-            HorizontalLayout {
-                padding-left: 8px; padding-bottom: 24px; spacing: 10px; height: 60px;
-                Image { source: @image-url("assets/ember_logo_128.png"); width: 36px; height: 36px; y: 0px; }
+            HRow {
+                pad-start: 8px; padding-bottom: 24px; spacing: 10px; height: 60px;
+                Image { source: @image-url("assets/ember_logo_128.png"); width: 36px; height: 36px; }
                 Label { text: "Ember"; font-size: Type.headline-small; font-weight: 600; }
             }
-            NavItem { icon: Icons.home; text: t-home; active: page == 0; clicked => { page = 0; } }
-            NavItem { icon: Icons.subscriptions; text: t-servers; active: page == 1; clicked => { page = 1; } }
-            NavItem { icon: Icons.settings; text: t-settings; active: page == 2; clicked => { page = 2; } }
-            NavItem { icon: Icons.logs; text: t-logs; active: page == 3; clicked => { page = 3; } }
+            NavItem { icon: Icons.home; text: Tr.home; active: page == 0; clicked => { page = 0; } }
+            NavItem { icon: Icons.subscriptions; text: Tr.servers; active: page == 1; clicked => { page = 1; } }
+            NavItem { icon: Icons.settings; text: Tr.settings; active: page == 2; clicked => { page = 2; } }
+            NavItem { icon: Icons.logs; text: Tr.logs; active: page == 3; clicked => { page = 3; } }
             Rectangle { vertical-stretch: 1; }
-            NavItem { icon: Icons.whats-new; text: t-whats-new; active: page == 4; clicked => { page = 4; } }
-            NavItem { icon: Icons.info-circle; text: t-about; active: page == 5; clicked => { page = 5; } }
+            NavItem { icon: Icons.whats-new; text: Tr.whats-new; active: page == 4; clicked => { page = 4; } }
+            NavItem { icon: Icons.info-circle; text: Tr.about; active: page == 5; clicked => { page = 5; } }
         }
         Rectangle { width: 1px; background: Palette.divider; }
         Rectangle {
@@ -87,15 +80,14 @@ export component App inherits Window {
                     state: root.state; status: root.status; secondary: root.secondary;
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
-                    caption: root.caption; error: root.error;
-                    test-label: t-test; fastest-label: t-fastest; manage-label: t-manage;
-                    orb-clicked => { root.orb-clicked(); }
+                    caption: root.caption; error: root.error; menu-request: root.menu-request;
+                                orb-clicked => { root.orb-clicked(); }
                     choose(id) => { root.choose(id); }
                     open-servers => { root.page = 1; }
                     test-speed => { root.test-speed(); }
                 }
                 if page != 0 : Label {
-                    x: 32px; y: 32px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;
+                    x: 32px; y: 32px; width: parent.width - 64px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;
                 }
             }
         }

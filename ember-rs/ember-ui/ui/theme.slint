@@ -6,6 +6,8 @@ import "assets/fonts/inter_bold.ttf";
 
 export global Palette {
     in property <bool> dark: true;
+    // right-to-left languages (Persian): the whole window is mirrored, then text and pictures are flipped back
+    in property <bool> rtl: false;
     out property <color> primary: dark ? #ff8d5c : #9c3107;
     out property <color> on-surface: dark ? #f3eee6 : #1f1b16;
     out property <color> on-variant: dark ? #cdc5ba : #534c44;
@@ -59,4 +61,17 @@ export global Motion {
     in property <float> pop: 1;
     in property <image> sphere-off;
     in property <image> sphere-on;
+}
+
+/// Every string the .slint files show; filled from strings.rs when the language changes.
+export global Tr {
+    in property <string> home: "Home";
+    in property <string> servers: "Servers";
+    in property <string> settings: "Settings";
+    in property <string> logs: "Logs";
+    in property <string> whats-new: "What's new";
+    in property <string> about: "About";
+    in property <string> test-speed: "Test speed";
+    in property <string> fastest-server: "Fastest server";
+    in property <string> manage-servers: "Manage servers";
 }

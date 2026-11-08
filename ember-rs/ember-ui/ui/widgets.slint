@@ -9,16 +9,31 @@ export component Card inherits Rectangle {
     clip: true;
 }
 
-/// Text in the app's typography. `weight` is the CSS weight (400, 500, 600, 700).
+/// A horizontal row that runs right to left in a right-to-left language (Persian). The software renderer cannot mirror a
+/// whole window, so every row in the app is one of these. `alignment: stretch` lets an item with `horizontal-stretch: 1`
+/// take the free space; `start` packs the items at the start edge. `pad-start` / `pad-end` are padding on the side where
+/// the row begins and ends, whichever that is.
+export component HRow inherits FlexboxLayout {
+    in property <length> pad-start;
+    in property <length> pad-end;
+    flex-direction: Palette.rtl ? row-reverse : row;
+    flex-wrap: no-wrap;
+    cross-axis-alignment: center;
+    padding-left: Palette.rtl ? pad-end : pad-start;
+    padding-right: Palette.rtl ? pad-start : pad-end;
+}
+
+/// Text in the app's typography, aligned to the start of the line: left, or right in a right-to-left language.
 export component Label inherits Text {
     in property <bool> muted: false;
     font-family: Type.family;
     font-size: Type.body-medium;
     color: muted ? Palette.on-variant : Palette.on-surface;
     vertical-alignment: center;
+    horizontal-alignment: Palette.rtl ? right : left;
 }
 
-/// A small flat icon button (the Kotlin IconAction): icon on the left, optional caption.
+/// A small flat icon button (the Kotlin IconAction): icon, then an optional caption.
 export component IconAction inherits Rectangle {
     in property <image> icon;
     in property <string> caption;
@@ -28,10 +43,10 @@ export component IconAction inherits Rectangle {
     width: row.preferred-width + 20px;
     border-radius: 10px;
     background: touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent;
-    row := HorizontalLayout {
-        padding-left: 10px; padding-right: 10px; spacing: 8px;
-        Image { source: icon; colorize: Palette.primary; width: 18px; height: 18px; y: (parent.height - self.height) / 2; opacity: enabled ? 1 : 0.38; }
-        Text { text: caption; color: Palette.primary; font-family: Type.family; font-size: Type.body-small; font-weight: 500; vertical-alignment: center; visible: caption != ""; }
+    row := HRow {
+        pad-start: 10px; pad-end: 10px; spacing: 8px;
+        Image { source: icon; colorize: Palette.primary; width: 18px; height: 18px; opacity: enabled ? 1 : 0.38; }
+        Label { text: caption; color: Palette.primary; font-size: Type.body-small; font-weight: 500; visible: caption != ""; }
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
