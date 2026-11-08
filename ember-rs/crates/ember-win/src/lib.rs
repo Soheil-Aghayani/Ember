@@ -12,6 +12,7 @@ pub mod openvpn;
 pub mod paths;
 pub mod privileged_task;
 pub mod proc;
+pub mod shell;
 pub mod single_instance;
 pub mod theme;
 pub mod tray;

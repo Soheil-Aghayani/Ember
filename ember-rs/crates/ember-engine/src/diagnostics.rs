@@ -56,7 +56,7 @@ pub fn system_lines(renderer: &str) -> Vec<String> {
     ]
 }
 
-fn windows_version() -> String {
+pub fn windows_version() -> String {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     std::process::Command::new("cmd")

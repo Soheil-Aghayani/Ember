@@ -5,7 +5,8 @@ import { HomePage, ServerRow } from "home.slint";
 import { ServersPage, SubRow, NodeRow } from "servers.slint";
 import { LogsPage } from "logs.slint";
 import { SettingsPage } from "settings.slint";
-export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow }
+import { AboutPage, WhatsNewPage, InfoItem, ReleaseRow } from "about.slint";
+export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow, InfoItem, ReleaseRow }
 
 component NavItem inherits Rectangle {
     in property <image> icon;
@@ -63,6 +64,10 @@ export component App inherits Window {
     callback language-chosen(string);
     callback theme-chosen(string);
     callback flag-toggled(string, bool);
+    in property <[InfoItem]> about-info;
+    in property <[InfoItem]> about-licenses;
+    in property <[ReleaseRow]> releases;
+    callback open-contact();
     in property <string> toast;
     in property <bool> toast-error;
     callback log-filter-changed(int);
@@ -157,8 +162,14 @@ export component App inherits Window {
                     theme-chosen(v) => { root.theme-chosen(v); }
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
                 }
-                if page > 3 : Label {
-                    x: 32px; y: 32px; width: parent.width - 64px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;
+                if page == 4 : WhatsNewPage {
+                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    releases: root.releases;
+                }
+                if page == 5 : AboutPage {
+                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    info: root.about-info; licenses: root.about-licenses;
+                    open-contact => { root.open-contact(); }
                 }
             }
         }

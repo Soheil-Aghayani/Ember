@@ -1,0 +1,137 @@
+// The About page and the What's new page. Ports of AboutPage.kt and WhatsNewPage.kt.
+import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Card, Label, HRow } from "widgets.slint";
+
+export struct InfoItem {
+    label: string,
+    value: string,
+    breakable: bool,   // may wrap in the middle of a word (a file path)
+}
+
+export struct ReleaseRow {
+    version: string,
+    current: bool,
+    lines: [string],
+}
+
+component Divider inherits Rectangle {
+    height: 1px;
+    Rectangle { x: Palette.rtl ? 0px : 16px; width: parent.width - 16px; height: 1px; background: Palette.outline-variant; }
+}
+
+/// A label on one side and its value on the other (40% / 60%), both allowed to wrap, even inside a long path.
+component InfoRow inherits Rectangle {
+    in property <InfoItem> item;
+    property <length> inner: root.width - 32px;
+    height: max(name.preferred-height, value.preferred-height) + 24px;
+    name := Label {
+        x: Palette.rtl ? 16px + root.inner * 0.6 + 8px : 16px; y: 12px; width: root.inner * 0.4 - 8px;
+        text: item.label; muted: true; wrap: word-wrap; vertical-alignment: top;
+    }
+    value := Label {
+        x: Palette.rtl ? 16px : 16px + root.inner * 0.4 + 8px; y: 12px; width: root.inner * 0.6 - 8px;
+        text: item.value; wrap: item.breakable ? char-wrap : word-wrap; vertical-alignment: top;
+    }
+}
+
+export component AboutPage inherits Rectangle {
+    in property <[InfoItem]> info;
+    in property <[InfoItem]> licenses;
+    callback open-contact();
+    property <bool> show-licenses: false;
+
+    Flickable {
+        content-height: page.preferred-height + 48px;
+        page := VerticalLayout {
+            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 12px; alignment: start;
+            Label { text: Tr.about; font-size: Type.headline-large; font-weight: 700; height: 40px; }
+            Card {
+                height: facts.preferred-height;
+                facts := VerticalLayout {
+                    for item in root.info : InfoRow { item: item; }
+                }
+            }
+            Card {
+                height: more.preferred-height;
+                more := VerticalLayout {
+                    Rectangle {
+                        height: 64px;
+                        background: contact-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+                        Image {
+                            source: Icons.telegram; colorize: Palette.primary; width: 24px; height: 24px;
+                            x: Palette.rtl ? parent.width - self.width - 16px : 16px; y: (parent.height - self.height) / 2;
+                        }
+                        VerticalLayout {
+                            x: Palette.rtl ? 16px : 16px + 24px + 12px; y: 10px;
+                            width: parent.width - 16px - 24px - 12px - 16px - (Palette.rtl ? 0px : 0px); alignment: center; height: parent.height - 20px;
+                            Label { text: Tr.contact; muted: true; font-size: Type.body-small; }
+                            Label { text: "Telegram  @env_soh"; color: Palette.primary; font-size: Type.body-large; }
+                        }
+                        contact-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-contact(); } }
+                    }
+                    Divider { }
+                    Rectangle {
+                        height: 52px;
+                        background: licenses-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+                        Label {
+                            x: Palette.rtl ? 16px + 80px : 16px; width: parent.width - 32px - 80px; height: parent.height;
+                            text: Tr.licenses; font-size: Type.body-large;
+                        }
+                        Label {
+                            x: Palette.rtl ? 16px : parent.width - 16px - 80px; width: 80px; height: parent.height;
+                            text: root.show-licenses ? Tr.hide : Tr.show; color: Palette.primary; font-size: Type.body-medium;
+                            horizontal-alignment: Palette.rtl ? left : right;
+                        }
+                        licenses-touch := TouchArea { mouse-cursor: pointer; clicked => { root.show-licenses = !root.show-licenses; } }
+                    }
+                    if show-licenses : VerticalLayout {
+                        for item in root.licenses : VerticalLayout {
+                            Divider { }
+                            InfoRow { item: item; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component BulletLine inherits Rectangle {
+    in property <string> text;
+    height: body.preferred-height;
+    Label {
+        x: Palette.rtl ? parent.width - 12px : 0px; y: 0px; width: 12px; height: 22px;
+        text: "\u{2022}"; muted: true; vertical-alignment: top;
+    }
+    body := Label {
+        x: Palette.rtl ? 0px : 20px; y: 0px; width: parent.width - 20px;
+        text: root.text; wrap: word-wrap; vertical-alignment: top;
+    }
+}
+
+component ReleaseCard inherits Card {
+    in property <ReleaseRow> release;
+    height: col.preferred-height;
+    col := VerticalLayout {
+        padding: 16px; spacing: 8px;
+        HRow {
+            alignment: start; height: 24px; spacing: 8px;
+            Label { text: release.version; font-size: 17px; font-weight: 600; }
+            if release.current : Label { text: Tr.current-version; color: Palette.primary; font-size: Type.body-small; font-weight: 500; }
+        }
+        for line in release.lines : BulletLine { text: line; }
+    }
+}
+
+export component WhatsNewPage inherits Rectangle {
+    in property <[ReleaseRow]> releases;
+    Flickable {
+        content-height: page.preferred-height + 48px;
+        page := VerticalLayout {
+            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 12px; alignment: start;
+            Label { text: Tr.whats-new; font-size: Type.headline-large; font-weight: 700; height: 40px; }
+            Label { text: Tr.whats-new-intro; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+            for release in root.releases : ReleaseCard { release: release; }
+        }
+    }
+}

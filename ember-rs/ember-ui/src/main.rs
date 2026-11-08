@@ -1,6 +1,8 @@
+mod about;
 mod backend;
 mod lang;
 mod logs;
+mod releases;
 mod servers;
 mod sphere;
 mod strings;
@@ -257,6 +259,12 @@ fn apply_language(app: &App, language: &str) {
     tr.set_proxy_only(s.proxy_only_short.into());
     tr.set_next_connection(s.next_connection.into());
     tr.set_not_yet(lang::not_yet().into());
+    tr.set_whats_new_intro(s.whats_new_intro.into());
+    tr.set_show(s.show.into());
+    tr.set_hide(s.hide.into());
+    tr.set_contact(s.about_contact.into());
+    tr.set_licenses(s.about_licenses.into());
+    tr.set_current_version(s.current_version.into());
 }
 
 /// A short message at the bottom of the window.
@@ -278,6 +286,15 @@ fn show_toast(app: &App, generation: &Arc<AtomicU32>, text: &str, error: bool) {
 
 fn set_clipboard(text: &str) -> bool {
     arboard::Clipboard::new().and_then(|mut c| c.set_text(text.to_string())).is_ok()
+}
+
+/// Fills the About and What's new pages in the language in use.
+fn push_static_pages(app: &App, data_dir: &std::path::Path) {
+    let s = lang::current();
+    app.set_about_info(about::info(data_dir, s));
+    app.set_about_licenses(about::licenses());
+    // the Kotlin app marks the entry of the version that is running; the Rust build has its own version numbers
+    app.set_releases(about::releases(lang::code(), env!("CARGO_PKG_VERSION")));
 }
 
 /// Whether the window is dark for an Appearance value ("Light", "Dark" or "System").
@@ -307,8 +324,10 @@ fn wire_settings_page(
     servers_ui: &Rc<servers::ServersUi>,
     logs_ui: &Rc<logs::LogsUi>,
     dirty: &Arc<AtomicBool>,
+    data_dir: &std::path::Path,
 ) {
     {
+        let data_dir = data_dir.to_path_buf();
         let (engine, weak, servers_ui, logs_ui, dirty) =
             (engine.clone(), app.as_weak(), Rc::clone(servers_ui), Rc::clone(logs_ui), Arc::clone(dirty));
         app.on_language_chosen(move |code| {
@@ -318,6 +337,7 @@ fn wire_settings_page(
             lang::set(code);
             apply_language(&app, code);
             push_settings(&app, &engine);
+            push_static_pages(&app, &data_dir);
             servers_ui.invalidate();
             logs::apply(&app, &logs_ui, true);
             dirty.store(true, Ordering::SeqCst);
@@ -565,8 +585,12 @@ fn main() {
     wire_servers_page(&app, &engine, &servers_ui, &dirty);
     let logs_ui = Rc::new(logs::LogsUi::default());
     wire_logs_page(&app, &logs_ui);
-    wire_settings_page(&app, &engine, forced_theme, &servers_ui, &logs_ui, &dirty);
+    wire_settings_page(&app, &engine, forced_theme, &servers_ui, &logs_ui, &dirty, &data_dir);
     push_settings(&app, &engine);
+    push_static_pages(&app, &data_dir);
+    app.on_open_contact(|| {
+        ember_win::shell::open_url(about::CONTACT_LINK);
+    });
     if has("--expand") {
         for sub in engine.store().subscriptions() {
             servers_ui.expanded.borrow_mut().insert(sub.id);
@@ -582,6 +606,12 @@ fn main() {
     }
     if has("--settings") {
         app.set_page(2);
+    }
+    if has("--whatsnew") {
+        app.set_page(4);
+    }
+    if has("--about") {
+        app.set_page(5);
     }
     if has("--demo-log") {
         // made-up values only; they let the redaction of the copied report be checked
