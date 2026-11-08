@@ -1,0 +1,62 @@
+// Colours and type, mirroring desktop/.../ui/Theme.kt and design/tokens.json. Edit the tokens first, then mirror here.
+import "assets/fonts/inter_regular.ttf";
+import "assets/fonts/inter_medium.ttf";
+import "assets/fonts/inter_semibold.ttf";
+import "assets/fonts/inter_bold.ttf";
+
+export global Palette {
+    in property <bool> dark: true;
+    out property <color> primary: dark ? #ff8d5c : #9c3107;
+    out property <color> on-surface: dark ? #f3eee6 : #1f1b16;
+    out property <color> on-variant: dark ? #cdc5ba : #534c44;
+    out property <color> tertiary: dark ? #5fd17f : #1e7a3c;
+    out property <color> error: dark ? #ffb4ab : #ba1a1a;
+    out property <color> background: dark ? #1a1714 : #faf7f2;
+    out property <color> surface-variant: dark ? #3a342d : #f1ece3;
+    out property <color> outline-variant: dark ? #3a342d : #e4ddd1;
+    // The glass panels: the Kotlin fill is a vertical gradient, but the software renderer cannot round the corners of a
+    // gradient, so this is the average of its two ends.
+    out property <color> glass: dark ? #1f1829.with-alpha(0.60) : #ffffff.with-alpha(0.72);
+    out property <color> glass-edge: dark ? #ffffff.with-alpha(0.16) : #ffffff.with-alpha(0.65);
+    out property <color> divider: dark ? #ffffff.with-alpha(0.10) : #ffffff.with-alpha(0.65);
+    out property <color> orb-ink: dark ? #ffffff : #7a5bc0;
+}
+
+export global Type {
+    out property <string> family: "Inter";
+    // size, weight pairs from the Kotlin typography: headlineLarge 28/700, headlineMedium 22/600, titleMedium 17/600, bodyLarge 17/400, bodyMedium 15/400, bodySmall 13/400
+    out property <length> headline-large: 28px;
+    out property <length> headline-medium: 22px;
+    out property <length> headline-small: 20px;
+    out property <length> title-small: 16px;
+    out property <length> body-large: 17px;
+    out property <length> body-medium: 15px;
+    out property <length> body-small: 13px;
+}
+
+export global Icons {
+    out property <image> home: @image-url("assets/icons/home.svg");
+    out property <image> subscriptions: @image-url("assets/icons/subscriptions.svg");
+    out property <image> settings: @image-url("assets/icons/settings.svg");
+    out property <image> logs: @image-url("assets/icons/logs.svg");
+    out property <image> whats-new: @image-url("assets/icons/whats-new.svg");
+    out property <image> info-circle: @image-url("assets/icons/info-circle.svg");
+    out property <image> check: @image-url("assets/icons/check.svg");
+    out property <image> chevron-down: @image-url("assets/icons/chevron-down.svg");
+    out property <image> chevron-up: @image-url("assets/icons/chevron-up.svg");
+    out property <image> bolt: @image-url("assets/icons/bolt.svg");
+    out property <image> power: @image-url("assets/icons/power.svg");
+    out property <image> stop: @image-url("assets/icons/stop.svg");
+    out property <image> refresh: @image-url("assets/icons/refresh.svg");
+}
+
+/// Where the orb's motion comes from: set by the engine side several times a second, read by the orb.
+export global Motion {
+    in property <float> angle;
+    in property <float> lit;
+    in property <float> loader;
+    in property <float> ripple: 1;
+    in property <float> pop: 1;
+    in property <image> sphere-off;
+    in property <image> sphere-on;
+}

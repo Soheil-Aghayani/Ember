@@ -1,6 +1,6 @@
 ﻿[workspace]
 resolver = "2"
-members = ["crates/ember-subs", "crates/ember-win", "proto", "tools/gen-sphere"]
+members = ["crates/ember-subs", "crates/ember-win", "ember-ui"]
 
 [workspace.package]
 edition = "2021"
@@ -12,3 +12,4 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+

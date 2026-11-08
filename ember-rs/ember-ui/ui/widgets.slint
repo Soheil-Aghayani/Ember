@@ -1,0 +1,37 @@
+import { Palette, Type } from "theme.slint";
+
+/// A frosted panel: translucent fill, hairline edge, 16 corner radius.
+export component Card inherits Rectangle {
+    background: Palette.glass;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Palette.glass-edge;
+    clip: true;
+}
+
+/// Text in the app's typography. `weight` is the CSS weight (400, 500, 600, 700).
+export component Label inherits Text {
+    in property <bool> muted: false;
+    font-family: Type.family;
+    font-size: Type.body-medium;
+    color: muted ? Palette.on-variant : Palette.on-surface;
+    vertical-alignment: center;
+}
+
+/// A small flat icon button (the Kotlin IconAction): icon on the left, optional caption.
+export component IconAction inherits Rectangle {
+    in property <image> icon;
+    in property <string> caption;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 36px;
+    width: row.preferred-width + 20px;
+    border-radius: 10px;
+    background: touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent;
+    row := HorizontalLayout {
+        padding-left: 10px; padding-right: 10px; spacing: 8px;
+        Image { source: icon; colorize: Palette.primary; width: 18px; height: 18px; y: (parent.height - self.height) / 2; opacity: enabled ? 1 : 0.38; }
+        Text { text: caption; color: Palette.primary; font-family: Type.family; font-size: Type.body-small; font-weight: 500; vertical-alignment: center; visible: caption != ""; }
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
