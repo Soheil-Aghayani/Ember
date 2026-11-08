@@ -1,0 +1,521 @@
+{
+  "cases": [
+    {
+      "name": "vless reality",
+      "link": "vless://11111111-2222-3333-4444-555555555555@vl.example.com:443?type=tcp&security=reality&pbk=KEY&sni=www.example.org&sid=ab&flow=xtls-rprx-vision#UK%20Reality",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "encryption": "none",
+                  "flow": "xtls-rprx-vision"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.example.org",
+            "fingerprint": "chrome",
+            "publicKey": "KEY",
+            "shortId": "ab",
+            "spiderX": ""
+          }
+        }
+      }
+    },
+    {
+      "name": "vless ws tls",
+      "link": "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=ws&security=tls&path=%2Fp&host=h.example.com&alpn=h2,http/1.1&fp=firefox&allowInsecure=1#W",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "h.example.com",
+            "alpn": [
+              "h2",
+              "http/1.1"
+            ],
+            "fingerprint": "firefox",
+            "allowInsecure": true
+          },
+          "wsSettings": {
+            "path": "/p",
+            "headers": {
+              "Host": "h.example.com"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless tcp http header",
+      "link": "vless://11111111-2222-3333-4444-555555555555@h.example.com:80?type=tcp&headerType=http&host=cdn.example.com&path=%2Fa&encryption=none#H",
+      "address": "203.0.113.7",
+      "tag": "t",
+      "expected": {
+        "tag": "t",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 80,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "none",
+          "tcpSettings": {
+            "header": {
+              "type": "http",
+              "request": {
+                "path": [
+                  "/a"
+                ],
+                "headers": {
+                  "Host": [
+                    "cdn.example.com"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vless splithttp",
+      "link": "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=splithttp&security=tls&sni=s.example.com&mode=packet-up&path=%2Fx#X",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "s.example.com",
+            "fingerprint": "chrome"
+          },
+          "xhttpSettings": {
+            "path": "/x",
+            "mode": "packet-up"
+          }
+        }
+      }
+    },
+    {
+      "name": "vless h2",
+      "link": "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=h2&security=tls&host=a.example.com,b.example.com#H2",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "encryption": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "http",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "a.example.com,b.example.com",
+            "fingerprint": "chrome"
+          },
+          "httpSettings": {
+            "path": "/",
+            "host": [
+              "a.example.com",
+              "b.example.com"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "trojan grpc",
+      "link": "trojan://pw@tr.example.com:443?security=tls&type=grpc&serviceName=svc&mode=multi#T",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "trojan",
+        "settings": {
+          "servers": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "password": "pw"
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "grpc",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "tr.example.com",
+            "fingerprint": "chrome"
+          },
+          "grpcSettings": {
+            "serviceName": "svc",
+            "multiMode": true
+          }
+        }
+      }
+    },
+    {
+      "name": "trojan default tls, httpupgrade",
+      "link": "trojan://p%40w@tr.example.com:443?type=httpupgrade&host=x.example.com&path=%2Fu#T",
+      "address": "2001:db8::5",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "trojan",
+        "settings": {
+          "servers": [
+            {
+              "address": "2001:db8::5",
+              "port": 443,
+              "password": "p@w"
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "httpupgrade",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "x.example.com",
+            "fingerprint": "chrome"
+          },
+          "httpupgradeSettings": {
+            "path": "/u",
+            "host": "x.example.com"
+          }
+        }
+      }
+    },
+    {
+      "name": "vmess ws tls",
+      "vmess_json": {
+        "v": "2",
+        "ps": "Vm",
+        "add": "vm.example.com",
+        "port": "443",
+        "id": "11111111-2222-3333-4444-555555555555",
+        "aid": "0",
+        "net": "ws",
+        "host": "vm.example.com",
+        "path": "/w",
+        "tls": "tls"
+      },
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vmess",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "alterId": 0,
+                  "security": "auto"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "ws",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "vm.example.com",
+            "fingerprint": "chrome"
+          },
+          "wsSettings": {
+            "path": "/w",
+            "headers": {
+              "Host": "vm.example.com"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "vmess grpc, numeric port",
+      "vmess_json": {
+        "add": "v.example.com",
+        "port": 8443,
+        "id": "11111111-2222-3333-4444-555555555555",
+        "aid": "2",
+        "net": "grpc",
+        "path": "svc",
+        "tls": "none",
+        "scy": "aes-128-gcm",
+        "type": "none"
+      },
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "vmess",
+        "settings": {
+          "vnext": [
+            {
+              "address": "203.0.113.7",
+              "port": 8443,
+              "users": [
+                {
+                  "id": "11111111-2222-3333-4444-555555555555",
+                  "alterId": 2,
+                  "security": "aes-128-gcm"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "grpc",
+          "security": "none",
+          "grpcSettings": {
+            "serviceName": "svc",
+            "multiMode": false
+          }
+        }
+      }
+    },
+    {
+      "name": "shadowsocks base64 user info",
+      "ss_userinfo": "aes-256-gcm:pw",
+      "ss_tail": "@1.2.3.4:8388#S",
+      "address": "1.2.3.4",
+      "tag": "p",
+      "expected": {
+        "tag": "p",
+        "protocol": "shadowsocks",
+        "settings": {
+          "servers": [
+            {
+              "address": "1.2.3.4",
+              "port": 8388,
+              "method": "aes-256-gcm",
+              "password": "pw"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "shadowsocks plain user info",
+      "link": "ss://aes-256-gcm:p%3Aw@1.2.3.4:8388#S",
+      "address": "203.0.113.7",
+      "tag": "p",
+      "expected": {
+        "tag": "p",
+        "protocol": "shadowsocks",
+        "settings": {
+          "servers": [
+            {
+              "address": "203.0.113.7",
+              "port": 8388,
+              "method": "aes-256-gcm",
+              "password": "p:w"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "shadowsocks legacy",
+      "link": "ss://YWVzLTI1Ni1nY206cHdAMS4yLjMuNDo4Mzg4#Legacy",
+      "address": "203.0.113.7",
+      "tag": "p",
+      "expected": {
+        "tag": "p",
+        "protocol": "shadowsocks",
+        "settings": {
+          "servers": [
+            {
+              "address": "203.0.113.7",
+              "port": 8388,
+              "method": "aes-256-gcm",
+              "password": "pw"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "hysteria2",
+      "link": "hysteria2://secret@hy.example.com:443?sni=hy.example.com&insecure=1#Hy",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "203.0.113.7",
+          "port": 443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "hy.example.com",
+            "alpn": [
+              "h3"
+            ],
+            "allowInsecure": true
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "secret"
+          }
+        }
+      }
+    },
+    {
+      "name": "hy2 without sni uses the host",
+      "link": "hy2://secret@hy.example.com:443#Hy",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "tag": "proxy",
+        "protocol": "hysteria",
+        "settings": {
+          "version": 2,
+          "address": "203.0.113.7",
+          "port": 443
+        },
+        "streamSettings": {
+          "network": "hysteria",
+          "security": "tls",
+          "tlsSettings": {
+            "serverName": "hy.example.com",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "hysteriaSettings": {
+            "version": 2,
+            "auth": "secret"
+          }
+        }
+      }
+    },
+    {
+      "name": "stored wireguard outbound pinned to an IPv6 address",
+      "link": "xrayjson:{\"protocol\":\"wireguard\",\"tag\":\"old\",\"ember_name\":\"Office\",\"settings\":{\"secretKey\":\"K\",\"address\":[\"10.8.0.2/32\"],\"peers\":[{\"publicKey\":\"P\",\"endpoint\":\"wg.example.com:51821\",\"allowedIPs\":[\"0.0.0.0/0\"]}]}}",
+      "address": "2001:db8::9",
+      "tag": "proxy",
+      "expected": {
+        "protocol": "wireguard",
+        "tag": "proxy",
+        "settings": {
+          "secretKey": "K",
+          "address": [
+            "10.8.0.2/32"
+          ],
+          "peers": [
+            {
+              "publicKey": "P",
+              "endpoint": "[2001:db8::9]:51821",
+              "allowedIPs": [
+                "0.0.0.0/0"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "stored shadowsocks outbound",
+      "link": "xrayjson:{\"protocol\":\"shadowsocks\",\"settings\":{\"servers\":[{\"address\":\"s.example.com\",\"port\":8388,\"method\":\"m\",\"password\":\"p\"}]}}",
+      "address": "203.0.113.7",
+      "tag": "proxy",
+      "expected": {
+        "protocol": "shadowsocks",
+        "tag": "proxy",
+        "settings": {
+          "servers": [
+            {
+              "address": "203.0.113.7",
+              "port": 8388,
+              "method": "m",
+              "password": "p"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

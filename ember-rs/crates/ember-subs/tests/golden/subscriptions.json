@@ -1,0 +1,197 @@
+{
+  "cases": [
+    {
+      "name": "plain list with a duplicate and junk",
+      "body": "vless://11111111-2222-3333-4444-555555555555@a.example.com:443?type=tcp#A\n# profile update\nhello world\ntrojan://pw@b.example.com:443?security=tls#B\nvless://11111111-2222-3333-4444-555555555555@a.example.com:443?type=tcp#A\n",
+      "expected": [
+        {
+          "name": "A",
+          "host": "a.example.com",
+          "port": 443
+        },
+        {
+          "name": "B",
+          "host": "b.example.com",
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "CRLF and BOM",
+      "body": "﻿vless://11111111-2222-3333-4444-555555555555@a.example.com:443?type=tcp#A\r\ntrojan://pw@b.example.com:443?security=tls#B\r\n",
+      "expected": [
+        {
+          "name": "A",
+          "host": "a.example.com",
+          "port": 443
+        },
+        {
+          "name": "B",
+          "host": "b.example.com",
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "base64",
+      "body": "dmxlc3M6Ly8xMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTVAYS5leGFtcGxlLmNvbTo0NDM/dHlwZT10Y3AjQQp0cm9qYW46Ly9wd0BiLmV4YW1wbGUuY29tOjQ0Mz9zZWN1cml0eT10bHMjQg==",
+      "expected": [
+        {
+          "name": "A",
+          "host": "a.example.com",
+          "port": 443
+        },
+        {
+          "name": "B",
+          "host": "b.example.com",
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "url-safe base64 without padding and wrapped lines",
+      "body": "dmxlc3M6Ly8xMTExMTExMS0yMjIyLTMzMzMtNDQ0\nNC01NTU1NTU1NTU1NTVAYS5leGFtcGxlLmNvbTo0\nNDM_dHlwZT10Y3AjQQp0cm9qYW46Ly9wd0BiLmV4\nYW1wbGUuY29tOjQ0Mz9zZWN1cml0eT10bHMjQgp2\nbGVzczovLzExMTExMTExLTIyMjItMzMzMy00NDQ0\nLTU1NTU1NTU1NTU1NUBhLmV4YW1wbGUuY29tOjQ0\nMz90eXBlPXRjcCNBCnRyb2phbjovL3B3QGIuZXhh\nbXBsZS5jb206NDQzP3NlY3VyaXR5PXRscyNCCnZs\nZXNzOi8vMTExMTExMTEtMjIyMi0zMzMzLTQ0NDQt\nNTU1NTU1NTU1NTU1QGEuZXhhbXBsZS5jb206NDQz\nP3R5cGU9dGNwI0EKdHJvamFuOi8vcHdAYi5leGFt\ncGxlLmNvbTo0NDM_c2VjdXJpdHk9dGxzI0I",
+      "expected": [
+        {
+          "name": "A",
+          "host": "a.example.com",
+          "port": 443
+        },
+        {
+          "name": "B",
+          "host": "b.example.com",
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "xray json: first real outbound of each config, remarks fall back",
+      "body": "[{\"remarks\": \"One\", \"outbounds\": [{\"protocol\": \"freedom\", \"tag\": \"direct\"}, {\"protocol\": \"vless\", \"settings\": {\"vnext\": [{\"address\": \"j1.example.com\", \"port\": 443, \"users\": [{\"id\": \"11111111-2222-3333-4444-555555555555\"}]}]}}]}, {\"ps\": \"Two\", \"outbounds\": [{\"protocol\": \"shadowsocks\", \"settings\": {\"servers\": [{\"address\": \"j2.example.com\", \"port\": 8388, \"method\": \"m\", \"password\": \"p\"}]}}]}, {\"outbounds\": [{\"protocol\": \"wireguard\", \"settings\": {\"peers\": [{\"endpoint\": \"[2001:db8::1]:51820\"}]}}]}, {\"outbounds\": [{\"protocol\": \"freedom\"}]}, \"not an object\"]",
+      "expected": [
+        {
+          "name": "One",
+          "host": "j1.example.com",
+          "port": 443
+        },
+        {
+          "name": "Two",
+          "host": "j2.example.com",
+          "port": 8388
+        },
+        {
+          "name": "2001:db8::1:51820",
+          "host": "2001:db8::1",
+          "port": 51820
+        }
+      ]
+    },
+    {
+      "name": "wireguard file named by the hint",
+      "body": "[Interface]\nPrivateKey = k\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = p\nEndpoint = 192.0.2.1:51820\n",
+      "name_hint": "Home",
+      "expected": [
+        {
+          "name": "Home",
+          "host": "192.0.2.1",
+          "port": 51820
+        }
+      ]
+    },
+    {
+      "name": "openvpn file",
+      "body": "client\ndev tun\nremote o.example.com 1195\n",
+      "name_hint": "Work",
+      "expected": [
+        {
+          "name": "Work",
+          "host": "o.example.com",
+          "port": 1195
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "body": "not a subscription",
+      "message": "No servers were found in this subscription."
+    },
+    {
+      "body": "",
+      "message": "No servers were found in this subscription."
+    },
+    {
+      "body": "{\"outbounds\": []}",
+      "message": "This subscription is in a format Ember does not read (JSON without Xray servers). Ask the provider for the standard link list."
+    },
+    {
+      "body": "[Interface]\nPrivateKey = k\n",
+      "message": "The WireGuard file has no [Peer] section."
+    },
+    {
+      "body": "[Interface]\nPrivateKey = k\nAddress = 10.0.0.2/32\n[Peer]\nPublicKey = p\n",
+      "message": "The WireGuard file has no Endpoint."
+    },
+    {
+      "body": "[Interface]\nAddress = 10.0.0.2/32\n[Peer]\nPublicKey = p\nEndpoint = h:1\n",
+      "message": "The WireGuard file has no PrivateKey."
+    },
+    {
+      "body": "[Interface]\nPrivateKey = k\n[Peer]\nPublicKey = p\nEndpoint = h:1\n",
+      "message": "The WireGuard file has no Address."
+    },
+    {
+      "body": "[Interface]\nPrivateKey = k\nAddress = a\n[Peer]\nEndpoint = h:1\n",
+      "message": "The WireGuard file has no peer PublicKey."
+    },
+    {
+      "body": "[Interface]\nPrivateKey = k\nAddress = a\n[Peer]\nPublicKey = p\nEndpoint = nonsense\n",
+      "message": "The WireGuard endpoint is not valid."
+    }
+  ],
+  "user_info": [
+    {
+      "header": "upload=1; download=2; total=100; expire=1893456000",
+      "expected": {
+        "uploaded": 1,
+        "downloaded": 2,
+        "total": 100,
+        "expire": 1893456000
+      }
+    },
+    {
+      "header": "total=5.9",
+      "expected": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "total": 5,
+        "expire": null
+      }
+    },
+    {
+      "header": "Total=10;EXPIRE=0;upload=x",
+      "expected": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "total": 10,
+        "expire": null
+      }
+    },
+    {
+      "header": "upload=1; download=2",
+      "expected": null
+    },
+    {
+      "header": "  ",
+      "expected": null
+    },
+    {
+      "header": "noequals;=3;total=7",
+      "expected": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "total": 7,
+        "expire": null
+      }
+    }
+  ]
+}
