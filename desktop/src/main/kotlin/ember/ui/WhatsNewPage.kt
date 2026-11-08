@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.99",
+        listOf(
+            "Much lighter: the animated background and the orb stop completely while the window is minimized or in the tray (0.3% of a core instead of a constant load), and redraw less often while the window is open.",
+            "Ember's memory is capped (it had grown past 1 GB after hours); it now stays near 600 MB or less.",
+        ),
+        listOf(
+            "بسیار سبک‌تر: پس‌زمینه و گوی متحرک وقتی پنجره کوچک شده یا در سینی است کاملاً می‌ایستند، و در پنجرهٔ باز هم کمتر بازرسم می‌شوند.",
+            "حافظهٔ امبر محدود شد (پس از ساعت‌ها از ۱ گیگابایت می‌گذشت) و حالا حدود ۶۰۰ مگابایت یا کمتر می‌ماند.",
+        ),
+    ),
+    Release(
         "1.0.98",
         listOf(
             "Fixes a blank window on some Windows PCs: Ember now draws with OpenGL, which works where the default graphics path showed nothing.",

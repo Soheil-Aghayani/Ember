@@ -117,6 +117,8 @@ tasks.withType<Test> { useJUnitPlatform() }
 compose.desktop {
     application {
         mainClass = "ember.MainKt"
+        // The default (G1, heap up to a quarter of the RAM) let Ember grow past 1 GB; this window needs a fraction of that.
+        jvmArgs += listOf("-XX:+UseSerialGC", "-Xmx512m", "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=30")
         nativeDistributions {
             appResourcesRootDir.set(layout.projectDirectory.dir("appResources"))
             targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)

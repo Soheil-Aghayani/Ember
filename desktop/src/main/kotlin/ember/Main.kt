@@ -40,6 +40,7 @@ import ember.ui.EmberTheme
 import ember.ui.GlassBackground
 import ember.ui.EnglishStrings
 import ember.ui.LocalStrings
+import ember.ui.LocalWindowShown
 import ember.ui.PersianStrings
 import java.awt.GraphicsDevice
 import java.awt.GraphicsEnvironment
@@ -136,7 +137,7 @@ private fun runApp(args: Array<String>) = application {
             "Dark" -> true
             else -> isSystemInDarkTheme()
         }) {
-            CompositionLocalProvider(LocalStrings provides strings) {
+            CompositionLocalProvider(LocalStrings provides strings, LocalWindowShown provides (visible && !windowState.isMinimized)) {
                 val frameShape = RoundedCornerShape(EmberDesktopMetrics.windowCornerRadius)
                 GlassBackground(if (showRoundedFrame) Modifier.clip(frameShape) else Modifier) {
                     Column(Modifier.fillMaxSize()) {

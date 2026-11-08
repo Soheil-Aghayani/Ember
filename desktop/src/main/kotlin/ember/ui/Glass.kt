@@ -16,12 +16,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+
+/** False while the window is minimized or hidden in the tray: the animations stop, so no frames are drawn that nobody sees. */
+internal val LocalWindowShown = compositionLocalOf { true }
 
 @Composable
 private fun isDarkGlass() = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -53,11 +57,13 @@ internal fun GlassBackground(modifier: Modifier = Modifier, content: @Composable
 private fun LivingLight() {
     val dark = isDarkGlass()
     var phase by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val start = System.nanoTime()
+    val shown = LocalWindowShown.current
+    LaunchedEffect(shown) {
+        if (!shown) return@LaunchedEffect
+        val start = System.nanoTime() - (phase / (2 * Math.PI) * 70.0 * 1e9).toLong() // carry on from where it stopped
         while (true) {
             phase = ((System.nanoTime() - start) / 1e9 / 70.0 * 2 * Math.PI).toFloat() // one full drift in 70 seconds
-            delay(40)
+            delay(80) // it drifts about a pixel a second, so 12 redraws a second look just as smooth
         }
     }
     val violet = if (dark) Color(0xFF7A55E0).copy(alpha = 0.34f) else Color(0xFFB79CFF).copy(alpha = 0.40f)
