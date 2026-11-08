@@ -1,0 +1,294 @@
+{
+  "single": [
+    {
+      "name": "plain",
+      "raw": "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=tcp#N",
+      "address": "203.0.113.7",
+      "socks_port": 10808,
+      "http_port": null,
+      "log_file": "C:/x/xray.log",
+      "verbose": false,
+      "bypass": [],
+      "expected": {
+        "log": {
+          "loglevel": "warning",
+          "error": "C:/x/xray.log"
+        },
+        "inbounds": [
+          {
+            "tag": "in",
+            "listen": "127.0.0.1",
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "203.0.113.7",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "11111111-2222-3333-4444-555555555555",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "none"
+            }
+          },
+          {
+            "tag": "block",
+            "protocol": "blackhole"
+          }
+        ],
+        "routing": {
+          "domainStrategy": "AsIs",
+          "rules": [
+            {
+              "type": "field",
+              "network": "udp",
+              "port": "443",
+              "outboundTag": "block"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "http proxy, verbose, bypass",
+      "raw": "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=tcp#N",
+      "address": "203.0.113.7",
+      "socks_port": 10808,
+      "http_port": 10809,
+      "log_file": "C:/x/xray.log",
+      "verbose": true,
+      "bypass": [
+        [
+          "open.spotify.com",
+          [
+            "1.2.3.4"
+          ]
+        ],
+        [
+          "a.example.com",
+          [
+            "5.6.7.8",
+            "9.9.9.9"
+          ]
+        ]
+      ],
+      "expected": {
+        "log": {
+          "loglevel": "info",
+          "error": "C:/x/xray.log"
+        },
+        "dns": {
+          "hosts": {
+            "full:open.spotify.com": [
+              "1.2.3.4"
+            ],
+            "full:a.example.com": [
+              "5.6.7.8",
+              "9.9.9.9"
+            ]
+          },
+          "servers": [
+            "localhost"
+          ]
+        },
+        "inbounds": [
+          {
+            "tag": "in",
+            "listen": "127.0.0.1",
+            "port": 10808,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            }
+          },
+          {
+            "tag": "http",
+            "listen": "127.0.0.1",
+            "port": 10809,
+            "protocol": "http"
+          }
+        ],
+        "outbounds": [
+          {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "203.0.113.7",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "11111111-2222-3333-4444-555555555555",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "none"
+            }
+          },
+          {
+            "tag": "block",
+            "protocol": "blackhole"
+          },
+          {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {
+              "domainStrategy": "UseIPv4"
+            }
+          }
+        ],
+        "routing": {
+          "domainStrategy": "AsIs",
+          "rules": [
+            {
+              "type": "field",
+              "domain": [
+                "full:open.spotify.com",
+                "full:a.example.com"
+              ],
+              "outboundTag": "direct"
+            },
+            {
+              "type": "field",
+              "network": "udp",
+              "port": "443",
+              "outboundTag": "block"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "many": [
+    {
+      "name": "two servers",
+      "entries": [
+        [
+          "vless://11111111-2222-3333-4444-555555555555@h.example.com:443?type=tcp#N",
+          "203.0.113.7",
+          21001
+        ],
+        [
+          "ss://aes-256-gcm:pw@1.2.3.4:8388#S",
+          "1.2.3.4",
+          21002
+        ]
+      ],
+      "log_file": "C:/x/xray.log",
+      "expected": {
+        "log": {
+          "loglevel": "warning",
+          "error": "C:/x/xray.log"
+        },
+        "inbounds": [
+          {
+            "tag": "in0",
+            "listen": "127.0.0.1",
+            "port": 21001,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            }
+          },
+          {
+            "tag": "in1",
+            "listen": "127.0.0.1",
+            "port": 21002,
+            "protocol": "socks",
+            "settings": {
+              "auth": "noauth",
+              "udp": true,
+              "ip": "127.0.0.1"
+            }
+          }
+        ],
+        "outbounds": [
+          {
+            "tag": "out0",
+            "protocol": "vless",
+            "settings": {
+              "vnext": [
+                {
+                  "address": "203.0.113.7",
+                  "port": 443,
+                  "users": [
+                    {
+                      "id": "11111111-2222-3333-4444-555555555555",
+                      "encryption": "none"
+                    }
+                  ]
+                }
+              ]
+            },
+            "streamSettings": {
+              "network": "tcp",
+              "security": "none"
+            }
+          },
+          {
+            "tag": "out1",
+            "protocol": "shadowsocks",
+            "settings": {
+              "servers": [
+                {
+                  "address": "1.2.3.4",
+                  "port": 8388,
+                  "method": "aes-256-gcm",
+                  "password": "pw"
+                }
+              ]
+            }
+          }
+        ],
+        "routing": {
+          "domainStrategy": "AsIs",
+          "rules": [
+            {
+              "type": "field",
+              "inboundTag": [
+                "in0"
+              ],
+              "outboundTag": "out0"
+            },
+            {
+              "type": "field",
+              "inboundTag": [
+                "in1"
+              ],
+              "outboundTag": "out1"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,8 +1,15 @@
-﻿[package]
+[package]
 name = "ember-subs"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-
+serde_json = "1"
+base64 = "0.22"
+url = "2"
+ureq = { version = "2", default-features = false, features = ["tls", "socks-proxy"] }
+qrcode = { version = "0.14", default-features = false }
+thiserror = "2"
+# OS randomness for WARP device keys (already a transitive dependency of rustls/ring).
+getrandom = "0.3"

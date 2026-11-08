@@ -1,0 +1,24 @@
+{
+  "prepare": {
+    "input": "﻿# comment\r\nclient\r\ndev tun\r\nproto udp\r\nremote vpn.example.com 443 udp\r\nauth-user-pass creds.txt\r\nca ca.crt\r\ncert [inline]\r\ntls-auth ta.key 1\r\n--script-security 2\r\nup /bin/evil.cmd\r\nplugin evil.dll\r\nmanagement 127.0.0.1 7505\r\n<up>\r\nevil\r\n</up>\r\n<ca>\r\nup not-a-directive\r\n</ca>\r\npersist-key\r\n",
+    "files": {
+      "ca.crt": "CA-PEM",
+      "ta.key": "TA-KEY"
+    },
+    "expected": "# comment\nclient\ndev tun\nproto udp\nremote vpn.example.com 443 udp\nauth-user-pass\n<ca>\nCA-PEM\n</ca>\ncert [inline]\n<tls-auth>\nTA-KEY\n</tls-auth>\nkey-direction 1\n# removed: script-security\n# removed: up\n# removed: plugin\n# removed: management\n# removed <up>\n<ca>\nup not-a-directive\n</ca>\npersist-key\n"
+  },
+  "node": {
+    "input": "client\ndev tun\nproto tcp\nport 8443\nremote vpn.example.com\n",
+    "name_hint": "",
+    "name": "vpn.example.com",
+    "host": "vpn.example.com",
+    "port": 8443
+  },
+  "remotes": {
+    "profile": "client\nremote a.example.com 1\nREMOTE b.example.com\nremote a.example.com 2\n",
+    "expected": [
+      "a.example.com",
+      "b.example.com"
+    ]
+  }
+}
