@@ -4,6 +4,7 @@ import { Label, HRow } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
 import { ServersPage, SubRow, NodeRow } from "servers.slint";
 import { LogsPage } from "logs.slint";
+import { SettingsPage } from "settings.slint";
 export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow }
 
 component NavItem inherits Rectangle {
@@ -54,6 +55,14 @@ export component App inherits Window {
     in property <[string]> log-lines;
     in property <bool> log-has-entries;
     in-out property <int> log-filter: 0;
+    in property <string> set-language;
+    in property <string> set-theme;
+    in property <bool> set-auto-connect;
+    in property <bool> set-auto-failover;
+    in property <bool> set-diagnostic-log;
+    callback language-chosen(string);
+    callback theme-chosen(string);
+    callback flag-toggled(string, bool);
     in property <string> toast;
     in property <bool> toast-error;
     callback log-filter-changed(int);
@@ -140,7 +149,15 @@ export component App inherits Window {
                     clear => { root.clear-logs(); }
                     copy-report => { root.copy-report(); }
                 }
-                if page == 2 || page > 3 : Label {
+                if page == 2 : SettingsPage {
+                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    language: root.set-language; theme: root.set-theme; auto-connect: root.set-auto-connect;
+                    auto-failover: root.set-auto-failover; diagnostic-log: root.set-diagnostic-log;
+                    language-chosen(v) => { root.language-chosen(v); }
+                    theme-chosen(v) => { root.theme-chosen(v); }
+                    flag-toggled(key, v) => { root.flag-toggled(key, v); }
+                }
+                if page > 3 : Label {
                     x: 32px; y: 32px; width: parent.width - 64px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;
                 }
             }

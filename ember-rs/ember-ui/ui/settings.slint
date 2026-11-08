@@ -1,0 +1,235 @@
+// The Settings page. Port of SettingsPage.kt: a short list of groups; some rows open a sub-page, language and appearance
+// open a small menu. Rows for features this build does not have yet (whole-device mode and what hangs on it, tray,
+// start with Windows, app rules, skip list, trusted networks, backup) are shown dimmed with a note instead of switches
+// that would do nothing.
+import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Card, Label, IconAction, HRow, ToggleSwitch } from "widgets.slint";
+
+export struct ChoiceOption {
+    value: string,
+    label: string,
+}
+
+component Divider inherits Rectangle {
+    height: 1px;
+    Rectangle { x: Palette.rtl ? 0px : 16px; width: parent.width - 16px; height: 1px; background: Palette.outline-variant; }
+}
+
+component GroupLabel inherits Label {
+    font-size: Type.title-small; font-weight: 500; muted: true;
+    height: 44px; vertical-alignment: bottom;
+}
+
+/// A row with a switch. `subtitle` is the explanation under the title.
+component SwitchRow inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    property <length> text-width: root.width - 16px - 48px - 12px - 16px;
+    height: max(column.preferred-height + 28px, 60px);
+    opacity: enabled ? 1 : 0.45;
+    column := VerticalLayout {
+        x: Palette.rtl ? 16px + 48px + 12px : 16px;
+        y: (root.height - self.preferred-height) / 2;
+        width: root.text-width; spacing: 2px; alignment: start;
+        Label { text: root.title; font-size: Type.body-large; wrap: word-wrap; }
+        if subtitle != "" : Label { text: root.subtitle; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+    }
+    ToggleSwitch {
+        x: Palette.rtl ? 16px : root.width - self.width - 16px;
+        y: (root.height - self.height) / 2;
+        checked: root.checked; enabled: root.enabled;
+        toggled(v) => { root.toggled(v); }
+    }
+}
+
+/// A row that opens another page; `value` is what is set now.
+component NavRow inherits Rectangle {
+    in property <string> title;
+    in property <string> value;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 52px;
+    opacity: enabled ? 1 : 0.45;
+    background: touch.has-hover && enabled ? Palette.primary.with-alpha(0.06) : transparent;
+    Label {
+        x: Palette.rtl ? 16px + 16px + 8px + value-label.preferred-width + 8px : 16px;
+        width: root.width - 16px - 16px - 8px - value-label.preferred-width - 8px - 16px - 16px; height: root.height;
+        text: root.title; font-size: Type.body-large; overflow: elide;
+    }
+    value-label := Label {
+        x: Palette.rtl ? 16px + 16px + 8px : root.width - self.width - 16px - 16px - 8px; height: root.height;
+        text: root.value; muted: true; font-size: Type.body-medium;
+    }
+    Image {
+        source: Palette.rtl ? Icons.chevron-left : Icons.chevron-right; colorize: Palette.on-variant; width: 16px; height: 16px;
+        x: Palette.rtl ? 16px : root.width - self.width - 16px; y: (root.height - self.height) / 2;
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: enabled ? pointer : default; clicked => { root.clicked(); } }
+}
+
+/// A row that shows the current choice and opens a menu of the others.
+component ChoiceRow inherits Rectangle {
+    in property <string> title;
+    in property <[ChoiceOption]> options;
+    in property <string> selected;
+    callback picked(string);
+    height: 52px;
+    background: touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+    in property <string> current-label;
+    Label {
+        x: Palette.rtl ? 16px + 16px + 8px + value-label.preferred-width + 8px : 16px;
+        width: root.width - 16px - 16px - 8px - value-label.preferred-width - 8px - 16px - 16px; height: root.height;
+        text: root.title; font-size: Type.body-large; overflow: elide;
+    }
+    value-label := Label {
+        x: Palette.rtl ? 16px + 16px + 8px : root.width - self.width - 16px - 16px - 8px; height: root.height;
+        text: root.current-label; muted: true; font-size: Type.body-medium;
+    }
+    Image {
+        source: Icons.chevron-down; colorize: Palette.on-variant; width: 16px; height: 16px;
+        x: Palette.rtl ? 16px : root.width - self.width - 16px; y: (root.height - self.height) / 2;
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { menu.show(); } }
+    menu := PopupWindow {
+        x: Palette.rtl ? 16px : root.width - 220px - 16px; y: root.height - 4px; width: 220px; height: root.options.length * 44px + 8px;
+        close-policy: close-on-click-outside;
+        Rectangle { background: Palette.dark ? #24201c : #ffffff; border-radius: 16px; border-width: 1px; border-color: Palette.outline-variant; }
+        VerticalLayout {
+            padding: 4px;
+            for option in root.options : Rectangle {
+                height: 44px; border-radius: 10px;
+                background: item.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
+                Label {
+                    x: Palette.rtl ? 40px : 12px; width: parent.width - 52px; height: parent.height; text: option.label;
+                }
+                if option.value == root.selected : Image {
+                    source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px;
+                    x: Palette.rtl ? 12px : parent.width - self.width - 12px; y: (parent.height - self.height) / 2;
+                }
+                item := TouchArea { mouse-cursor: pointer; clicked => { root.picked(option.value); menu.close(); } }
+            }
+        }
+    }
+}
+
+export component SettingsPage inherits Rectangle {
+    in property <string> language;
+    in property <string> theme;
+    in property <bool> auto-connect;
+    in property <bool> auto-failover;
+    in property <bool> diagnostic-log;
+    callback language-chosen(string);
+    callback theme-chosen(string);
+    callback flag-toggled(string, bool);
+
+    // 0 the list; 1 startup and tray; 2 protection; 3 advanced
+    property <int> section: 0;
+
+    Flickable {
+        content-height: page.preferred-height + 48px;
+        page := VerticalLayout {
+            y: 0px; padding-top: 32px; padding-bottom: 16px; alignment: start;
+            if section == 0 : VerticalLayout {
+                Label { text: Tr.settings; font-size: Type.headline-large; font-weight: 700; height: 40px; }
+                GroupLabel { text: Tr.settings-interface; }
+                Card {
+                    height: list1.preferred-height;
+                    list1 := VerticalLayout {
+                        ChoiceRow {
+                            title: Tr.language; selected: root.language; current-label: root.language == "fa" ? Tr.persian : Tr.english; picked(v) => { root.language-chosen(v); }
+                            options: [{ value: "en", label: Tr.english }, { value: "fa", label: Tr.persian }];
+                        }
+                        Divider { }
+                        ChoiceRow {
+                            title: Tr.appearance; selected: root.theme; current-label: root.theme == "Light" ? Tr.light : (root.theme == "Dark" ? Tr.dark : Tr.system); picked(v) => { root.theme-chosen(v); }
+                            options: [{ value: "Light", label: Tr.light }, { value: "Dark", label: Tr.dark }, { value: "System", label: Tr.system }];
+                        }
+                        Divider { }
+                        NavRow { title: Tr.startup-tray; clicked => { root.section = 1; } }
+                    }
+                }
+                GroupLabel { text: Tr.settings-connection; }
+                Card {
+                    height: list2.preferred-height;
+                    list2 := VerticalLayout {
+                        NavRow { title: Tr.protection; value: Tr.proxy-only; clicked => { root.section = 2; } }
+                        Divider { }
+                        NavRow { title: Tr.app-rules; value: Tr.not-yet; enabled: false; }
+                        Divider { }
+                        NavRow { title: Tr.skip-vpn; value: Tr.not-yet; enabled: false; }
+                        Divider { }
+                        NavRow { title: Tr.trusted-networks; value: Tr.not-yet; enabled: false; }
+                    }
+                }
+                GroupLabel { text: Tr.settings-more; }
+                Card {
+                    height: list3.preferred-height;
+                    list3 := VerticalLayout {
+                        NavRow { title: Tr.backup; value: Tr.not-yet; enabled: false; }
+                        Divider { }
+                        NavRow { title: Tr.advanced; clicked => { root.section = 3; } }
+                    }
+                }
+            }
+            if section != 0 : VerticalLayout {
+                spacing: 16px;
+                HRow {
+                    alignment: start; height: 40px; spacing: 8px;
+                    IconAction { icon: Palette.rtl ? Icons.chevron-right : Icons.chevron-left; tint: Palette.on-surface; clicked => { root.section = 0; } }
+                    Label {
+                        text: root.section == 1 ? Tr.startup-tray : (root.section == 2 ? Tr.protection : Tr.advanced);
+                        font-size: Type.headline-medium; font-weight: 600;
+                    }
+                }
+                if section == 1 : Card {
+                    height: startup.preferred-height;
+                    startup := VerticalLayout {
+                        SwitchRow { title: Tr.keep-in-tray; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        Divider { }
+                        SwitchRow { title: Tr.start-with-windows; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        Divider { }
+                        SwitchRow {
+                            title: Tr.auto-connect; subtitle: Tr.auto-connect-help; checked: root.auto-connect;
+                            toggled(v) => { root.flag-toggled("autoConnect", v); }
+                        }
+                    }
+                }
+                if section == 2 : Card {
+                    height: protection.preferred-height;
+                    protection := VerticalLayout {
+                        SwitchRow { title: Tr.whole-device; subtitle: Tr.whole-device-unavailable; enabled: false; checked: false; }
+                        Divider { }
+                        SwitchRow { title: Tr.kill-switch; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        Divider { }
+                        SwitchRow { title: Tr.ipv6; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        Divider { }
+                        SwitchRow {
+                            title: Tr.auto-failover; subtitle: Tr.auto-failover-help; checked: root.auto-failover;
+                            toggled(v) => { root.flag-toggled("autoFailover", v); }
+                        }
+                        Divider { }
+                        SwitchRow { title: Tr.no-prompts; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                    }
+                }
+                if section == 3 : Card {
+                    height: advanced.preferred-height;
+                    advanced := VerticalLayout {
+                        SwitchRow {
+                            title: Tr.diagnostic-log; subtitle: Tr.diagnostic-log-help; checked: root.diagnostic-log;
+                            toggled(v) => { root.flag-toggled("diagnosticLog", v); }
+                        }
+                        Divider { }
+                        VerticalLayout {
+                            padding: 16px; spacing: 6px;
+                            Label { text: Tr.mtu-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                            Label { text: Tr.not-yet; muted: true; font-size: Type.body-small; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

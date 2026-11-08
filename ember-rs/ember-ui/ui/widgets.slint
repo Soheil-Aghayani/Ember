@@ -102,3 +102,22 @@ export component TextField inherits Rectangle {
         vertical-alignment: multiline ? top : center; overflow: elide;
     }
 }
+
+/// An on/off switch (the Material one in the Kotlin app).
+export component ToggleSwitch inherits Rectangle {
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    horizontal-stretch: 0;
+    width: 48px; height: 28px; border-radius: 14px;
+    border-width: 2px;
+    border-color: checked ? Palette.primary : Palette.on-variant;
+    background: checked ? Palette.primary : transparent;
+    Rectangle {
+        width: 18px; height: 18px; border-radius: 9px;
+        x: checked ? 24px : 5px; y: 5px;
+        background: checked ? Palette.on-primary : Palette.on-variant;
+        animate x { duration: 150ms; easing: ease-out; }
+    }
+    TouchArea { enabled: root.enabled; mouse-cursor: enabled ? pointer : default; clicked => { root.toggled(!root.checked); } }
+}

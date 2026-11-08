@@ -1,4 +1,5 @@
 mod backend;
+mod lang;
 mod logs;
 mod servers;
 mod sphere;
@@ -214,6 +215,48 @@ fn apply_language(app: &App, language: &str) {
     tr.set_copy_report_hint(s.copy_report_hint.into());
     tr.set_empty_logs_title(s.empty_logs_title.into());
     tr.set_empty_logs_text(s.empty_logs.into());
+    tr.set_settings_interface(s.settings_interface.into());
+    tr.set_settings_connection(s.settings_connection.into());
+    tr.set_settings_more(s.settings_more.into());
+    tr.set_language(s.language.into());
+    tr.set_english(s.english_language.into());
+    tr.set_persian(s.persian_language.into());
+    tr.set_appearance(s.appearance.into());
+    tr.set_light(s.light.into());
+    tr.set_dark(s.dark.into());
+    tr.set_system(s.system.into());
+    tr.set_startup_tray(s.startup_and_tray.into());
+    tr.set_protection(s.protection.into());
+    tr.set_app_rules(s.app_rules.into());
+    tr.set_skip_vpn(s.skip_vpn.into());
+    tr.set_trusted_networks(s.trusted_networks_title.into());
+    tr.set_backup(s.backup_title.into());
+    tr.set_advanced(s.advanced.into());
+    tr.set_back(s.back.into());
+    tr.set_keep_in_tray(s.keep_in_tray.into());
+    tr.set_tray_help(s.tray_help.into());
+    tr.set_start_with_windows(s.start_with_windows.into());
+    tr.set_start_quietly(s.start_quietly.into());
+    tr.set_auto_connect(s.auto_connect.into());
+    tr.set_auto_connect_help(s.auto_connect_help.into());
+    tr.set_whole_device(s.whole_device.into());
+    tr.set_whole_device_unavailable(s.whole_device_unavailable.into());
+    tr.set_kill_switch(s.kill_switch.into());
+    tr.set_kill_switch_help(s.kill_switch_help.into());
+    tr.set_ipv6(s.ipv6.into());
+    tr.set_ipv6_help(s.ipv6_help.into());
+    tr.set_auto_failover(s.auto_failover.into());
+    tr.set_auto_failover_help(s.auto_failover_help.into());
+    tr.set_no_prompts(s.no_prompts.into());
+    tr.set_no_prompts_help(s.no_prompts_help.into());
+    tr.set_diagnostic_log(s.diagnostic_log.into());
+    tr.set_diagnostic_log_help(s.diagnostic_log_help.into());
+    tr.set_mtu_help(s.mtu_help.into());
+    tr.set_repair_network(s.repair_network.into());
+    tr.set_repair_network_hint(s.repair_network_hint.into());
+    tr.set_proxy_only(s.proxy_only_short.into());
+    tr.set_next_connection(s.next_connection.into());
+    tr.set_not_yet(lang::not_yet().into());
 }
 
 /// A short message at the bottom of the window.
@@ -237,8 +280,76 @@ fn set_clipboard(text: &str) -> bool {
     arboard::Clipboard::new().and_then(|mut c| c.set_text(text.to_string())).is_ok()
 }
 
+/// Whether the window is dark for an Appearance value ("Light", "Dark" or "System").
+fn is_dark(theme: &str, forced: Option<bool>) -> bool {
+    forced.unwrap_or_else(|| match theme {
+        "Light" => false,
+        "Dark" => true,
+        _ => ember_win::theme::apps_use_dark(),
+    })
+}
+
+/// Puts the saved settings into the Settings page.
+fn push_settings(app: &App, engine: &Engine) {
+    let s = engine.settings();
+    app.set_set_language(lang::code().into());
+    app.set_set_theme(s.theme().into());
+    app.set_set_auto_connect(s.auto_connect());
+    app.set_set_auto_failover(s.auto_failover());
+    app.set_set_diagnostic_log(s.diagnostic_log());
+}
+
+/// The Settings page's choices and switches.
+fn wire_settings_page(
+    app: &App,
+    engine: &Engine,
+    forced_theme: Option<bool>,
+    servers_ui: &Rc<servers::ServersUi>,
+    logs_ui: &Rc<logs::LogsUi>,
+    dirty: &Arc<AtomicBool>,
+) {
+    {
+        let (engine, weak, servers_ui, logs_ui, dirty) =
+            (engine.clone(), app.as_weak(), Rc::clone(servers_ui), Rc::clone(logs_ui), Arc::clone(dirty));
+        app.on_language_chosen(move |code| {
+            let Some(app) = weak.upgrade() else { return };
+            let code = if code == "fa" { "fa" } else { "en" };
+            engine.settings().set_language(code);
+            lang::set(code);
+            apply_language(&app, code);
+            push_settings(&app, &engine);
+            servers_ui.invalidate();
+            logs::apply(&app, &logs_ui, true);
+            dirty.store(true, Ordering::SeqCst);
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_theme_chosen(move |theme| {
+            let Some(app) = weak.upgrade() else { return };
+            engine.settings().set_theme(&theme);
+            app.global::<Palette>().set_dark(is_dark(&theme, forced_theme));
+            push_settings(&app, &engine);
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_flag_toggled(move |key, value| {
+            let Some(app) = weak.upgrade() else { return };
+            let s = engine.settings();
+            match key.as_str() {
+                "autoConnect" => s.set_auto_connect(value),
+                "autoFailover" => s.set_auto_failover(value),
+                "diagnosticLog" => s.set_diagnostic_log(value),
+                _ => {}
+            }
+            push_settings(&app, &engine);
+        });
+    }
+}
+
 /// The Logs page's buttons.
-fn wire_logs_page(app: &App, ui: &Rc<logs::LogsUi>, text: &'static strings::Strings) {
+fn wire_logs_page(app: &App, ui: &Rc<logs::LogsUi>) {
     let toasts = Arc::new(AtomicU32::new(0));
     {
         let (ui, weak) = (Rc::clone(ui), app.as_weak());
@@ -254,7 +365,7 @@ fn wire_logs_page(app: &App, ui: &Rc<logs::LogsUi>, text: &'static strings::Stri
             let Some(app) = weak.upgrade() else { return };
             let lines = logs::filtered(app.get_log_filter());
             if set_clipboard(&lines.join("\n")) {
-                show_toast(&app, &toasts, text.copied, false);
+                show_toast(&app, &toasts, lang::current().copied, false);
             }
         });
     }
@@ -275,7 +386,7 @@ fn wire_logs_page(app: &App, ui: &Rc<logs::LogsUi>, text: &'static strings::Stri
             let recent: Vec<String> = entries[entries.len().saturating_sub(120)..].iter().map(logs::line).collect();
             let report = ember_engine::diagnostics::report(env!("CARGO_PKG_VERSION"), &ember_engine::diagnostics::system_lines("software"), &recent);
             if set_clipboard(&report) {
-                show_toast(&app, &toasts, text.report_copied, false);
+                show_toast(&app, &toasts, lang::current().report_copied, false);
             }
         });
     }
@@ -302,7 +413,7 @@ fn lock_set(set: &std::sync::Mutex<std::collections::HashSet<String>>) -> std::s
 }
 
 /// The Servers page's buttons.
-fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, dirty: &Arc<AtomicBool>, text: &'static strings::Strings) {
+fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, dirty: &Arc<AtomicBool>) {
     let notices = Arc::new(AtomicU32::new(0));
     {
         let (ui, dirty) = (Rc::clone(ui), Arc::clone(dirty));
@@ -349,7 +460,7 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
                 lock_set(&refreshing).remove(&id);
                 dirty.store(true, Ordering::SeqCst);
                 let _ = weak.upgrade_in_event_loop(move |app| match outcome {
-                    Ok(()) => show_notice(&app, &notices, text.updated.into(), false),
+                    Ok(()) => show_notice(&app, &notices, lang::current().updated.into(), false),
                     Err(e) => show_notice(&app, &notices, e.into(), true),
                 });
             });
@@ -376,7 +487,7 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
             let clipboard = arboard::Clipboard::new().and_then(|mut c| c.get_text()).unwrap_or_default();
             let clipboard = clipboard.trim();
             if clipboard.is_empty() {
-                app.set_dialog_error(text.clipboard_empty.into());
+                app.set_dialog_error(lang::current().clipboard_empty.into());
                 return;
             }
             app.set_dialog_error(SharedString::new());
@@ -407,7 +518,7 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
                     match outcome {
                         Ok(count) => {
                             app.set_dialog_done(done.fetch_add(1, Ordering::SeqCst) as i32 + 1);
-                            let message = if id.is_empty() { servers::added_message(text, count) } else { text.updated.into() };
+                            let message = if id.is_empty() { servers::added_message(lang::current(), count) } else { lang::current().updated.into() };
                             show_notice(&app, &notices, message, false);
                         }
                         Err(e) => app.set_dialog_error(e.into()),
@@ -442,28 +553,35 @@ fn main() {
     }
 
     let app = App::new().unwrap();
-    app.global::<Palette>().set_dark(!has("--light"));
+    // --light / --dark force the look (for screenshots); otherwise the Appearance setting decides
+    let forced_theme = if has("--light") { Some(false) } else if has("--dark") { Some(true) } else { None };
+    app.global::<Palette>().set_dark(is_dark(&engine.settings().theme(), forced_theme));
     let language = if has("--fa") { "fa".to_string() } else { engine.settings().language() };
+    lang::set(&language);
     apply_language(&app, &language);
     let rows_model = Rc::new(VecModel::<ServerRow>::default());
     app.set_servers(ModelRc::from(rows_model.clone()));
-    let text = strings::for_language(&language);
     let servers_ui = Rc::new(servers::ServersUi::default());
-    wire_servers_page(&app, &engine, &servers_ui, &dirty, text);
+    wire_servers_page(&app, &engine, &servers_ui, &dirty);
     let logs_ui = Rc::new(logs::LogsUi::default());
-    wire_logs_page(&app, &logs_ui, text);
+    wire_logs_page(&app, &logs_ui);
+    wire_settings_page(&app, &engine, forced_theme, &servers_ui, &logs_ui, &dirty);
+    push_settings(&app, &engine);
     if has("--expand") {
         for sub in engine.store().subscriptions() {
             servers_ui.expanded.borrow_mut().insert(sub.id);
         }
     }
-    refresh(&app, &engine, &rows_model, text, ports);
-    servers::apply(&app, &engine, text, &servers_ui);
+    refresh(&app, &engine, &rows_model, lang::current(), ports);
+    servers::apply(&app, &engine, lang::current(), &servers_ui);
     if has("--servers") {
         app.set_page(1);
     }
     if has("--logs") {
         app.set_page(3);
+    }
+    if has("--settings") {
+        app.set_page(2);
     }
     if has("--demo-log") {
         // made-up values only; they let the redaction of the copied report be checked
@@ -504,6 +622,11 @@ fn main() {
         app.on_cancel_test(move || engine.cancel_test());
     }
 
+    // like the Kotlin app: with "connect on start" on and a server chosen, connect straight away
+    if engine.settings().auto_connect() && engine.selected_node().is_some() && !has("--no-auto") {
+        engine.connect_selected();
+    }
+
     let timer = slint::Timer::default();
     let weak = app.as_weak();
     let engine_for_timer = engine.clone();
@@ -518,6 +641,13 @@ fn main() {
         let app = weak.unwrap();
         let engine = &engine_for_timer;
         tick += 1;
+        // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
+        if forced_theme.is_none() && tick.is_multiple_of(60) && engine.settings().theme() == "System" {
+            let dark = ember_win::theme::apps_use_dark();
+            if app.global::<Palette>().get_dark() != dark {
+                app.global::<Palette>().set_dark(dark);
+            }
+        }
         if menu_at != 0 && tick == menu_at {
             app.set_menu_request(1);
         }
@@ -534,8 +664,8 @@ fn main() {
         }
         // refresh when the engine said something changed, and once a second while connected (the elapsed time)
         if dirty.swap(false, Ordering::SeqCst) || (state == ConnState::Connected && tick.is_multiple_of(30)) {
-            refresh(&app, engine, &rows_model, text, ports);
-            servers::apply(&app, engine, text, &servers_ui);
+            refresh(&app, engine, &rows_model, lang::current(), ports);
+            servers::apply(&app, engine, lang::current(), &servers_ui);
         }
         // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
         let px = (176.0 * app.window().scale_factor()).round() as u32;

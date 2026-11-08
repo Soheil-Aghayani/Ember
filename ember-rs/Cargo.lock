@@ -924,6 +924,7 @@ dependencies = [
  "arboard",
  "ember-engine",
  "ember-subs",
+ "ember-win",
  "slint",
  "slint-build",
 ]

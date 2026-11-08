@@ -13,6 +13,7 @@ pub mod paths;
 pub mod privileged_task;
 pub mod proc;
 pub mod single_instance;
+pub mod theme;
 pub mod tray;
 pub mod windows_tunnel;
 
