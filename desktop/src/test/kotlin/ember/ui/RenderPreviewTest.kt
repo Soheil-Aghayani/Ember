@@ -53,6 +53,10 @@ class RenderPreviewTest {
             val theme = if (dark) "dark" else "light"
             render(dir, "whats-new-$theme", dark) { WhatsNewPage("en") }
             render(dir, "about-$theme", dark) { AboutPage() }
+            render(dir, "backup-$theme", dark, height = 360) {
+                Text(EnglishStrings.backupTitle, style = MaterialTheme.typography.headlineMedium)
+                BackupSettings {}
+            }
             render(dir, "empty-$theme", dark, height = 420) {
                 Text("Servers", style = MaterialTheme.typography.headlineLarge)
                 Card { EmptyState("subscriptions", "No servers yet", EnglishStrings.noSubscriptions) {} }

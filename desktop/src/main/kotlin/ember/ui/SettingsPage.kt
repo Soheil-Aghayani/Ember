@@ -42,7 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Section { Startup, Protection, Apps, Skip, Trusted, Advanced }
+private enum class Section { Startup, Protection, Apps, Skip, Trusted, Backup, Advanced }
 
 /** Settings as a short list of groups; each row opens its own page (or a menu, for language and theme). */
 @Composable
@@ -68,6 +68,7 @@ internal fun SettingsPage(
                     Section.Apps -> strings.appRules
                     Section.Skip -> strings.skipVpn
                     Section.Trusted -> strings.trustedNetworksTitle
+                    Section.Backup -> strings.backupTitle
                     Section.Advanced -> strings.advanced
                 },
                 style = MaterialTheme.typography.headlineMedium,
@@ -80,6 +81,7 @@ internal fun SettingsPage(
             Section.Apps -> AppRulesSettings(engine)
             Section.Skip -> SkipVpnSettings(engine, engine.settings.wholeDevice && available)
             Section.Trusted -> TrustedNetworksSettings(engine)
+            Section.Backup -> BackupSettings(engine::shutdown)
             Section.Advanced -> AdvancedSettings(engine)
         }
         return
@@ -124,7 +126,13 @@ internal fun SettingsPage(
     }
 
     GroupLabel(strings.settingsMore)
-    Card { NavRow(strings.advanced, null) { section = Section.Advanced } }
+    Card {
+        Column {
+            NavRow(strings.backupTitle, null) { section = Section.Backup }
+            RowDivider()
+            NavRow(strings.advanced, null) { section = Section.Advanced }
+        }
+    }
 }
 
 @Composable

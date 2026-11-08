@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.100",
+        listOf(
+            "Backup and restore (Settings, More): save your subscriptions and settings to one file and put them back on this or another computer. The file contains your account keys, so keep it private.",
+        ),
+        listOf(
+            "پشتیبان‌گیری و بازیابی (تنظیمات، بیشتر): اشتراک‌ها و تنظیمات را در یک فایل ذخیره کنید و روی همین رایانه یا رایانهٔ دیگر برگردانید. این فایل کلیدهای حساب شما را دارد، آن را خصوصی نگه دارید.",
+        ),
+    ),
+    Release(
         "1.0.99",
         listOf(
             "Much lighter: the animated background and the orb stop completely while the window is minimized or in the tray (0.3% of a core instead of a constant load), and redraw less often while the window is open.",

@@ -199,6 +199,14 @@ data class Strings(
     val warpChainTitle: String,
     val warpChainHelp: String,
     val mtuValidation: (Int, Int) -> String,
+    val backupTitle: String,
+    val backupHint: String,
+    val saveBackup: String,
+    val restoreBackup: String,
+    val restoreAndRestart: String,
+    val restoreConfirm: (String) -> String,
+    val backupSaved: (String) -> String,
+    val backupFailed: (String) -> String,
 )
 
 val EnglishStrings = Strings(
@@ -397,6 +405,14 @@ val EnglishStrings = Strings(
     warpChainTitle = "Which server should carry WARP?",
     warpChainHelp = "Use this when your network blocks Cloudflare directly. WARP travels inside the connection to the server you pick (it must carry UDP), and your traffic leaves from Cloudflare.",
     mtuValidation = { min, max -> "Enter a whole number from $min to $max." },
+    backupTitle = "Backup and restore",
+    backupHint = "Saves your subscriptions and settings to one file, so you can set up another computer or recover after a reinstall. The file contains your account keys: keep it private.",
+    saveBackup = "Save a backup…",
+    restoreBackup = "Restore from a backup…",
+    restoreAndRestart = "Restore and restart",
+    restoreConfirm = { name -> "Replace your subscriptions and settings with the ones in $name? Ember disconnects and restarts." },
+    backupSaved = { name -> "Saved $name." },
+    backupFailed = { reason -> "That did not work: $reason" },
 )
 
 val PersianStrings = Strings(
@@ -595,6 +611,14 @@ val PersianStrings = Strings(
     warpChainTitle = "کدام سرور WARP را حمل کند؟",
     warpChainHelp = "وقتی شبکه‌تان مستقیم به Cloudflare دسترسی نمی‌دهد از این استفاده کنید. WARP درون اتصال به سروری که انتخاب می‌کنید می‌رود (باید UDP را عبور دهد) و ترافیک شما از Cloudflare خارج می‌شود.",
     mtuValidation = { min, max -> "یک عدد صحیح از $min تا $max وارد کنید." },
+    backupTitle = "پشتیبان‌گیری و بازیابی",
+    backupHint = "اشتراک‌ها و تنظیمات شما را در یک فایل ذخیره می‌کند تا بتوانید رایانهٔ دیگری را راه بیندازید یا پس از نصب دوباره همه‌چیز را برگردانید. این فایل کلیدهای حساب شما را دارد: آن را خصوصی نگه دارید.",
+    saveBackup = "ذخیرهٔ پشتیبان…",
+    restoreBackup = "بازیابی از پشتیبان…",
+    restoreAndRestart = "بازیابی و راه‌اندازی دوباره",
+    restoreConfirm = { name -> "اشتراک‌ها و تنظیمات فعلی با موارد داخل $name جایگزین شوند؟ Ember قطع می‌شود و دوباره راه می‌افتد." },
+    backupSaved = { name -> "$name ذخیره شد." },
+    backupFailed = { reason -> "انجام نشد: $reason" },
 )
 
 val LocalStrings = staticCompositionLocalOf { EnglishStrings }
