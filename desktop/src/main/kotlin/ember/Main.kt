@@ -47,7 +47,16 @@ import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.geom.RoundRectangle2D
 
-fun main(args: Array<String>) = application {
+fun main(args: Array<String>) {
+    // Skiko's default Direct3D path leaves the borderless transparent window blank on some PCs (seen on Windows 10, 19045);
+    // OpenGL draws it everywhere we tried. An explicit SKIKO_RENDER_API or -Dskiko.renderApi still wins.
+    if (System.getProperty("os.name").startsWith("Windows") && System.getenv("SKIKO_RENDER_API") == null) {
+        System.getProperty("skiko.renderApi") ?: System.setProperty("skiko.renderApi", "OPENGL")
+    }
+    runApp(args)
+}
+
+private fun runApp(args: Array<String>) = application {
     val engine = remember { EmberEngine(appDataDir()) }
     var visible by remember { mutableStateOf(!args.contains("--minimized") || !isTraySupported) }
     var theme by remember { mutableStateOf(engine.settings.theme) }

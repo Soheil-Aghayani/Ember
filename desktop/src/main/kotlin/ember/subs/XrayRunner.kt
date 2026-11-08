@@ -70,7 +70,9 @@ class XrayRunner(dataDir: File) : XrayProcess {
             }
             delay(100)
         }
-        error("Xray did not start in time. " + logTail())
+        error("Xray did not start in time. " + logTail().ifBlank {
+            "It wrote nothing, so something may be holding xray.exe up (an antivirus scan, or a program using port $port)."
+        })
     }
 
     private fun logTail(): String = runCatching { logFile.readLines().takeLast(3).joinToString(" ") }.getOrDefault("").take(400)

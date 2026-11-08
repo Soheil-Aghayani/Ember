@@ -349,7 +349,7 @@ class EmberEngine(private val dataDir: File) {
                     }
                 val skipped = if (wholeDevice) resolveExclusions() else SkipList(emptyList(), emptyMap())
                 xray.start(XrayConfig.single(node, address, SOCKS_PORT, if (wholeDevice) null else HTTP_PORT, xray.logFile, settings.diagnosticLog, if (appRules) emptyMap() else skipped.domains))
-                xray.awaitListening(SOCKS_PORT)
+                xray.awaitListening(SOCKS_PORT, 30_000) // an antivirus scanning xray.exe on first launch can take well over 10 s
                 // Before anything on the computer is changed: does this server pass traffic at all?
                 _progress.value = "Checking the server..."
                 val serverCheck = probe(proxied = true)

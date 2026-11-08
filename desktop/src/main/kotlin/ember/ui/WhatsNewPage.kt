@@ -21,6 +21,17 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.98",
+        listOf(
+            "Fixes a blank window on some Windows PCs: Ember now draws with OpenGL, which works where the default graphics path showed nothing.",
+            "Xray gets 30 seconds instead of 10 to start before Ember gives up, and the error now says when Xray wrote nothing (often an antivirus scan).",
+        ),
+        listOf(
+            "رفع پنجرهٔ خالی در برخی رایانه‌های ویندوزی: امبر حالا با OpenGL رسم می‌کند.",
+            "Xray برای شروع ۳۰ ثانیه فرصت دارد (به‌جای ۱۰)، و پیام خطا مشخص می‌کند که Xray چیزی ننوشته است (اغلب اسکن آنتی‌ویروس).",
+        ),
+    ),
+    Release(
         "1.0.97",
         listOf(
             "The orb's animation now loops with no seam: the second ring's dots and the arc that runs round it while connecting no longer jump every so often.",
