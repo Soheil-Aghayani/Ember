@@ -1,0 +1,108 @@
+// The connect orb. Port of desktop/.../ui/GlassOrb.kt: a glass sphere (two pre-rendered sprites cross-faded by `lit`,
+// because the software renderer cannot clip a gradient to a circle), two tilted orbit rings with dots, a running arc
+// while connecting and one ripple after connecting. All motion comes from the four in-properties.
+
+component RingLayer inherits Rectangle {
+    in property <float> lit;
+    in property <float> angle;      // radians, wraps after ten turns (see LOOP in Kotlin)
+    in property <bool> front;       // true: near half and near dots, drawn over the sphere
+    in property <float> tilt;       // radians
+    in property <length> a;
+    in property <length> b;
+    in property <float> direction;
+    in property <float> dot1;
+    in property <float> dot2;
+    in property <length> cx;
+    in property <length> cy;
+    in property <color> ink: #ffffff;
+
+    property <float> c: Math.cos(tilt * 1rad);
+    property <float> s: Math.sin(tilt * 1rad);
+    property <length> x0: cx + a * c;
+    property <length> y0: cy + a * s;
+    property <length> x1: cx - a * c;
+    property <length> y1: cy - a * s;
+    property <float> core: 0.30 + 0.60 * lit;
+
+    // front half: theta 0..pi (below the centre line of the ring); back half: pi..2pi
+    Path {
+        x: 0; y: 0; width: parent.width; height: parent.height;
+        fill: transparent;
+        stroke: ink.with-alpha(front ? core : core * 0.65);
+        stroke-width: 1.5px;
+        stroke-line-cap: round;
+        MoveTo { x: front ? x0 / 1px : x1 / 1px; y: front ? y0 / 1px : y1 / 1px; }
+        ArcTo {
+            x: front ? x1 / 1px : x0 / 1px; y: front ? y1 / 1px : y0 / 1px;
+            radius-x: a / 1px; radius-y: b / 1px; x-rotation: tilt * 57.29578; sweep: true;
+        }
+    }
+
+    for off[i] in [dot1, dot2] : Rectangle {
+        property <float> th: off + angle * direction;
+        property <float> sn: Math.sin(th * 1rad);
+        property <float> cs: Math.cos(th * 1rad);
+        visible: front ? sn >= 0 : sn < 0;
+        x: cx + a * cs * c - b * sn * s - self.width / 2;
+        y: cy + a * cs * s + b * sn * c - self.height / 2;
+        width: 12px; height: 12px; border-radius: 6px;
+        background: ink.with-alpha(0.18 * lit + 0.04);
+        Rectangle {
+            width: 5.2px; height: 5.2px; border-radius: 2.6px;
+            background: ink.with-alpha(0.45 + 0.55 * lit);
+        }
+    }
+}
+
+export component Orb inherits Rectangle {
+    in property <float> lit;        // 0 off, 0.55 connecting, 1 connected
+    in property <float> angle;
+    in property <float> loader;     // 0..1, the running arc while connecting
+    in property <float> ripple: 1;  // 0..1 expanding ring after connecting; 1 = none
+    in property <float> pop: 1;
+    in property <color> ink: #ffffff;
+    callback clicked();
+
+    property <length> s: min(self.width, self.height);
+    property <length> cx: self.width / 2;
+    property <length> cy: self.height / 2;
+    property <length> r: s * 0.34 * pop;
+
+    // back halves of both rings, then the sphere, then the front halves
+    RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
+    RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
+
+    Image { source: @image-url("sphere-off.png"); x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; }
+    Image { source: @image-url("sphere-on.png"); opacity: lit; x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; }
+
+    RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
+    RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
+
+    // running arc while connecting: 80 degrees starting at 0.9 x the clock
+    Path {
+        x: 0; y: 0; width: parent.width; height: parent.height;
+        visible: loader > 0.01;
+        fill: transparent;
+        stroke: ink.with-alpha(0.85 * loader); stroke-width: 2.5px; stroke-line-cap: round;
+        property <float> ar: (r + 7px) / 1px;
+        property <float> mx: cx / 1px;
+        property <float> my: cy / 1px;
+        property <float> p0: angle * 0.9;
+        property <float> p1: p0 + 1.396;
+        MoveTo { x: parent.mx + parent.ar * Math.cos(parent.p0 * 1rad); y: parent.my + parent.ar * Math.sin(parent.p0 * 1rad); }
+        ArcTo {
+            x: parent.mx + parent.ar * Math.cos(parent.p1 * 1rad); y: parent.my + parent.ar * Math.sin(parent.p1 * 1rad);
+            radius-x: parent.ar; radius-y: parent.ar; sweep: true;
+        }
+    }
+
+    // the one ripple that leaves the sphere once connected
+    Rectangle {
+        visible: ripple < 1;
+        property <length> rr: r * (1.02 + 0.42 * ripple);
+        x: cx - rr; y: cy - rr; width: 2 * rr; height: 2 * rr; border-radius: rr;
+        border-width: 2.5px; border-color: #ffb27a.with-alpha(0.55 * (1 - ripple));
+    }
+
+    TouchArea { x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; clicked => { root.clicked(); } }
+}

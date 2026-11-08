@@ -1,51 +1,21 @@
+import { Orb } from "orb.slint";
+
 export component App inherits Window {
-    in property <float> angle: 0;
-    in property <float> lit: 0;
+    in property <float> angle;
+    in property <float> lit;
+    in property <float> loader;
+    in property <float> ripple: 1;
+    in property <float> pop: 1;
     in property <string> label: "Connect";
     callback toggle();
     width: 420px; height: 360px;
     title: "Ember prototype";
     background: #14161c;
 
-    // orb centre (210,170), sphere radius 100
-    property <length> cx: 210px;
-    property <length> cy: 170px;
-    property <length> r: 100px;
-
-    Rectangle {
-        x: cx - r; y: cy - r; width: 2 * r; height: 2 * r;
-        border-radius: r;
-        background: @radial-gradient(circle, #ffffff22 0%, transparent 60%);
+    Orb {
+        x: 60px; y: 10px; width: 300px; height: 300px;
+        lit: root.lit; angle: root.angle; loader: root.loader; ripple: root.ripple; pop: root.pop;
+        clicked => { root.toggle(); }
     }
-    Rectangle {
-        x: cx - r; y: cy - r; width: 2 * r; height: 2 * r;
-        border-radius: r;
-        clip: true;
-        Rectangle {
-            width: parent.width; height: parent.height;
-            background: @linear-gradient(180deg,
-                lit < 0.5 ? #7a8292 : #4e1cd6 0%,
-                lit < 0.5 ? #2b303b : #ce2496 45%,
-                lit < 0.5 ? #8a4a2a : #ffcd1e 100%);
-        }
-        Rectangle {
-            width: parent.width; height: parent.height;
-            border-radius: r; border-width: 1.5px; border-color: #ffffff40;
-        }
-    }
-    // two orbit rings
-    Path {
-        x: 0; y: 0; width: root.width; height: root.height;
-        stroke: #ffffffb0; stroke-width: 1.5px; fill: transparent;
-        commands: "M 73 231 A 150 42 -24 1 1 347 109 A 150 42 -24 1 1 73 231";
-        viewbox-width: 420; viewbox-height: 360;
-    }
-    // dot orbiting the tilted ring (tilt -24deg)
-    Rectangle {
-        width: 10px; height: 10px; border-radius: 5px; background: white;
-        x: cx + 150px * Math.cos(angle * 1deg) * Math.cos(-24deg) - 42px * Math.sin(angle * 1deg) * Math.sin(-24deg) - 5px;
-        y: cy + 150px * Math.cos(angle * 1deg) * Math.sin(-24deg) + 42px * Math.sin(angle * 1deg) * Math.cos(-24deg) - 5px;
-    }
-    TouchArea { x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; clicked => { root.toggle(); } }
-    Text { x: 0; y: 300px; width: root.width; horizontal-alignment: center; text: label; color: #e8eaf0; font-size: 18px; }
+    Text { x: 0; y: 315px; width: root.width; horizontal-alignment: center; text: label; color: #e8eaf0; font-size: 18px; }
 }
