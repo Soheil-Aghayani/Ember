@@ -43,6 +43,16 @@ fn flag(code: &str) -> Option<Image> {
     [beside_exe, Some(in_source)].into_iter().flatten().find(|p| p.exists()).and_then(|p| Image::load_from_path(&p).ok())
 }
 
+/// `--ports <socks> <http>`: other local proxy ports, so the Rust app can run beside the Kotlin app (which holds 10808).
+fn ports(args: &[String]) -> (u16, u16) {
+    let Some(i) = args.iter().position(|a| a == "--ports") else { return (SOCKS_PORT, HTTP_PORT) };
+    let number = |k: usize| args.get(i + k).and_then(|v| v.parse::<u16>().ok());
+    match (number(1), number(2)) {
+        (Some(socks), Some(http)) if socks != http => (socks, http),
+        _ => (SOCKS_PORT, HTTP_PORT),
+    }
+}
+
 fn duration(seconds: u64) -> String {
     format!("{:02}:{:02}:{:02}", seconds / 3600, seconds % 3600 / 60, seconds % 60)
 }
@@ -79,7 +89,7 @@ fn sync_rows(model: &VecModel<ServerRow>, rows: Vec<ServerRow>) {
 }
 
 /// Copies what the engine knows into the window.
-fn refresh(app: &App, engine: &Engine, model: &VecModel<ServerRow>, s: &strings::Strings) {
+fn refresh(app: &App, engine: &Engine, model: &VecModel<ServerRow>, s: &strings::Strings, ports: (u16, u16)) {
     let snap = engine.snapshot();
     let store = engine.store();
     let results = store.results();
@@ -147,7 +157,7 @@ fn refresh(app: &App, engine: &Engine, model: &VecModel<ServerRow>, s: &strings:
     app.set_caption(if connected {
         strings::fill(
             s.proxy_mode_caption,
-            &[("socks", &format!("{LOCAL_BIND}:{SOCKS_PORT}")), ("http", &format!("{LOCAL_BIND}:{HTTP_PORT}"))],
+            &[("socks", &format!("{LOCAL_BIND}:{}", ports.0)), ("http", &format!("{LOCAL_BIND}:{}", ports.1))],
         )
         .into()
     } else {
@@ -186,8 +196,10 @@ fn main() {
     // the engine tells us it changed from any thread; the timer below picks the flag up on the UI thread
     let dirty = Arc::new(AtomicBool::new(true));
     let flag_dirty = Arc::clone(&dirty);
-    let engine = Engine::new(&data_dir, backend::find_xray(), "en", false, move || flag_dirty.store(true, Ordering::SeqCst))
-        .expect("could not open Ember's data folder");
+    let ports = ports(&args);
+    let engine =
+        Engine::with_ports(&data_dir, backend::find_xray(), "en", false, ports, move || flag_dirty.store(true, Ordering::SeqCst))
+            .expect("could not open Ember's data folder");
     if !imported.is_empty() {
         ember_engine::log::info("Ember", &format!("first run: copied {} from the Kotlin app's folder", imported.join(" and ")));
     }
@@ -202,7 +214,7 @@ fn main() {
     let rows_model = Rc::new(VecModel::<ServerRow>::default());
     app.set_servers(ModelRc::from(rows_model.clone()));
     let text = strings::for_language(&language);
-    refresh(&app, &engine, &rows_model, text);
+    refresh(&app, &engine, &rows_model, text, ports);
     if has("--servers") {
         app.set_page(1);
     }
@@ -258,7 +270,7 @@ fn main() {
         let state = engine.snapshot().state;
         // refresh when the engine said something changed, and once a second while connected (the elapsed time)
         if dirty.swap(false, Ordering::SeqCst) || (state == ConnState::Connected && tick.is_multiple_of(30)) {
-            refresh(&app, engine, &rows_model, text);
+            refresh(&app, engine, &rows_model, text, ports);
         }
         // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
         let px = (176.0 * app.window().scale_factor()).round() as u32;
