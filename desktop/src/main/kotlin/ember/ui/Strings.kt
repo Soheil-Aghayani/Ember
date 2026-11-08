@@ -207,6 +207,9 @@ data class Strings(
     val restoreConfirm: (String) -> String,
     val backupSaved: (String) -> String,
     val backupFailed: (String) -> String,
+    val copyReport: String,
+    val copyReportHint: String,
+    val reportCopied: String,
 )
 
 val EnglishStrings = Strings(
@@ -413,6 +416,9 @@ val EnglishStrings = Strings(
     restoreConfirm = { name -> "Replace your subscriptions and settings with the ones in $name? Ember disconnects and restarts." },
     backupSaved = { name -> "Saved $name." },
     backupFailed = { reason -> "That did not work: $reason" },
+    copyReport = "Copy report",
+    copyReportHint = "A short report to paste when asking for help: versions, this computer and the recent log. Server links, account ids and IP addresses are removed first.",
+    reportCopied = "Report copied.",
 )
 
 val PersianStrings = Strings(
@@ -619,6 +625,9 @@ val PersianStrings = Strings(
     restoreConfirm = { name -> "اشتراک‌ها و تنظیمات فعلی با موارد داخل $name جایگزین شوند؟ Ember قطع می‌شود و دوباره راه می‌افتد." },
     backupSaved = { name -> "$name ذخیره شد." },
     backupFailed = { reason -> "انجام نشد: $reason" },
+    copyReport = "کپی گزارش",
+    copyReportHint = "گزارشی کوتاه برای فرستادن هنگام کمک‌خواهی: نسخه‌ها، این رایانه و گزارش اخیر. لینک سرورها، شناسهٔ حساب و نشانی‌های IP از آن حذف می‌شود.",
+    reportCopied = "گزارش کپی شد.",
 )
 
 val LocalStrings = staticCompositionLocalOf { EnglishStrings }

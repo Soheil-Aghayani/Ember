@@ -53,6 +53,11 @@ class RenderPreviewTest {
             val theme = if (dark) "dark" else "light"
             render(dir, "whats-new-$theme", dark) { WhatsNewPage("en") }
             render(dir, "about-$theme", dark) { AboutPage() }
+            render(dir, "logs-$theme", dark, height = 420) {
+                com.soheil.ember.data.AppLogger.i("Xray", "started xray.exe (pid 12584)")
+                com.soheil.ember.data.AppLogger.w("NodeTester", "could not look up sv0.example.ir")
+                LogsPage()
+            }
             render(dir, "backup-$theme", dark, height = 360) {
                 Text(EnglishStrings.backupTitle, style = MaterialTheme.typography.headlineMedium)
                 BackupSettings {}

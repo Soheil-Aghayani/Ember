@@ -39,7 +39,6 @@ import com.soheil.ember.data.model.ConnectionState
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -75,15 +74,16 @@ internal fun GlassOrb(
         var last = 0L
         while (true) {
             withFrameNanos { now ->
-                if (last != 0L) {
+                if (last == 0L) last = now
+                // Every other frame (about 30 a second) is smooth for this motion, and the nearly still disconnected orb
+                // needs only about 20. A frame that changes nothing is not redrawn, which is what saves the work.
+                else if (now - last >= (if (speedNow < 0.2f) 45_000_000L else 30_000_000L)) {
                     val dt = ((now - last) / 1e9f).coerceAtMost(0.1f)
                     angle = (angle + dt * speedNow) % LOOP
                     clock = (clock + dt) % LOOP
+                    last = now
                 }
-                last = now
             }
-            // every other frame (about 30 a second) is smooth for this motion; the nearly still disconnected orb needs only about 15
-            delay(if (speedNow < 0.2f) 50 else 16)
         }
     }
     val ripple = remember { Animatable(1f) }

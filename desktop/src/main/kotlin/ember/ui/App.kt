@@ -104,6 +104,7 @@ import com.soheil.ember.data.formatBytesPerSecond
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.vpn.tun.HevSocks5TunnelConfig
 import ember.engine.Autostart
+import ember.engine.Diagnostics
 import ember.engine.EmberEngine
 import ember.subs.AUTO_NODE
 import ember.subs.ProxyNode
@@ -588,7 +589,7 @@ private fun formatDuration(seconds: Long): String {
 private enum class LogFilter { All, Info, Problems }
 
 @Composable
-private fun LogsPage() {
+internal fun LogsPage() {
     val strings = LocalStrings.current
     val entries by AppLogger.entries.collectAsState()
     var filter by remember { mutableStateOf(LogFilter.All) }
@@ -621,7 +622,13 @@ private fun LogsPage() {
             toaster.show(strings.copied, ToastKind.Success)
         }, enabled = lines.isNotEmpty())
         IconAction("trash", strings.clear, onClick = { AppLogger.clear() }, enabled = entries.isNotEmpty())
+        TextButton(onClick = {
+            val recent = entries.takeLast(120).map { "${dateFormat.format(Date(it.timestampMillis))} ${it.level} [${it.tag}] ${it.message}" }
+            clipboard.setText(AnnotatedString(Diagnostics.report(System.getProperty("jpackage.app-version"), recent)))
+            toaster.show(strings.reportCopied, ToastKind.Success)
+        }) { Text(strings.copyReport) }
     }
+    Text(strings.copyReportHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(12.dp))
     Card {
         SelectionContainer {

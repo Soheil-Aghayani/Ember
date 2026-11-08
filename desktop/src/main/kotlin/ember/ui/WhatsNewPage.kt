@@ -21,6 +21,15 @@ internal class Release(val version: String, val en: List<String>, val fa: List<S
 /** Newest first. Add the entry for a version in the build that ships it. */
 internal val Releases = listOf(
     Release(
+        "1.0.101",
+        listOf(
+            "Logs now has Copy report: version, this computer and the recent log in one paste for asking for help. Server links, account ids and IP addresses are removed first.",
+        ),
+        listOf(
+            "در بخش گزارش‌ها دکمهٔ «کپی گزارش» اضافه شد: نسخه، مشخصات رایانه و گزارش اخیر در یک بار چسباندن. لینک سرورها، شناسهٔ حساب و نشانی‌های IP از آن حذف می‌شود.",
+        ),
+    ),
+    Release(
         "1.0.100",
         listOf(
             "Backup and restore (Settings, More): save your subscriptions and settings to one file and put them back on this or another computer. The file contains your account keys, so keep it private.",
