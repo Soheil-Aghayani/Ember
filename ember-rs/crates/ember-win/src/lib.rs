@@ -1,4 +1,4 @@
-﻿//! Windows integration for Ember (port of the Windows parts of `desktop/.../engine/` and `Main.kt`).
+//! Windows integration for Ember (port of the Windows parts of `desktop/.../engine/` and `Main.kt`).
 //!
 //! Everything that changes the machine (scheduled tasks, the elevated helper, OpenVPN, sing-box) goes through a thin
 //! function that runs a program or a Win32 call; the logic around it (command lines, scripts, config JSON, parsing
@@ -6,6 +6,7 @@
 
 pub mod app_routing;
 pub mod autostart;
+pub mod clock;
 pub mod network_identity;
 pub mod openvpn;
 pub mod paths;

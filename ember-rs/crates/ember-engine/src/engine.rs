@@ -115,6 +115,7 @@ impl Engine {
         on_change: impl Fn() + Send + Sync + 'static,
     ) -> std::io::Result<Engine> {
         std::fs::create_dir_all(data_dir)?;
+        log::set_utc_offset_minutes(ember_win::clock::utc_offset_minutes());
         log::init(data_dir.join("ember.log"));
         let settings = Settings::open(&data_dir.join("settings.properties"), system_language);
         let store = SubscriptionStore::open(&data_dir.join("subscriptions.json"));

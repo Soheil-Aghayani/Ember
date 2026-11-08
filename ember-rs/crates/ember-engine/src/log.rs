@@ -5,6 +5,7 @@ use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 const KEEP: usize = 2000;
@@ -50,6 +51,13 @@ struct Logger {
     file: Option<PathBuf>,
 }
 
+/// Minutes the log's clock is ahead of UTC; the engine sets it from the computer's time zone when it starts.
+static UTC_OFFSET_MINUTES: AtomicI32 = AtomicI32::new(0);
+
+pub fn set_utc_offset_minutes(minutes: i32) {
+    UTC_OFFSET_MINUTES.store(minutes, Ordering::Relaxed);
+}
+
 static LOGGER: Mutex<Logger> = Mutex::new(Logger { entries: VecDeque::new(), file: None });
 
 fn lock() -> std::sync::MutexGuard<'static, Logger> {
@@ -64,8 +72,13 @@ pub fn init(file: PathBuf) {
     lock().file = Some(file);
 }
 
-/// `2026-11-08T23:41:05.123` in UTC (the Kotlin app writes local time; a time-zone crate is not worth it here).
+/// `2026-11-08T23:41:05.123` on the computer's clock (see [`set_utc_offset_minutes`]).
 pub fn format_time(ms: i64) -> String {
+    format_clock(ms + i64::from(UTC_OFFSET_MINUTES.load(Ordering::Relaxed)) * 60_000)
+}
+
+/// The same for a time already shifted to the wanted zone.
+fn format_clock(ms: i64) -> String {
     let secs = ms.div_euclid(1000);
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);

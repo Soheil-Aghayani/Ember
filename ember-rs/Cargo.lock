@@ -899,6 +899,8 @@ name = "ember-engine"
 version = "0.1.0"
 dependencies = [
  "ember-subs",
+ "ember-win",
+ "regex",
  "serde_json",
 ]
 

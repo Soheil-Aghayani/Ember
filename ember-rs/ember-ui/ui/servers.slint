@@ -204,7 +204,7 @@ export component ServersPage inherits Rectangle {
                 height: 250px;
                 VerticalLayout {
                     alignment: center; spacing: 12px; padding: 24px;
-                    Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 48px; height: 48px; }
+                    HRow { alignment: center; height: 48px; Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 48px; height: 48px; } }
                     Label { text: Tr.empty-title; font-size: Type.body-large; font-weight: 600; horizontal-alignment: center; }
                     Label { text: Tr.empty-text; muted: true; font-size: Type.body-small; wrap: word-wrap; horizontal-alignment: center; }
                     HRow {

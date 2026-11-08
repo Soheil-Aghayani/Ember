@@ -10,6 +10,10 @@ export global Palette {
     in property <bool> rtl: false;
     out property <color> primary: dark ? #ff8d5c : #9c3107;
     out property <color> on-primary: dark ? #1a1714 : #ffffff;
+    out property <color> inverse-surface: dark ? #f3eee6 : #2f2a24;
+    out property <color> inverse-on: dark ? #2b2620 : #f5efe6;
+    out property <color> toast-ok: dark ? #14301d : #ddf1e2;
+    out property <color> toast-bad: dark ? #5c1a14 : #ffdad6;
     out property <color> on-surface: dark ? #f3eee6 : #1f1b16;
     out property <color> on-variant: dark ? #cdc5ba : #534c44;
     out property <color> tertiary: dark ? #5fd17f : #1e7a3c;
@@ -51,6 +55,8 @@ export global Icons {
     out property <image> power: @image-url("assets/icons/power.svg");
     out property <image> stop: @image-url("assets/icons/stop.svg");
     out property <image> refresh: @image-url("assets/icons/refresh.svg");
+    out property <image> warning: @image-url("assets/icons/warning.svg");
+    out property <image> copy: @image-url("assets/icons/copy.svg");
     out property <image> clipboard: @image-url("assets/icons/clipboard.svg");
     out property <image> close: @image-url("assets/icons/close.svg");
     out property <image> trash: @image-url("assets/icons/trash.svg");
@@ -104,4 +110,13 @@ export global Tr {
     in property <string> save: "Save";
     in property <string> cancel: "Cancel";
     in property <string> test-needs-disconnect: "Disconnect to test the servers.";
+    in property <string> all-logs: "All";
+    in property <string> info-logs: "Info";
+    in property <string> problem-logs: "Problems";
+    in property <string> copy: "Copy";
+    in property <string> clear: "Clear";
+    in property <string> copy-report: "Copy report";
+    in property <string> copy-report-hint: "";
+    in property <string> empty-logs-title: "Nothing logged yet";
+    in property <string> empty-logs-text: "";
 }

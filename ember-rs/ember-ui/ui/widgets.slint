@@ -68,7 +68,7 @@ export component Button inherits Rectangle {
     background: primary ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
     opacity: enabled ? 1 : 0.45;
     label := Label {
-        x: 16px; width: parent.width - 32px; text: root.text;
+        x: 16px; y: 0px; width: parent.width - 32px; height: parent.height; text: root.text;
         font-size: Type.body-medium; font-weight: 500;
         color: primary ? Palette.on-primary : Palette.primary;
         horizontal-alignment: center;

@@ -1,4 +1,5 @@
 mod backend;
+mod logs;
 mod servers;
 mod sphere;
 mod strings;
@@ -204,7 +205,82 @@ fn apply_language(app: &App, language: &str) {
     tr.set_save(s.save.into());
     tr.set_cancel(s.cancel.into());
     tr.set_test_needs_disconnect(s.test_needs_disconnect.into());
+    tr.set_all_logs(s.all_logs.into());
+    tr.set_info_logs(s.info_logs.into());
+    tr.set_problem_logs(s.problem_logs.into());
+    tr.set_copy(s.copy.into());
+    tr.set_clear(s.clear.into());
+    tr.set_copy_report(s.copy_report.into());
+    tr.set_copy_report_hint(s.copy_report_hint.into());
+    tr.set_empty_logs_title(s.empty_logs_title.into());
+    tr.set_empty_logs_text(s.empty_logs.into());
 }
+
+/// A short message at the bottom of the window.
+fn show_toast(app: &App, generation: &Arc<AtomicU32>, text: &str, error: bool) {
+    let mine = generation.fetch_add(1, Ordering::SeqCst) + 1;
+    app.set_toast(text.into());
+    app.set_toast_error(error);
+    let (weak, generation) = (app.as_weak(), Arc::clone(generation));
+    // errors stay a little longer, as in the Kotlin app
+    let seconds = if error { 5 } else { 3 } + (text.len() as u64 / 40).min(4);
+    slint::Timer::single_shot(Duration::from_secs(seconds), move || {
+        if generation.load(Ordering::SeqCst) == mine {
+            if let Some(app) = weak.upgrade() {
+                app.set_toast(SharedString::new());
+            }
+        }
+    });
+}
+
+fn set_clipboard(text: &str) -> bool {
+    arboard::Clipboard::new().and_then(|mut c| c.set_text(text.to_string())).is_ok()
+}
+
+/// The Logs page's buttons.
+fn wire_logs_page(app: &App, ui: &Rc<logs::LogsUi>, text: &'static strings::Strings) {
+    let toasts = Arc::new(AtomicU32::new(0));
+    {
+        let (ui, weak) = (Rc::clone(ui), app.as_weak());
+        app.on_log_filter_changed(move |_| {
+            if let Some(app) = weak.upgrade() {
+                logs::apply(&app, &ui, true);
+            }
+        });
+    }
+    {
+        let (weak, toasts) = (app.as_weak(), Arc::clone(&toasts));
+        app.on_copy_logs(move || {
+            let Some(app) = weak.upgrade() else { return };
+            let lines = logs::filtered(app.get_log_filter());
+            if set_clipboard(&lines.join("\n")) {
+                show_toast(&app, &toasts, text.copied, false);
+            }
+        });
+    }
+    {
+        let (ui, weak) = (Rc::clone(ui), app.as_weak());
+        app.on_clear_logs(move || {
+            ember_engine::log::clear();
+            if let Some(app) = weak.upgrade() {
+                logs::apply(&app, &ui, true);
+            }
+        });
+    }
+    {
+        let (weak, toasts) = (app.as_weak(), Arc::clone(&toasts));
+        app.on_copy_report(move || {
+            let Some(app) = weak.upgrade() else { return };
+            let entries = ember_engine::log::entries();
+            let recent: Vec<String> = entries[entries.len().saturating_sub(120)..].iter().map(logs::line).collect();
+            let report = ember_engine::diagnostics::report(env!("CARGO_PKG_VERSION"), &ember_engine::diagnostics::system_lines("software"), &recent);
+            if set_clipboard(&report) {
+                show_toast(&app, &toasts, text.report_copied, false);
+            }
+        });
+    }
+}
+
 
 /// Shows a message at the top of the Servers page for a few seconds.
 fn show_notice(app: &App, generation: &Arc<AtomicU32>, text: SharedString, error: bool) {
@@ -374,6 +450,8 @@ fn main() {
     let text = strings::for_language(&language);
     let servers_ui = Rc::new(servers::ServersUi::default());
     wire_servers_page(&app, &engine, &servers_ui, &dirty, text);
+    let logs_ui = Rc::new(logs::LogsUi::default());
+    wire_logs_page(&app, &logs_ui, text);
     if has("--expand") {
         for sub in engine.store().subscriptions() {
             servers_ui.expanded.borrow_mut().insert(sub.id);
@@ -383,6 +461,18 @@ fn main() {
     servers::apply(&app, &engine, text, &servers_ui);
     if has("--servers") {
         app.set_page(1);
+    }
+    if has("--logs") {
+        app.set_page(3);
+    }
+    if has("--demo-log") {
+        // made-up values only; they let the redaction of the copied report be checked
+        use ember_engine::log::{error, info, warn};
+        info("Xray", "started xray.exe (pid 12584)");
+        info("EmberEngine", "connected via a vless server (proxy mode) after 789 ms");
+        warn("NodeTester", "could not look up sv0.example.ir");
+        warn("Subscriptions", "retrying vless://11111111-2222-3333-4444-555555555555@fdh11.example.top:8080?security=reality#UK for 203.0.113.7");
+        error("EmberEngine", "connecting failed: key 3q2-9Ab_cdEFghIJklMNopQRstUVwxYZ012345 was refused");
     }
 
     {
@@ -438,6 +528,10 @@ fn main() {
             engine.connect_selected();
         }
         let state = engine.snapshot().state;
+        // the log page follows the log twice a second while it is open
+        if tick.is_multiple_of(15) && app.get_page() == 3 {
+            logs::apply(&app, &logs_ui, false);
+        }
         // refresh when the engine said something changed, and once a second while connected (the elapsed time)
         if dirty.swap(false, Ordering::SeqCst) || (state == ConnState::Connected && tick.is_multiple_of(30)) {
             refresh(&app, engine, &rows_model, text, ports);

@@ -5,6 +5,7 @@
 //! This first slice connects in proxy mode only (Xray on a local SOCKS5 and HTTP port). Whole-device mode, app rules
 //! and OpenVPN answer with a clear "not available in this build yet" until they are wired to `ember-win`.
 
+pub mod diagnostics;
 pub mod engine;
 pub mod log;
 pub mod settings;

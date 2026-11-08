@@ -1,0 +1,73 @@
+// The Logs page. Port of LogsPage in desktop/.../ui/App.kt: a filter, copy, clear, a redacted report for asking for help,
+// and the recent log, newest first. Only the newest lines are drawn (the log can hold thousands); copying takes all of them.
+import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Card, Label, IconAction, HRow, Button } from "widgets.slint";
+
+component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected;
+    callback clicked();
+    horizontal-stretch: 0;
+    height: 32px;
+    width: label.preferred-width + 32px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: selected ? Palette.primary : Palette.outline-variant;
+    background: selected ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.08) : transparent);
+    label := Label {
+        x: 16px; y: 0px; width: parent.width - 32px; height: parent.height; text: root.text;
+        font-size: Type.body-small; font-weight: 500;
+        color: selected ? Palette.primary : Palette.on-surface; horizontal-alignment: center;
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component LogsPage inherits Rectangle {
+    in property <[string]> lines;
+    in property <bool> has-entries;
+    in-out property <int> filter: 0;      // 0 all, 1 info, 2 problems
+    callback filter-changed(int);
+    callback copy();
+    callback clear();
+    callback copy-report();
+
+    Flickable {
+        content-height: page.preferred-height + 48px;
+        page := VerticalLayout {
+            y: 0px; padding-top: 32px; padding-bottom: 16px; alignment: start;
+            Label { text: Tr.logs; font-size: Type.headline-large; font-weight: 700; height: 40px; }
+            Rectangle { height: 16px; }
+            HRow {
+                alignment: start; height: 32px; spacing: 8px;
+                Chip { text: Tr.all-logs; selected: root.filter == 0; clicked => { root.filter = 0; root.filter-changed(0); } }
+                Chip { text: Tr.info-logs; selected: root.filter == 1; clicked => { root.filter = 1; root.filter-changed(1); } }
+                Chip { text: Tr.problem-logs; selected: root.filter == 2; clicked => { root.filter = 2; root.filter-changed(2); } }
+            }
+            Rectangle { height: 4px; }
+            HRow {
+                alignment: start; cross-axis-alignment: stretch; height: 40px; spacing: 4px;
+                IconAction { icon: Icons.copy; caption: Tr.copy; enabled: lines.length > 0; clicked => { root.copy(); } }
+                IconAction { icon: Icons.trash; caption: Tr.clear; enabled: has-entries; clicked => { root.clear(); } }
+                Button { text: Tr.copy-report; clicked => { root.copy-report(); } }
+            }
+            Label { text: Tr.copy-report-hint; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+            Rectangle { height: 12px; }
+            Card {
+                height: body.preferred-height;
+                body := VerticalLayout {
+                    padding: 16px; spacing: 8px;
+                    if lines.length == 0 : VerticalLayout {
+                        alignment: center; spacing: 10px; padding-top: 12px; padding-bottom: 12px;
+                        HRow { alignment: center; height: 40px; Image { source: Icons.logs; colorize: Palette.on-variant; width: 40px; height: 40px; } }
+                        Label { text: Tr.empty-logs-title; font-size: Type.body-large; font-weight: 600; horizontal-alignment: center; }
+                        Label { text: Tr.empty-logs-text; muted: true; font-size: Type.body-small; horizontal-alignment: center; }
+                    }
+                    for line in lines : Label {
+                        text: line; font-family: "Consolas"; font-size: Type.body-small; wrap: word-wrap;
+                        horizontal-alignment: left;   // log lines stay left to right in every language
+                    }
+                }
+            }
+        }
+    }
+}
