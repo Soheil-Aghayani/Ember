@@ -2,7 +2,8 @@
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
 import { Label, HRow } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
-export { Palette, Motion, Tr, ServerRow }
+import { ServersPage, SubRow, NodeRow } from "servers.slint";
+export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow }
 
 component NavItem inherits Rectangle {
     in property <image> icon;
@@ -42,6 +43,22 @@ export component App inherits Window {
     callback choose(string);
     callback test-speed();
     callback cancel-test();
+    in property <[SubRow]> subs;
+    in property <string> page-notice;
+    in property <bool> page-notice-error;
+    in property <bool> dialog-busy;
+    in property <string> dialog-error;
+    in property <int> dialog-done;
+    in property <int> dialog-request;
+    in property <string> pasted-text;
+    in property <int> paste-serial;
+    callback paste-request();
+    callback toggle-expanded(string);
+    callback favorite(string);
+    callback test-subscription(string);
+    callback refresh-subscription(string);
+    callback remove-subscription(string);
+    callback submit-subscription(string, string, string);
 
     title: "Ember";
     default-font-family: Type.family;
@@ -90,7 +107,22 @@ export component App inherits Window {
                     test-speed => { root.test-speed(); }
                     cancel-test => { root.cancel-test(); }
                 }
-                if page != 0 : Label {
+                if page == 1 : ServersPage {
+                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    subs: root.subs; testing: root.testing; can-test: root.can-pick; test-progress: root.test-progress;
+                    notice: root.page-notice; notice-error: root.page-notice-error;
+                    dialog-busy: root.dialog-busy; dialog-error: root.dialog-error; dialog-done: root.dialog-done; dialog-request: root.dialog-request; pasted-text: root.pasted-text; paste-serial: root.paste-serial;
+                    toggle-expanded(id) => { root.toggle-expanded(id); }
+                    select(id) => { root.choose(id); }
+                    favorite(id) => { root.favorite(id); }
+                    test(id) => { root.test-subscription(id); }
+                    stop-test => { root.cancel-test(); }
+                    refresh(id) => { root.refresh-subscription(id); }
+                    remove(id) => { root.remove-subscription(id); }
+                    submit(id, link, name) => { root.submit-subscription(id, link, name); }
+                    paste-request => { root.paste-request(); }
+                }
+                if page > 1 : Label {
                     x: 32px; y: 32px; width: parent.width - 64px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;
                 }
             }

@@ -9,6 +9,7 @@ export global Palette {
     // right-to-left languages (Persian): the whole window is mirrored, then text and pictures are flipped back
     in property <bool> rtl: false;
     out property <color> primary: dark ? #ff8d5c : #9c3107;
+    out property <color> on-primary: dark ? #1a1714 : #ffffff;
     out property <color> on-surface: dark ? #f3eee6 : #1f1b16;
     out property <color> on-variant: dark ? #cdc5ba : #534c44;
     out property <color> tertiary: dark ? #5fd17f : #1e7a3c;
@@ -50,6 +51,13 @@ export global Icons {
     out property <image> power: @image-url("assets/icons/power.svg");
     out property <image> stop: @image-url("assets/icons/stop.svg");
     out property <image> refresh: @image-url("assets/icons/refresh.svg");
+    out property <image> clipboard: @image-url("assets/icons/clipboard.svg");
+    out property <image> close: @image-url("assets/icons/close.svg");
+    out property <image> trash: @image-url("assets/icons/trash.svg");
+    out property <image> edit: @image-url("assets/icons/edit.svg");
+    out property <image> plus: @image-url("assets/icons/plus.svg");
+    out property <image> star-filled: @image-url("assets/icons/star-filled.svg");
+    out property <image> star: @image-url("assets/icons/star.svg");
 }
 
 /// Where the orb's motion comes from: set by the engine side several times a second, read by the orb.
@@ -75,4 +83,25 @@ export global Tr {
     in property <string> stop-test: "Stop the test";
     in property <string> fastest-server: "Fastest server";
     in property <string> manage-servers: "Manage servers";
+    in property <string> subscriptions: "Subscriptions";
+    in property <string> subscriptions-help: "";
+    in property <string> add-servers: "Add servers";
+    in property <string> add-link: "Add link";
+    in property <string> paste-clipboard: "Add from the clipboard";
+    in property <string> empty-title: "No servers yet";
+    in property <string> empty-text: "";
+    in property <string> refresh: "Refresh";
+    in property <string> edit: "Edit";
+    in property <string> remove: "Remove";
+    in property <string> expand: "Show servers";
+    in property <string> collapse: "Hide servers";
+    in property <string> no-answer: "No answer";
+    in property <string> favorite: "Favourite";
+    in property <string> link-label: "Subscription link (https://...) or server links";
+    in property <string> name-label: "Name (optional)";
+    in property <string> adding: "Adding...";
+    in property <string> saving: "Saving...";
+    in property <string> save: "Save";
+    in property <string> cancel: "Cancel";
+    in property <string> test-needs-disconnect: "Disconnect to test the servers.";
 }

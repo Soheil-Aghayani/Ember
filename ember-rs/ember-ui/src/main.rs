@@ -1,4 +1,5 @@
 mod backend;
+mod servers;
 mod sphere;
 mod strings;
 
@@ -10,7 +11,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -36,7 +37,7 @@ fn approach(v: f32, target: f32, dt: f32, seconds: f32) -> f32 {
 }
 
 /// A round flag from the bundled circle-flags set: next to the exe in an install, in the source tree when developing.
-fn flag(code: &str) -> Option<Image> {
+pub(crate) fn flag(code: &str) -> Option<Image> {
     let name = format!("flags/{}.svg", code.to_lowercase());
     let beside_exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(&name)));
     let in_source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ui/assets").join(&name);
@@ -182,6 +183,163 @@ fn apply_language(app: &App, language: &str) {
     tr.set_stop_test(s.stop_test.into());
     tr.set_fastest_server(s.fastest_server.into());
     tr.set_manage_servers(s.manage_servers.into());
+    tr.set_subscriptions(s.subscriptions.into());
+    tr.set_subscriptions_help(s.subscriptions_help.into());
+    tr.set_add_servers(s.add_servers.into());
+    tr.set_add_link(s.add_subscription.into());
+    tr.set_paste_clipboard(s.paste_from_clipboard.into());
+    tr.set_empty_title(s.empty_servers_title.into());
+    tr.set_empty_text(s.no_subscriptions.into());
+    tr.set_refresh(s.refresh.into());
+    tr.set_edit(s.edit_subscription.into());
+    tr.set_remove(s.remove_subscription.into());
+    tr.set_expand(s.expand.into());
+    tr.set_collapse(s.collapse.into());
+    tr.set_no_answer(s.no_answer.into());
+    tr.set_favorite(s.favorite.into());
+    tr.set_link_label(s.subscription_link.into());
+    tr.set_name_label(s.subscription_name_optional.into());
+    tr.set_adding(s.adding.into());
+    tr.set_saving(s.saving.into());
+    tr.set_save(s.save.into());
+    tr.set_cancel(s.cancel.into());
+    tr.set_test_needs_disconnect(s.test_needs_disconnect.into());
+}
+
+/// Shows a message at the top of the Servers page for a few seconds.
+fn show_notice(app: &App, generation: &Arc<AtomicU32>, text: SharedString, error: bool) {
+    let mine = generation.fetch_add(1, Ordering::SeqCst) + 1;
+    app.set_page_notice(text);
+    app.set_page_notice_error(error);
+    let (weak, generation) = (app.as_weak(), Arc::clone(generation));
+    slint::Timer::single_shot(Duration::from_secs(6), move || {
+        if generation.load(Ordering::SeqCst) == mine {
+            if let Some(app) = weak.upgrade() {
+                app.set_page_notice(SharedString::new());
+            }
+        }
+    });
+}
+
+fn lock_set(set: &std::sync::Mutex<std::collections::HashSet<String>>) -> std::sync::MutexGuard<'_, std::collections::HashSet<String>> {
+    set.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The Servers page's buttons.
+fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, dirty: &Arc<AtomicBool>, text: &'static strings::Strings) {
+    let notices = Arc::new(AtomicU32::new(0));
+    {
+        let (ui, dirty) = (Rc::clone(ui), Arc::clone(dirty));
+        app.on_toggle_expanded(move |id| {
+            {
+                let mut open = ui.expanded.borrow_mut();
+                if !open.remove(id.as_str()) {
+                    open.insert(id.to_string());
+                }
+            }
+            ui.invalidate();
+            dirty.store(true, Ordering::SeqCst);
+        });
+    }
+    {
+        let (engine, dirty) = (engine.clone(), Arc::clone(dirty));
+        app.on_favorite(move |id| {
+            if let Some(node) = engine.store().node_by_id(&id) {
+                engine.toggle_favorite(&node);
+                dirty.store(true, Ordering::SeqCst);
+            }
+        });
+    }
+    {
+        let engine = engine.clone();
+        app.on_test_subscription(move |id| {
+            if let Some(sub) = engine.store().subscriptions().into_iter().find(|s| s.id == id.as_str()) {
+                engine.test_nodes(sub.nodes);
+            }
+        });
+    }
+    {
+        let (engine, ui, dirty, notices, weak) = (engine.clone(), Rc::clone(ui), Arc::clone(dirty), Arc::clone(&notices), app.as_weak());
+        let refreshing = Arc::clone(&ui.refreshing);
+        app.on_refresh_subscription(move |id| {
+            let id = id.to_string();
+            lock_set(&refreshing).insert(id.clone());
+            ui.invalidate();
+            dirty.store(true, Ordering::SeqCst);
+            let (engine, dirty, notices, weak, refreshing) =
+                (engine.clone(), Arc::clone(&dirty), Arc::clone(&notices), weak.clone(), Arc::clone(&refreshing));
+            std::thread::spawn(move || {
+                let outcome = engine.store().refresh(&id);
+                lock_set(&refreshing).remove(&id);
+                dirty.store(true, Ordering::SeqCst);
+                let _ = weak.upgrade_in_event_loop(move |app| match outcome {
+                    Ok(()) => show_notice(&app, &notices, text.updated.into(), false),
+                    Err(e) => show_notice(&app, &notices, e.into(), true),
+                });
+            });
+        });
+    }
+    {
+        let (engine, ui, dirty) = (engine.clone(), Rc::clone(ui), Arc::clone(dirty));
+        app.on_remove_subscription(move |id| {
+            let store = engine.store();
+            let selected = engine.snapshot().selected_id;
+            if store.subscriptions().iter().any(|s| s.id == id.as_str() && s.nodes.iter().any(|n| n.id == selected)) {
+                engine.choose_server("");
+            }
+            store.remove(&id);
+            ui.invalidate();
+            dirty.store(true, Ordering::SeqCst);
+        });
+    }
+    {
+        let weak = app.as_weak();
+        let serial = std::cell::Cell::new(0);
+        app.on_paste_request(move || {
+            let Some(app) = weak.upgrade() else { return };
+            let clipboard = arboard::Clipboard::new().and_then(|mut c| c.get_text()).unwrap_or_default();
+            let clipboard = clipboard.trim();
+            if clipboard.is_empty() {
+                app.set_dialog_error(text.clipboard_empty.into());
+                return;
+            }
+            app.set_dialog_error(SharedString::new());
+            app.set_pasted_text(clipboard.into());
+            serial.set(serial.get() + 1);
+            app.set_paste_serial(serial.get());
+        });
+    }
+    {
+        let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(dirty), Arc::clone(&notices), app.as_weak());
+        let done = Arc::new(AtomicU32::new(0));
+        app.on_submit_subscription(move |id, link, name| {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_dialog_busy(true);
+            app.set_dialog_error(SharedString::new());
+            let (id, link, name) = (id.to_string(), link.to_string(), name.to_string());
+            let (engine, dirty, notices, weak, done) = (engine.clone(), Arc::clone(&dirty), Arc::clone(&notices), weak.clone(), Arc::clone(&done));
+            std::thread::spawn(move || {
+                // adding reads the link over the network, so it happens off the window's thread
+                let outcome = if id.is_empty() {
+                    engine.store().add(&link, &name).map(|sub| sub.nodes.iter().filter(|n| !n.is_info()).count())
+                } else {
+                    engine.store().update(&id, &name, &link).map(|_| 0)
+                };
+                dirty.store(true, Ordering::SeqCst);
+                let _ = weak.upgrade_in_event_loop(move |app| {
+                    app.set_dialog_busy(false);
+                    match outcome {
+                        Ok(count) => {
+                            app.set_dialog_done(done.fetch_add(1, Ordering::SeqCst) as i32 + 1);
+                            let message = if id.is_empty() { servers::added_message(text, count) } else { text.updated.into() };
+                            show_notice(&app, &notices, message, false);
+                        }
+                        Err(e) => app.set_dialog_error(e.into()),
+                    }
+                });
+            });
+        });
+    }
 }
 
 fn main() {
@@ -214,7 +372,15 @@ fn main() {
     let rows_model = Rc::new(VecModel::<ServerRow>::default());
     app.set_servers(ModelRc::from(rows_model.clone()));
     let text = strings::for_language(&language);
+    let servers_ui = Rc::new(servers::ServersUi::default());
+    wire_servers_page(&app, &engine, &servers_ui, &dirty, text);
+    if has("--expand") {
+        for sub in engine.store().subscriptions() {
+            servers_ui.expanded.borrow_mut().insert(sub.id);
+        }
+    }
     refresh(&app, &engine, &rows_model, text, ports);
+    servers::apply(&app, &engine, text, &servers_ui);
     if has("--servers") {
         app.set_page(1);
     }
@@ -256,6 +422,7 @@ fn main() {
     let mut tick = 0u32;
     let mut sprite_px = 0u32;
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
+    let dialog_at: u32 = if has("--dialog") { 40 } else { 0 }; // debug: open the add dialog after about a second
     let connect_at: u32 = if has("--connect") { 45 } else { 0 }; // debug: press Connect after about 1.5 seconds
     timer.start(slint::TimerMode::Repeated, Duration::from_millis(33), move || {
         let app = weak.unwrap();
@@ -264,6 +431,9 @@ fn main() {
         if menu_at != 0 && tick == menu_at {
             app.set_menu_request(1);
         }
+        if dialog_at != 0 && tick == dialog_at {
+            app.set_dialog_request(1);
+        }
         if connect_at != 0 && tick == connect_at {
             engine.connect_selected();
         }
@@ -271,6 +441,7 @@ fn main() {
         // refresh when the engine said something changed, and once a second while connected (the elapsed time)
         if dirty.swap(false, Ordering::SeqCst) || (state == ConnState::Connected && tick.is_multiple_of(30)) {
             refresh(&app, engine, &rows_model, text, ports);
+            servers::apply(&app, engine, text, &servers_ui);
         }
         // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
         let px = (176.0 * app.window().scale_factor()).round() as u32;

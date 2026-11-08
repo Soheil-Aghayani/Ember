@@ -38,15 +38,67 @@ export component IconAction inherits Rectangle {
     in property <image> icon;
     in property <string> caption;
     in property <bool> enabled: true;
+    in property <bool> filled: false;
+    in property <brush> tint: Palette.primary;
     callback clicked();
+    horizontal-stretch: 0;
     height: 36px;
-    width: row.preferred-width + 20px;
+    // an icon-only button is a 36 px square; with a caption it is as wide as its content
+    width: caption == "" ? 36px : row.preferred-width + 20px;
     border-radius: 10px;
-    background: touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent;
+    background: filled ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
     row := HRow {
         pad-start: 10px; pad-end: 10px; spacing: 8px;
-        Image { source: icon; colorize: Palette.primary; width: 18px; height: 18px; opacity: enabled ? 1 : 0.38; }
-        Label { text: caption; color: Palette.primary; font-size: Type.body-small; font-weight: 500; visible: caption != ""; }
+        Image { source: icon; colorize: filled ? Palette.on-primary : tint; width: 18px; height: 18px; opacity: enabled ? 1 : 0.38; }
+        if caption != "" : Label { text: caption; color: filled ? Palette.on-primary : tint; font-size: Type.body-small; font-weight: 500; }
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+/// A text button. `primary` is the solid one (the main action of a dialog).
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <bool> primary: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    horizontal-stretch: 0;
+    height: 40px;
+    width: label.preferred-width + 32px;
+    border-radius: 12px;
+    background: primary ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
+    opacity: enabled ? 1 : 0.45;
+    label := Label {
+        x: 16px; width: parent.width - 32px; text: root.text;
+        font-size: Type.body-medium; font-weight: 500;
+        color: primary ? Palette.on-primary : Palette.primary;
+        horizontal-alignment: center;
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: enabled ? pointer : default; clicked => { root.clicked(); } }
+}
+
+/// A text box with a placeholder; `multiline` makes it a taller box that wraps. Ctrl+V pastes into it as usual.
+export component TextField inherits Rectangle {
+    in property <string> placeholder;
+    in property <bool> multiline: false;
+    in-out property <string> text <=> input.text;
+    public function paste() { input.focus(); input.paste(); }
+    height: multiline ? 96px : 44px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: input.has-focus ? Palette.primary : Palette.outline-variant;
+    background: Palette.dark ? #00000040 : #ffffffa0;
+    input := TextInput {
+        x: 12px; y: multiline ? 10px : 0px;
+        width: parent.width - 24px; height: multiline ? parent.height - 20px : parent.height;
+        single-line: !multiline;
+        wrap: multiline ? word-wrap : no-wrap;
+        font-family: Type.family; font-size: Type.body-medium; color: Palette.on-surface;
+        vertical-alignment: multiline ? top : center;
+        selection-background-color: Palette.primary.with-alpha(0.4);
+    }
+    if input.text == "" : Text {
+        x: 12px; y: multiline ? 10px : 0px; width: parent.width - 24px; height: multiline ? 24px : parent.height;
+        text: placeholder; color: Palette.on-variant; font-family: Type.family; font-size: Type.body-medium;
+        vertical-alignment: multiline ? top : center; overflow: elide;
+    }
 }

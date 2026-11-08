@@ -1,0 +1,268 @@
+// The Servers page. Port of SubscriptionsPage.kt: subscription cards with their servers, favourites, usage, and the
+// add / edit dialog. Not in this version: file import, QR codes, WARP, the website check.
+import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Card, Label, IconAction, HRow, Button, TextField } from "widgets.slint";
+
+export struct NodeRow {
+    id: string,
+    title: string,
+    protocol: string,
+    flag: image,
+    has-flag: bool,
+    speed: string,
+    ping: string,
+    has-result: bool,
+    no-answer: bool,
+    has-bar: bool,
+    bar: float,
+    starred: bool,
+    selected: bool,
+}
+
+export struct SubRow {
+    id: string,
+    name: string,
+    url: string,
+    status: string,
+    has-usage: bool,
+    usage-fraction: float,
+    usage-text: string,
+    info: string,
+    can-refresh: bool,
+    refreshing: bool,
+    expanded: bool,
+    nodes: [NodeRow],
+}
+
+component ServerLine inherits Rectangle {
+    in property <NodeRow> entry;
+    in property <bool> first;
+    callback select();
+    callback favorite();
+    height: 62px;
+    background: entry.selected ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.08) : transparent);
+    if !first : Rectangle { y: 0; height: 1px; x: 16px; width: parent.width - 32px; background: Palette.outline-variant; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.select(); } }
+    HRow {
+        alignment: stretch; pad-start: 16px; pad-end: 8px; spacing: 12px;
+        if entry.has-flag : Image { source: entry.flag; width: 24px; height: 24px; image-fit: contain; }
+        VerticalLayout {
+            horizontal-stretch: 1; spacing: 2px; alignment: center;
+            Label { text: entry.title; font-size: Type.body-large; overflow: elide; }
+            Label { text: entry.protocol; muted: true; font-size: 12px; font-weight: 500; }
+            if entry.has-bar : Rectangle {
+                height: 3px;
+                Rectangle { width: parent.width - 12px; height: 3px; border-radius: 2px; background: Palette.outline-variant.with-alpha(0.5); }
+                Rectangle {
+                    x: Palette.rtl ? parent.width - 12px - self.width : 0px;
+                    width: (parent.width - 12px) * entry.bar; height: 3px; border-radius: 2px; background: Palette.primary.with-alpha(0.6);
+                }
+            }
+        }
+        Rectangle {
+            width: 120px; horizontal-stretch: 0;
+            if entry.has-result : VerticalLayout {
+                alignment: center;
+                Label { text: entry.no-answer ? Tr.no-answer : (entry.speed != "" ? entry.speed : entry.ping); font-size: Type.body-medium;
+                        color: entry.no-answer ? Palette.error : Palette.on-surface; horizontal-alignment: Palette.rtl ? left : right; }
+                if entry.speed != "" && entry.ping != "" : Label { text: entry.ping; muted: true; font-size: 12px; horizontal-alignment: Palette.rtl ? left : right; }
+            }
+        }
+        IconAction {
+            icon: entry.starred ? Icons.star-filled : Icons.star;
+            tint: entry.starred ? Palette.primary : Palette.on-variant;
+            clicked => { root.favorite(); }
+        }
+        Rectangle {
+            width: 20px; horizontal-stretch: 0;
+            if entry.selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; }
+        }
+    }
+}
+
+component SubscriptionCard inherits Card {
+    in property <SubRow> sub;
+    in property <bool> testing;
+    in property <bool> can-test;
+    callback toggle();
+    callback select(string);
+    callback favorite(string);
+    callback test();
+    callback stop-test();
+    callback refresh();
+    callback edit();
+    callback remove();
+    height: inner.preferred-height + 16px;
+    inner := VerticalLayout {
+        padding-top: 8px; padding-bottom: 8px;
+        Rectangle {
+            height: 56px;
+            TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
+            HRow {
+                alignment: space-between; pad-start: 16px; pad-end: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    Label { text: sub.name; font-size: 17px; font-weight: 600; overflow: elide; }
+                    Label { text: sub.status; muted: true; font-size: Type.body-small; overflow: elide; }
+                }
+                HRow {
+                    alignment: start; spacing: 4px;
+                    IconAction {
+                        icon: testing ? Icons.stop : Icons.bolt;
+                        enabled: testing || can-test;
+                        clicked => { if root.testing { root.stop-test(); } else { root.test(); } }
+                    }
+                    IconAction { icon: Icons.refresh; enabled: sub.can-refresh && !sub.refreshing; tint: Palette.on-surface; clicked => { root.refresh(); } }
+                    IconAction { icon: Icons.edit; tint: Palette.on-surface; clicked => { root.edit(); } }
+                    IconAction { icon: Icons.trash; tint: Palette.on-surface; clicked => { root.remove(); } }
+                    Image { source: sub.expanded ? Icons.chevron-up : Icons.chevron-down; colorize: Palette.on-variant; width: 18px; height: 18px; }
+                }
+            }
+        }
+        if sub.has-usage : VerticalLayout {
+            padding-left: 16px; padding-right: 16px; spacing: 4px;
+            Rectangle {
+                height: 4px;
+                Rectangle { height: 4px; border-radius: 2px; background: Palette.surface-variant; }
+                Rectangle {
+                    x: Palette.rtl ? parent.width - self.width : 0px;
+                    width: parent.width * sub.usage-fraction; height: 4px; border-radius: 2px; background: Palette.primary;
+                }
+            }
+            Label { text: sub.usage-text; muted: true; font-size: Type.body-small; }
+        }
+        if sub.expanded && sub.info != "" : Label {
+            text: sub.info; muted: true; font-size: Type.body-small; wrap: word-wrap;
+        }
+        if !testing && !can-test : Label { text: Tr.test-needs-disconnect; muted: true; font-size: Type.body-small; }
+        if sub.expanded : Rectangle { height: 8px; }
+        if sub.expanded : Rectangle { height: 1px; background: Palette.outline-variant; }
+        if sub.expanded : VerticalLayout {
+            for node[i] in sub.nodes : ServerLine {
+                entry: node; first: i == 0;
+                select => { root.select(node.id); }
+                favorite => { root.favorite(node.id); }
+            }
+        }
+    }
+}
+
+export component ServersPage inherits Rectangle {
+    in property <[SubRow]> subs;
+    in property <bool> testing;
+    in property <bool> can-test: true;
+    in property <string> test-progress;
+    in property <string> notice;
+    in property <bool> notice-error;
+    in property <bool> dialog-busy;
+    in property <string> dialog-error;
+    in property <int> dialog-done;
+    in property <int> dialog-request;   // bump to open the add dialog from outside (debug flag --dialog)
+    in property <string> pasted-text;
+    in property <int> paste-serial;     // bumped when pasted-text holds new clipboard text
+    callback paste-request();
+    callback toggle-expanded(string);
+    callback select(string);
+    callback favorite(string);
+    callback test(string);
+    callback stop-test();
+    callback refresh(string);
+    callback remove(string);
+    callback submit(string, string, string);   // id ("" for a new one), link, name
+
+    property <bool> dialog-open: false;
+    property <string> dialog-id: "";
+    property <string> dialog-title: "";
+    property <string> dialog-link: "";
+    property <string> dialog-name: "";
+
+    changed dialog-done => { dialog-open = false; }
+    changed paste-serial => { dialog-link = dialog-link == "" ? pasted-text : dialog-link + "\n" + pasted-text; }
+    changed dialog-request => { dialog-id = ""; dialog-title = Tr.add-link; dialog-link = ""; dialog-name = ""; dialog-open = true; }
+
+    Flickable {
+        content-height: page.preferred-height + 48px;
+        page := VerticalLayout {
+            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 0px; alignment: start;
+            HRow {
+                alignment: stretch; height: 40px; spacing: 8px;
+                Label { text: Tr.subscriptions; font-size: Type.headline-medium; font-weight: 600; horizontal-stretch: 1; }
+                IconAction {
+                    icon: Icons.plus; caption: Tr.add-servers; filled: true;
+                    clicked => { root.dialog-id = ""; root.dialog-title = Tr.add-link; root.dialog-link = ""; root.dialog-name = ""; root.dialog-open = true; }
+                }
+            }
+            Rectangle { height: 8px; }
+            Label { text: Tr.subscriptions-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+            if notice != "" : Rectangle { height: 12px; }
+            if notice != "" : Label {
+                text: root.notice; font-size: Type.body-small; wrap: word-wrap;
+                color: root.notice-error ? Palette.error : Palette.tertiary;
+            }
+            Rectangle { height: 16px; }
+            if subs.length == 0 : Card {
+                height: 250px;
+                VerticalLayout {
+                    alignment: center; spacing: 12px; padding: 24px;
+                    Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 48px; height: 48px; }
+                    Label { text: Tr.empty-title; font-size: Type.body-large; font-weight: 600; horizontal-alignment: center; }
+                    Label { text: Tr.empty-text; muted: true; font-size: Type.body-small; wrap: word-wrap; horizontal-alignment: center; }
+                    HRow {
+                        alignment: center; height: 40px;
+                        Button {
+                            text: Tr.add-link; primary: true;
+                            clicked => { root.dialog-id = ""; root.dialog-title = Tr.add-link; root.dialog-link = ""; root.dialog-name = ""; root.dialog-open = true; }
+                        }
+                    }
+                }
+            }
+            for sub in subs : VerticalLayout {
+                padding-bottom: 16px;
+                SubscriptionCard {
+                    sub: sub; testing: root.testing; can-test: root.can-test && !root.testing;
+                    toggle => { root.toggle-expanded(sub.id); }
+                    select(id) => { root.select(id); }
+                    favorite(id) => { root.favorite(id); }
+                    test => { root.test(sub.id); }
+                    stop-test => { root.stop-test(); }
+                    refresh => { root.refresh(sub.id); }
+                    remove => { root.remove(sub.id); }
+                    edit => { root.dialog-id = sub.id; root.dialog-title = Tr.edit; root.dialog-link = sub.url; root.dialog-name = sub.name; root.dialog-open = true; }
+                }
+            }
+        }
+    }
+
+    if dialog-open : Rectangle {
+        background: #00000088;
+        TouchArea { }   // blocks the page behind the dialog
+        Rectangle {
+            width: min(480px, parent.width - 32px); height: dlg.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            dlg := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: root.dialog-title; font-size: Type.headline-small; font-weight: 600; }
+                Label { text: Tr.link-label; muted: true; font-size: Type.body-small; }
+                TextField { multiline: true; placeholder: "https://..."; text <=> root.dialog-link; }
+                HRow {
+                    alignment: start; height: 36px;
+                    IconAction { icon: Icons.clipboard; caption: Tr.paste-clipboard; clicked => { root.paste-request(); } }
+                }
+                Label { text: Tr.name-label; muted: true; font-size: Type.body-small; }
+                TextField { text <=> root.dialog-name; }
+                if dialog-error != "" : Label { text: root.dialog-error; color: Palette.error; font-size: Type.body-small; wrap: word-wrap; }
+                HRow {
+                    alignment: end; height: 40px; spacing: 8px;
+                    Button { text: Tr.cancel; enabled: !root.dialog-busy; clicked => { root.dialog-open = false; } }
+                    Button {
+                        text: root.dialog-busy ? (root.dialog-id == "" ? Tr.adding : Tr.saving) : (root.dialog-id == "" ? Tr.add-link : Tr.save);
+                        primary: true; enabled: !root.dialog-busy && root.dialog-link != "";
+                        clicked => { root.submit(root.dialog-id, root.dialog-link, root.dialog-name); }
+                    }
+                }
+            }
+        }
+    }
+}
