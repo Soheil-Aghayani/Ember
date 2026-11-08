@@ -25,11 +25,14 @@ export component HomePage inherits Rectangle {
     in property <[ServerRow]> servers;
     in property <string> caption;
     in property <string> error;
+    in property <bool> testing;
+    in property <string> test-progress;
     in property <int> menu-request;        // bump to open the server menu from outside (debug flag --menu)
     callback orb-clicked();
     callback choose(string);
     callback open-servers();
     callback test-speed();
+    callback cancel-test();
 
     changed menu-request => { popup.show(); }
 
@@ -116,10 +119,15 @@ export component HomePage inherits Rectangle {
                 }
             }
         }
-        if can-pick && servers.length > 0 : Rectangle { height: 8px; }
-        if can-pick && servers.length > 0 : HRow {
-            alignment: start; height: 36px;
-            IconAction { icon: Icons.bolt; caption: Tr.test-speed; clicked => { root.test-speed(); } }
+        if (can-pick && servers.length > 0) || testing : Rectangle { height: 8px; }
+        if (can-pick && servers.length > 0) || testing : HRow {
+            alignment: start; height: 36px; spacing: 8px;
+            IconAction {
+                icon: testing ? Icons.stop : Icons.bolt;
+                caption: testing ? Tr.stop-test : Tr.test-speed;
+                clicked => { if root.testing { root.cancel-test(); } else { root.test-speed(); } }
+            }
+            if testing && test-progress != "" : Label { text: root.test-progress; muted: true; font-size: Type.body-small; overflow: elide; }
         }
         if caption != "" : Rectangle { height: 12px; }
         if caption != "" : Label { text: root.caption; muted: true; font-size: Type.body-small; horizontal-alignment: center; wrap: word-wrap; }

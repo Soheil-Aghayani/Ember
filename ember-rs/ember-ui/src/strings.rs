@@ -2,6 +2,7 @@
 //! add the rest as each page is ported. `{socks}`, `{http}` and `{0}` are filled in by the caller.
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)] // the other pages use the rest as they are ported
 pub struct Strings {
     pub home: &'static str,
     pub servers: &'static str,

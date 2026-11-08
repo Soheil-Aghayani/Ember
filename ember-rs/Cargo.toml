@@ -1,6 +1,6 @@
 ﻿[workspace]
 resolver = "2"
-members = ["crates/ember-subs", "crates/ember-win", "ember-ui"]
+members = ["crates/ember-subs", "crates/ember-win", "crates/ember-engine", "ember-ui"]
 
 [workspace.package]
 edition = "2021"

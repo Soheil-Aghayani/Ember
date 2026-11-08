@@ -36,9 +36,12 @@ export component App inherits Window {
     in property <string> caption;
     in property <string> error;
     in property <int> menu-request;
+    in property <bool> testing;
+    in property <string> test-progress;
     callback orb-clicked();
     callback choose(string);
     callback test-speed();
+    callback cancel-test();
 
     title: "Ember";
     default-font-family: Type.family;
@@ -80,11 +83,12 @@ export component App inherits Window {
                     state: root.state; status: root.status; secondary: root.secondary;
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
-                    caption: root.caption; error: root.error; menu-request: root.menu-request;
+                    caption: root.caption; error: root.error; menu-request: root.menu-request; testing: root.testing; test-progress: root.test-progress;
                                 orb-clicked => { root.orb-clicked(); }
                     choose(id) => { root.choose(id); }
                     open-servers => { root.page = 1; }
                     test-speed => { root.test-speed(); }
+                    cancel-test => { root.cancel-test(); }
                 }
                 if page != 0 : Label {
                     x: 32px; y: 32px; width: parent.width - 64px; text: "Coming next in the Rust port"; font-size: Type.headline-medium; font-weight: 600;

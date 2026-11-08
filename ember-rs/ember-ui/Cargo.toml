@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ember-engine = { path = "../crates/ember-engine" }
+ember-subs = { path = "../crates/ember-subs" }
 slint = { version = "1", default-features = false, features = ["std", "backend-winit", "renderer-software", "compat-1-2"] }
 
 [build-dependencies]
