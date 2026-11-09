@@ -33,6 +33,8 @@ struct OrbMotion {
     angle: f32,
     ripple: f32,
     pop: f32,
+    pop_v: f32,
+    frame: u32,
     page_in: f32,
     last_page: i32,
     last: Instant,
@@ -1244,8 +1246,11 @@ fn main() {
     let timer = slint::Timer::default();
     let weak = app.as_weak();
     let engine_for_timer = engine.clone();
+    let state_cell = Rc::new(std::cell::Cell::new(ConnState::Disconnected));
+    let state_for_main = Rc::clone(&state_cell);
+    let (demo_connecting, demo_connected, demo_settled) = (has("--demo-orb-connecting"), has("--demo-orb-connected"), has("--demo-orb-settled"));
     let mut motion =
-        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
+        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, frame: 0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
     let mut sprite_px = 0u32;
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
@@ -1321,48 +1326,99 @@ fn main() {
             m.set_sphere_on(on);
             m.set_sprite_size((px + 2 * sphere::PAD) as f32 / app.window().scale_factor());
         }
-        let now = Instant::now();
-        let dt = now.duration_since(motion.last).as_secs_f32().min(0.1);
-        motion.last = now;
-        if state == ConnState::Connected && motion.previous != ConnState::Connected {
-            motion.ripple = 0.0;
-            motion.pop = 0.94;
-        }
-        motion.previous = state;
-        // a page change restarts the short fade-and-rise of the page (eased out, a quarter of a second)
-        let page = app.get_page();
-        if page != motion.last_page {
-            motion.last_page = page;
-            motion.page_in = 0.0;
-        }
-        motion.page_in = (motion.page_in + dt / 0.25).min(1.0);
-        let (lit_t, speed_t) = match state {
-            ConnState::Disconnected => (0.0, 0.12),
-            ConnState::Connecting => (0.55, 3.2),
-            ConnState::Connected => (1.0, 0.45),
+        // debug: --demo-orb-connecting / -connected (switches 0.4 s before a 5 s screenshot) / -settled show the orb states without a server
+        let shown = if demo_connecting {
+            ConnState::Connecting
+        } else if demo_connected {
+            if tick >= 140 { ConnState::Connected } else { ConnState::Disconnected }
+        } else if demo_settled {
+            if tick >= 20 { ConnState::Connected } else { ConnState::Disconnected }
+        } else {
+            state
         };
-        motion.lit = approach(motion.lit, lit_t, dt, if state == ConnState::Disconnected { 0.5 } else { 0.4 });
-        motion.speed = approach(motion.speed, speed_t, dt, 0.35);
-        motion.loader = approach(motion.loader, if state == ConnState::Connecting { 1.0 } else { 0.0 }, dt, 0.15);
-        motion.angle = (motion.angle + dt * motion.speed) % LOOP;
-        if motion.ripple < 1.0 {
-            motion.ripple = (motion.ripple + dt / 1.2).min(1.0);
-        }
-        motion.pop = approach(motion.pop, 1.0, dt, 0.25);
-        let m = app.global::<Motion>();
-        m.set_angle(motion.angle);
-        m.set_lit(motion.lit);
-        m.set_loader(motion.loader);
-        m.set_ripple(motion.ripple);
-        m.set_pop(motion.pop);
-        m.set_page_in(1.0 - (1.0 - motion.page_in).powi(3));
+        state_for_main.set(shown);
     });
+    let motion_timer = slint::Timer::default();
+    {
+        let weak = app.as_weak();
+        let state_cell = Rc::clone(&state_cell);
+        motion_timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+            let Some(app) = weak.upgrade() else { return };
+            let state = state_cell.get();
+            let now = Instant::now();
+            let dt = now.duration_since(motion.last).as_secs_f32().min(0.1);
+            // nothing is drawn while the window is hidden (tray); the orb catches up in a frame or two when it shows again
+        if !app.window().is_visible() {
+            motion.last = now;
+            return;
+        }
+        // frames are the CPU cost, so the orb only runs at 60 per second while it really moves: connecting, a change in
+        // progress. Settled and connected it drifts at 20, and disconnected at rest at 10.
+        let settled = motion.ripple >= 1.0
+            && (motion.pop - 1.0).abs() < 0.0005
+            && motion.pop_v.abs() < 0.001
+            && motion.page_in >= 1.0
+            && motion.last_page == app.get_page()
+            && motion.loader < 0.002;
+        let every = match state {
+            ConnState::Disconnected if settled && motion.lit < 0.002 => 6,
+            ConnState::Connected if settled && motion.lit > 0.995 => 3,
+            _ => 1,
+        };
+        motion.frame = motion.frame.wrapping_add(1);
+        if !motion.frame.is_multiple_of(every) {
+            return;
+        }
+        motion.last = now;
+            if state == ConnState::Connected && motion.previous != ConnState::Connected {
+                motion.ripple = 0.0;
+                motion.pop = 0.93;
+                motion.pop_v = 0.0;
+            }
+            motion.previous = state;
+            // a page change restarts the short fade-and-rise of the page (eased out, a quarter of a second)
+            let page = app.get_page();
+            if page != motion.last_page {
+                motion.last_page = page;
+                motion.page_in = 0.0;
+            }
+            motion.page_in = (motion.page_in + dt / 0.25).min(1.0);
+            let (lit_t, speed_t) = match state {
+                ConnState::Disconnected => (0.0, 0.12),
+                ConnState::Connecting => (0.55, 3.2),
+                ConnState::Connected => (1.0, 0.45),
+            };
+            motion.lit = approach(motion.lit, lit_t, dt, if state == ConnState::Disconnected { 0.5 } else { 0.4 });
+            motion.speed = approach(motion.speed, speed_t, dt, 0.35);
+            motion.loader = approach(motion.loader, if state == ConnState::Connecting { 1.0 } else { 0.0 }, dt, 0.15);
+            motion.angle = (motion.angle + dt * motion.speed) % LOOP;
+            if motion.ripple < 1.0 {
+                motion.ripple = (motion.ripple + dt / 1.4).min(1.0);
+            }
+            // the sphere settles back to full size like a spring (a small overshoot), not a plain ease
+            let mut left = dt;
+            while left > 0.0 {
+                let h = left.min(1.0 / 240.0);
+                motion.pop_v += (240.0 * (1.0 - motion.pop) - 15.0 * motion.pop_v) * h;
+                motion.pop += motion.pop_v * h;
+                left -= h;
+            }
+            let m = app.global::<Motion>();
+            m.set_angle(motion.angle);
+            m.set_lit(motion.lit);
+            m.set_loader(motion.loader);
+            m.set_ripple(motion.ripple);
+            m.set_pop(motion.pop);
+            m.set_page_in(1.0 - (1.0 - motion.page_in).powi(3));
+    });
+    }
     // started with Windows: stay in the tray, no window
     if !(has("--minimized") && has_tray) {
         app.show().unwrap();
         style_window_soon(&app);
     }
     slint::run_event_loop_until_quit().unwrap();
+    drop(motion_timer);
     drop(timer); // takes the tray icon with it
     engine.shutdown();
 }

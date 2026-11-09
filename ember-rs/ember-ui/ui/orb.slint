@@ -70,14 +70,17 @@ export component Orb inherits Rectangle {
     property <length> s: min(self.width, self.height);
     property <length> cx: self.width / 2;
     property <length> cy: self.height / 2;
-    property <length> r: s * 0.34 * pop;
+    // pressing pushes the sphere in a little, hovering lifts it a little
+    property <float> feel: touch.pressed ? 0.965 : (touch.has-hover ? 1.02 : 1.0);
+    animate feel { duration: 140ms; easing: ease-out; }
+    property <length> r: s * 0.34 * pop * feel;
 
     // back halves of both rings, then the sphere, then the front halves
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
 
-    Image { source: off-sprite; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop; height: sprite-size * pop; }
-    Image { source: on-sprite; opacity: lit; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop; height: sprite-size * pop; }
+    Image { source: off-sprite; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop * feel; height: sprite-size * pop * feel; }
+    Image { source: on-sprite; opacity: lit; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop * feel; height: sprite-size * pop * feel; }
 
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
@@ -93,7 +96,7 @@ export component Orb inherits Rectangle {
         property <float> mx: cx / 1px;
         property <float> my: cy / 1px;
         property <float> p0: angle * 0.9;
-        property <float> p1: p0 + 1.396;
+        property <float> p1: p0 + 0.9 + 0.75 * (0.5 + 0.5 * Math.sin(angle * 0.55 * 1rad));   // 50 to 93 degrees, breathing
         MoveTo { x: parent.mx + parent.ar * Math.cos(parent.p0 * 1rad); y: parent.my + parent.ar * Math.sin(parent.p0 * 1rad); }
         ArcTo {
             x: parent.mx + parent.ar * Math.cos(parent.p1 * 1rad); y: parent.my + parent.ar * Math.sin(parent.p1 * 1rad);
@@ -104,10 +107,10 @@ export component Orb inherits Rectangle {
     // the one ripple that leaves the sphere once connected
     Rectangle {
         visible: ripple < 1;
-        property <length> rr: r * (1.02 + 0.42 * ripple);
+        property <length> rr: r * (1.02 + 0.5 * (1 - (1 - ripple) * (1 - ripple)));
         x: cx - rr; y: cy - rr; width: 2 * rr; height: 2 * rr; border-radius: rr;
-        border-width: 2.5px; border-color: #ffb27a.with-alpha(0.55 * (1 - ripple));
+        border-width: 3px; border-color: #ff8a3d.with-alpha(0.85 * (1 - ripple) * (1 - ripple));
     }
 
-    TouchArea { x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; clicked => { root.clicked(); } }
+    touch := TouchArea { x: cx - s * 0.34; y: cy - s * 0.34; width: 2 * s * 0.34; height: 2 * s * 0.34; mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
