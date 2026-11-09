@@ -1044,6 +1044,29 @@ fn main() {
         ember_win::tray::Tray::spawn("Ember", tray_menu(lang::current(), ConnState::Disconnected), wake)
     };
     {
+        use slint::winit_030::{winit, WinitWindowAccessor};
+        let w = app.as_weak();
+        app.on_window_drag(move || {
+            if let Some(a) = w.upgrade() { a.window().with_winit_window(|win| { let _ = win.drag_window(); }); }
+        });
+        let w = app.as_weak();
+        app.on_window_resize(move |edge| {
+            use winit::window::ResizeDirection as D;
+            let d = match edge { 1 => D::West, 2 => D::East, 3 => D::North, 4 => D::South, 5 => D::NorthWest, 6 => D::NorthEast, 7 => D::SouthWest, _ => D::SouthEast };
+            if let Some(a) = w.upgrade() { a.window().with_winit_window(|win| { let _ = win.drag_resize_window(d); }); }
+        });
+        let w = app.as_weak();
+        app.on_window_minimize(move || { if let Some(a) = w.upgrade() { a.window().with_winit_window(|win| win.set_minimized(true)); } });
+        let w = app.as_weak();
+        app.on_window_maximize(move || { if let Some(a) = w.upgrade() { a.window().with_winit_window(|win| win.set_maximized(!win.is_maximized())); } });
+        let w = app.as_weak();
+        app.on_window_close(move || {
+            if let Some(a) = w.upgrade() {
+                a.window().dispatch_event(slint::platform::WindowEvent::CloseRequested);
+            }
+        });
+    }
+    {
         let (engine, has_tray) = (engine.clone(), tray.is_some());
         app.window().on_close_requested(move || {
             if !(has_tray && engine.settings().keep_in_tray()) {

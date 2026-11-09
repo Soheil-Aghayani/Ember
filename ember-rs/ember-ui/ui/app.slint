@@ -105,6 +105,12 @@ export component App inherits Window {
     callback submit-subscription(string, string, string);
 
     title: "Ember";
+    no-frame: true;
+    callback window-drag();
+    callback window-resize(int);
+    callback window-minimize();
+    callback window-maximize();
+    callback window-close();
     default-font-family: Type.family;
     min-width: 760px; min-height: 600px;
     preferred-width: 900px; preferred-height: 680px;
@@ -263,4 +269,27 @@ export component App inherits Window {
             Label { text: root.toast; color: Palette.inverse-on; font-size: Type.body-medium; overflow: elide; }
         }
     }
+    // Own title bar: a drag strip, three window buttons and thin resize edges (the Windows frame is off).
+    TouchArea {
+        x: 0px; y: 0px; width: parent.width - 138px; height: 28px;
+        pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.window-drag(); } }
+    }
+    for glyph[i] in [Icons.minimize, Icons.maximize, Icons.window-close] : Rectangle {
+        x: Palette.rtl ? i * 46px : parent.width - (3 - i) * 46px; y: 0px; width: 46px; height: 32px;
+        background: wb.has-hover ? (i == 2 ? #e5484d : Palette.on-surface.with-alpha(0.10)) : transparent;
+        Image { source: glyph; width: 16px; height: 16px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; colorize: wb.has-hover && i == 2 ? white : Palette.on-variant; }
+        wb := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { if i == 0 { root.window-minimize(); } else if i == 1 { root.window-maximize(); } else { root.window-close(); } }
+        }
+    }
+    // resize edges: 1 left 2 right 3 top 4 bottom, 5 top-left 6 top-right 7 bottom-left 8 bottom-right
+    for edge[k] in [1, 2, 3, 4, 5, 6, 7, 8] : TouchArea {
+        x: edge == 2 || edge == 6 || edge == 8 ? parent.width - 5px : 0px;
+        y: edge == 4 || edge == 7 || edge == 8 ? parent.height - 5px : 0px;
+        width: edge == 3 || edge == 4 ? parent.width : 5px; height: edge == 1 || edge == 2 ? parent.height : 5px;
+        mouse-cursor: edge == 1 || edge == 2 ? MouseCursor.ew-resize : edge == 3 || edge == 4 ? MouseCursor.ns-resize : edge == 5 || edge == 8 ? MouseCursor.nwse-resize : MouseCursor.nesw-resize;
+        pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.window-resize(edge); } }
+    }
+
 }
