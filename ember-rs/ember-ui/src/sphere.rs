@@ -29,13 +29,16 @@ fn ramp(stops: &[(f32, [f32; 3]); 6], t: f32) -> [f32; 3] {
 
 fn mix(base: [f32; 3], over: [f32; 3], a: f32) -> [f32; 3] { [0, 1, 2].map(|i| base[i] + (over[i] - base[i]) * a) }
 
-fn pixels(size: u32, lit: f32) -> Vec<u8> {
+/// `size` is the sphere's diameter; the buffer is `pad` pixels larger on every side so the renderer's rounding never clips it.
+fn pixels(size: u32, pad: u32, lit: f32) -> Vec<u8> {
     let r = size as f32 / 2.0;
-    let mut out = vec![0u8; (size * size * 4) as usize];
-    for py in 0..size {
-        for px in 0..size {
-            let x = (px as f32 + 0.5 - r) / r; // -1..1
-            let y = (py as f32 + 0.5 - r) / r;
+    let total = size + 2 * pad;
+    let centre = total as f32 / 2.0;
+    let mut out = vec![0u8; (total * total * 4) as usize];
+    for py in 0..total {
+        for px in 0..total {
+            let x = (px as f32 + 0.5 - centre) / r; // -1..1 across the sphere
+            let y = (py as f32 + 0.5 - centre) / r;
             let d = (x * x + y * y).sqrt();
             let edge = ((1.0 - d) * r + 0.5).clamp(0.0, 1.0);
             if edge <= 0.0 { continue; }
@@ -52,7 +55,7 @@ fn pixels(size: u32, lit: f32) -> Vec<u8> {
             if d > 1.0 - rim && y < 0.0 {
                 c = mix(c, [255.0; 3], (0.22 + 0.28 * lit) * (-y).clamp(0.0, 1.0));
             }
-            let i = ((py * size + px) * 4) as usize;
+            let i = ((py * total + px) * 4) as usize;
             out[i] = c[0].round() as u8; out[i + 1] = c[1].round() as u8; out[i + 2] = c[2].round() as u8;
             out[i + 3] = (edge * 255.0).round() as u8;
         }
@@ -61,11 +64,15 @@ fn pixels(size: u32, lit: f32) -> Vec<u8> {
 }
 
 
-/// The off and on sprites, `diameter` pixels across.
+/// Transparent border around the sphere in the sprite, in pixels.
+pub const PAD: u32 = 4;
+
+/// The off and on sprites: a sphere `diameter` pixels across inside a buffer `PAD` pixels larger on every side.
 pub fn sprites(diameter: u32) -> (Image, Image) {
+    let total = diameter + 2 * PAD;
     let make = |lit: f32| {
-        let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(diameter, diameter);
-        buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, lit));
+        let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(total, total);
+        buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, PAD, lit));
         Image::from_rgba8(buffer)
     };
     (make(0.0), make(1.0))

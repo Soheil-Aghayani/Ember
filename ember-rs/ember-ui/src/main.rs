@@ -314,6 +314,8 @@ fn push_settings(app: &App, engine: &Engine) {
     app.set_set_auto_connect(s.auto_connect());
     app.set_set_auto_failover(s.auto_failover());
     app.set_set_diagnostic_log(s.diagnostic_log());
+    app.set_set_keep_in_tray(s.keep_in_tray());
+    app.set_set_start_with_windows(ember_win::autostart::is_enabled());
 }
 
 /// The Settings page's choices and switches.
@@ -361,6 +363,13 @@ fn wire_settings_page(
                 "autoConnect" => s.set_auto_connect(value),
                 "autoFailover" => s.set_auto_failover(value),
                 "diagnosticLog" => s.set_diagnostic_log(value),
+                "keepInTray" => s.set_keep_in_tray(value),
+                "startWithWindows" => {
+                    if !ember_win::autostart::set_enabled(value) {
+                        // the switch goes back to what Windows really has (push_settings below)
+                        ember_engine::log::warn("Ember", "could not change the Windows startup entry");
+                    }
+                }
                 _ => {}
             }
             push_settings(&app, &engine);
@@ -549,6 +558,16 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
     }
 }
 
+const TRAY_OPEN: u32 = 1;
+const TRAY_TOGGLE: u32 = 2;
+const TRAY_QUIT: u32 = 3;
+
+fn tray_menu(s: &strings::Strings, state: ConnState) -> Vec<ember_win::tray::MenuEntry> {
+    use ember_win::tray::MenuEntry;
+    let toggle = if state == ConnState::Disconnected { s.connect } else { s.disconnect };
+    vec![MenuEntry::item(TRAY_OPEN, s.open_ember), MenuEntry::item(TRAY_TOGGLE, toggle), MenuEntry::Separator, MenuEntry::item(TRAY_QUIT, s.quit)]
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let has = |a: &str| args.iter().any(|x| x == a);
@@ -556,6 +575,15 @@ fn main() {
     let data_dir = backend::data_dir(&args);
     // the first-run copy of the Kotlin app's servers is only for the default folder, never for a test folder
     let custom_dir = has("--data-dir") || std::env::var_os("EMBER_DATA_DIR").is_some();
+    // one Ember at a time (a test run with its own data folder may run beside the real one)
+    let _single = if custom_dir {
+        None
+    } else {
+        match ember_win::single_instance::acquire() {
+            Some(guard) => Some(guard),
+            None => return,
+        }
+    };
     let imported = if custom_dir { Vec::new() } else { backend::import_from_kotlin_app(&data_dir) };
 
     // the engine tells us it changed from any thread; the timer below picks the flag up on the UI thread
@@ -657,6 +685,25 @@ fn main() {
         engine.connect_selected();
     }
 
+    // the notification-area icon: Open, Connect/Disconnect, Quit (test runs with their own folder skip it unless --tray)
+    let tray = if custom_dir && !has("--tray") {
+        None
+    } else {
+        let wake: Box<dyn Fn() + Send> = Box::new(|| {});
+        ember_win::tray::Tray::spawn("Ember", tray_menu(lang::current(), ConnState::Disconnected), wake)
+    };
+    {
+        let (engine, has_tray) = (engine.clone(), tray.is_some());
+        app.window().on_close_requested(move || {
+            if !(has_tray && engine.settings().keep_in_tray()) {
+                let _ = slint::quit_event_loop();
+            }
+            slint::CloseRequestResponse::HideWindow
+        });
+    }
+    let has_tray = tray.is_some();
+    let mut tray_state = None;
+
     let timer = slint::Timer::default();
     let weak = app.as_weak();
     let engine_for_timer = engine.clone();
@@ -688,6 +735,32 @@ fn main() {
             engine.connect_selected();
         }
         let state = engine.snapshot().state;
+        if let Some((tray, events)) = &tray {
+            while let Ok(event) = events.try_recv() {
+                match event {
+                    ember_win::tray::TrayEvent::Open | ember_win::tray::TrayEvent::Command(TRAY_OPEN) => {
+                        let _ = app.show();
+                    }
+                    ember_win::tray::TrayEvent::Command(TRAY_TOGGLE) => {
+                        if engine.snapshot().state == ConnState::Disconnected {
+                            engine.connect_selected();
+                        } else {
+                            engine.disconnect();
+                        }
+                    }
+                    ember_win::tray::TrayEvent::Command(TRAY_QUIT) => {
+                        let _ = slint::quit_event_loop();
+                    }
+                    ember_win::tray::TrayEvent::Command(_) => {}
+                }
+            }
+            // the menu and tooltip follow the state and the language
+            let key = (state, lang::code());
+            if tray_state != Some(key) {
+                tray_state = Some(key);
+                tray.set_menu(tray_menu(lang::current(), state));
+            }
+        }
         // the log page follows the log twice a second while it is open
         if tick.is_multiple_of(15) && app.get_page() == 3 {
             logs::apply(&app, &logs_ui, false);
@@ -705,6 +778,7 @@ fn main() {
             let m = app.global::<Motion>();
             m.set_sphere_off(off);
             m.set_sphere_on(on);
+            m.set_sprite_size((px + 2 * sphere::PAD) as f32 / app.window().scale_factor());
         }
         let now = Instant::now();
         let dt = now.duration_since(motion.last).as_secs_f32().min(0.1);
@@ -734,6 +808,11 @@ fn main() {
         m.set_ripple(motion.ripple);
         m.set_pop(motion.pop);
     });
-    app.run().unwrap();
+    // started with Windows: stay in the tray, no window
+    if !(has("--minimized") && has_tray) {
+        app.show().unwrap();
+    }
+    slint::run_event_loop_until_quit().unwrap();
+    drop(timer); // takes the tray icon with it
     engine.shutdown();
 }

@@ -63,6 +63,7 @@ export component Orb inherits Rectangle {
     in property <color> ink: #ffffff;
     in property <image> off-sprite;
     in property <image> on-sprite;
+    in property <length> sprite-size;   // sprite edge, border included; shown 1:1 so its pixels are never resampled
     callback clicked();
 
     property <length> s: min(self.width, self.height);
@@ -74,8 +75,8 @@ export component Orb inherits Rectangle {
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
 
-    Image { source: off-sprite; x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; }
-    Image { source: on-sprite; opacity: lit; x: cx - r; y: cy - r; width: 2 * r; height: 2 * r; }
+    Image { source: off-sprite; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop; height: sprite-size * pop; }
+    Image { source: on-sprite; opacity: lit; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop; height: sprite-size * pop; }
 
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }

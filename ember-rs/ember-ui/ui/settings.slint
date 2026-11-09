@@ -121,6 +121,8 @@ export component SettingsPage inherits Rectangle {
     in property <bool> auto-connect;
     in property <bool> auto-failover;
     in property <bool> diagnostic-log;
+    in property <bool> keep-in-tray;
+    in property <bool> start-with-windows;
     callback language-chosen(string);
     callback theme-chosen(string);
     callback flag-toggled(string, bool);
@@ -187,9 +189,15 @@ export component SettingsPage inherits Rectangle {
                 if section == 1 : Card {
                     height: startup.preferred-height;
                     startup := VerticalLayout {
-                        SwitchRow { title: Tr.keep-in-tray; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        SwitchRow {
+                            title: Tr.keep-in-tray; subtitle: Tr.tray-help; checked: root.keep-in-tray;
+                            toggled(v) => { root.flag-toggled("keepInTray", v); }
+                        }
                         Divider { }
-                        SwitchRow { title: Tr.start-with-windows; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        SwitchRow {
+                            title: Tr.start-with-windows; subtitle: Tr.start-quietly; checked: root.start-with-windows;
+                            toggled(v) => { root.flag-toggled("startWithWindows", v); }
+                        }
                         Divider { }
                         SwitchRow {
                             title: Tr.auto-connect; subtitle: Tr.auto-connect-help; checked: root.auto-connect;

@@ -72,3 +72,20 @@ mod tests {
         assert_eq!(add[8], "/f");
     }
 }
+
+#[cfg(all(test, windows))]
+mod registry_roundtrip {
+    /// Touches the real Run key of the current user, so it only runs on request: `cargo test -p ember-win -- --ignored autostart`.
+    /// Skips (passes) when the user already has an Ember entry, so it never replaces one.
+    #[test]
+    #[ignore]
+    fn autostart_roundtrip() {
+        if super::is_enabled() {
+            return;
+        }
+        assert!(super::set_enabled(true));
+        assert!(super::is_enabled());
+        assert!(super::set_enabled(false));
+        assert!(!super::is_enabled());
+    }
+}

@@ -46,7 +46,7 @@ export component HomePage inherits Rectangle {
             Orb {
                 x: (parent.width - 260px) / 2; width: 260px; height: 260px;
                 lit: Motion.lit; angle: Motion.angle; loader: Motion.loader; ripple: Motion.ripple; pop: Motion.pop;
-                ink: Palette.orb-ink; off-sprite: Motion.sphere-off; on-sprite: Motion.sphere-on;
+                ink: Palette.orb-ink; off-sprite: Motion.sphere-off; on-sprite: Motion.sphere-on; sprite-size: Motion.sprite-size;
                 clicked => { root.orb-clicked(); }
             }
             Image {
