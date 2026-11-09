@@ -14,7 +14,7 @@ pub mod settings;
 pub mod skip;
 pub mod store;
 
-pub use engine::{Capabilities, ConnState, CredentialRequest, Engine, Snapshot, HTTP_PORT, LOCAL_BIND, SOCKS_PORT};
+pub use engine::{Capabilities, ConnState, CredentialRequest, Engine, Snapshot, SiteCheck, HTTP_PORT, LOCAL_BIND, SOCKS_PORT};
 pub use settings::Settings;
 pub use store::SubscriptionStore;
 

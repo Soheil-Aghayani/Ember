@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use ember_engine::Engine;
+use ember_engine::{Engine, SiteCheck};
 use ember_subs::subscription::{NodeResult, Subscription};
 use ember_subs::Node;
 use slint::{ModelRc, SharedString, VecModel};
@@ -58,9 +58,36 @@ fn node_row(
     selected_id: &str,
     favorites: &HashSet<String>,
     fastest: f64,
+    check: Option<&SiteCheck>,
 ) -> NodeRow {
     let code = node.flag_code();
     let image = code.as_deref().and_then(crate::flag);
+    // while a website check shows, each server shows what the site answered, instead of its speed and delay
+    if let Some(check) = check {
+        let answer = check.results.get(&node.id);
+        let (text, site) = match answer {
+            Some(r) if r.ok() => (format!("{} \u{b7} {} ms", r.code.unwrap_or(0), r.ms.unwrap_or(0)), 1),
+            Some(r) => (r.code.map(|c| c.to_string()).unwrap_or_default(), 2),
+            None => (String::new(), 0),
+        };
+        return NodeRow {
+            id: node.id.as_str().into(),
+            title: node.title().into(),
+            protocol: node.protocol.to_uppercase().into(),
+            has_flag: image.is_some(),
+            flag: image.unwrap_or_default(),
+            has_result: answer.is_some(),
+            no_answer: answer.is_some_and(|r| r.code.is_none()),
+            speed: text.into(),
+            ping: SharedString::new(),
+            has_bar: false,
+            bar: 0.0,
+            starred: favorites.contains(&node.id),
+            selected: false,
+            has_qr: node.share_link().is_some(),
+            site,
+        };
+    }
     let (speed, ping) = match result {
         Some(r) => (
             r.mbps.map(|m| format!("{m:.1} Mbps")).unwrap_or_default(),
@@ -83,6 +110,8 @@ fn node_row(
         bar: mbps.map(|m| (m / fastest).clamp(0.04, 1.0) as f32).unwrap_or(0.0),
         starred: favorites.contains(&node.id),
         selected: node.id == selected_id,
+        has_qr: node.share_link().is_some(),
+        site: 0,
     }
 }
 
@@ -102,6 +131,7 @@ fn sub_row(
     favorites: &HashSet<String>,
     selected_id: &str,
     testing: Option<&str>,
+    check: Option<&SiteCheck>,
 ) -> SubRow {
     let servers: Vec<Node> = sub.nodes.iter().filter(|n| !n.is_info()).cloned().collect();
     // a panel's own "traffic left" or "days left" line only repeats the usage bar below it, so it is dropped when the bar is there
@@ -114,7 +144,7 @@ fn sub_row(
     }
     let sorted = ember_subs::sort::sort_nodes(&servers, results, favorites);
     let fastest = sorted.iter().filter_map(|n| results.get(&n.id).and_then(|r| r.mbps)).fold(0.0, f64::max);
-    let nodes: Vec<NodeRow> = sorted.iter().map(|n| node_row(n, results.get(&n.id), selected_id, favorites, fastest)).collect();
+    let nodes: Vec<NodeRow> = sorted.iter().map(|n| node_row(n, results.get(&n.id), selected_id, favorites, fastest, check)).collect();
 
     let usage = sub.usage.as_ref().filter(|u| u.total > 0);
     let usage_text = usage
@@ -155,7 +185,7 @@ fn signature(rows: &[SubRow], testing: Option<&str>) -> String {
     for r in rows {
         text.push_str(&format!("{}|{}|{}|{}|{}|{}|{};", r.id, r.name, r.status, r.usage_text, r.expanded, r.refreshing, r.info));
         for n in r.nodes.iter() {
-            text.push_str(&format!("{}|{}|{}|{}|{}|{}|{:.2};", n.id, n.title, n.speed, n.ping, n.starred, n.selected, n.bar));
+            text.push_str(&format!("{}|{}|{}|{}|{}|{}|{:.2}|{}|{};", n.id, n.title, n.speed, n.ping, n.starred, n.selected, n.bar, n.site, n.has_result));
         }
     }
     text.push_str(testing.unwrap_or(""));
@@ -172,8 +202,9 @@ pub fn apply(app: &App, engine: &Engine, s: &Strings, ui: &ServersUi) {
     let rows: Vec<SubRow> = store
         .subscriptions()
         .iter()
-        .map(|sub| sub_row(sub, s, ui, &results, &favorites, &snap.selected_id, testing))
+        .map(|sub| sub_row(sub, s, ui, &results, &favorites, &snap.selected_id, testing, snap.site_check.as_ref()))
         .collect();
+    app.set_site_label(snap.site_check.as_ref().map(|c| c.label.as_str()).unwrap_or("").into());
     let new_signature = signature(&rows, testing);
     if *ui.signature.borrow() == new_signature {
         return;

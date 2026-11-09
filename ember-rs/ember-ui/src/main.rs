@@ -292,6 +292,15 @@ fn apply_language(app: &App, language: &str) {
     tr.set_contact(s.about_contact.into());
     tr.set_licenses(s.about_licenses.into());
     tr.set_current_version(s.current_version.into());
+    tr.set_check_site_title(s.check_site_title.into());
+    tr.set_check_site_help(s.check_site_help.into());
+    tr.set_site_hint(s.site_hint.into());
+    tr.set_check_button(s.check_button.into());
+    tr.set_clear_check(s.clear_check.into());
+    tr.set_qr_hint(s.qr_hint.into());
+    tr.set_qr_too_long(s.qr_too_long.into());
+    tr.set_copy_link(s.copy_link.into());
+    tr.set_close(s.close.into());
     tr.set_backup_hint(s.backup_hint.into());
     tr.set_save_backup(s.save_backup.into());
     tr.set_restore_backup(s.restore_backup.into());
@@ -339,6 +348,49 @@ fn show_toast(app: &App, generation: &Arc<AtomicU32>, text: &str, error: bool) {
                 app.set_toast(SharedString::new());
             }
         }
+    });
+}
+
+/// A link as a black-and-white QR picture (each module is 6 pixels, with the quiet border), or `None` when the link is
+/// too long for a code.
+fn qr_image(link: &str) -> Option<slint::Image> {
+    use ember_subs::qr::{qr_matrix, QUIET_ZONE};
+    const SCALE: usize = 6;
+    if link.is_empty() {
+        return None;
+    }
+    let matrix = qr_matrix(link).ok()?;
+    let side = (matrix.size + 2 * QUIET_ZONE) * SCALE;
+    let mut buffer = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(side as u32, side as u32);
+    let pixels = buffer.make_mut_slice();
+    for y in 0..side {
+        for x in 0..side {
+            let (mx, my) = (x / SCALE, y / SCALE);
+            let dark = mx >= QUIET_ZONE && my >= QUIET_ZONE && mx - QUIET_ZONE < matrix.size && my - QUIET_ZONE < matrix.size && matrix.is_dark(mx - QUIET_ZONE, my - QUIET_ZONE);
+            let v = if dark { 0 } else { 255 };
+            pixels[y * side + x] = slint::Rgba8Pixel { r: v, g: v, b: v, a: 255 };
+        }
+    }
+    Some(slint::Image::from_rgba8(buffer))
+}
+
+/// Applies [`style_window`] once the event loop is running (the system window may not exist before that).
+fn style_window_soon(app: &App) {
+    let weak = app.as_weak();
+    slint::Timer::single_shot(Duration::from_millis(100), move || {
+        if let Some(app) = weak.upgrade() {
+            style_window(&app);
+        }
+    });
+}
+
+/// The frameless window keeps the system's soft shadow and rounded corners (Windows 11).
+fn style_window(app: &App) {
+    use slint::winit_030::winit::platform::windows::{CornerPreference, WindowExtWindows};
+    use slint::winit_030::WinitWindowAccessor;
+    app.window().with_winit_window(|win| {
+        win.set_undecorated_shadow(true);
+        win.set_corner_preference(CornerPreference::Round);
     });
 }
 
@@ -766,6 +818,112 @@ fn lock_set(set: &std::sync::Mutex<std::collections::HashSet<String>>) -> std::s
 /// The Servers page's buttons.
 fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, dirty: &Arc<AtomicBool>) {
     let notices = Arc::new(AtomicU32::new(0));
+    // ---- file import, WARP, QR code, website check
+    app.set_site_presets(ModelRc::new(VecModel::from(
+        ember_subs::tester::SITE_PRESETS.iter().map(|(name, address)| SitePreset { name: (*name).into(), address: (*address).into() }).collect::<Vec<_>>(),
+    )));
+    {
+        let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(dirty), Arc::clone(&notices), app.as_weak());
+        app.on_import_files(move || {
+            let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(&dirty), Arc::clone(&notices), weak.clone());
+            // the file dialog blocks, and reading a link can take a while, so both happen off the window's thread
+            std::thread::spawn(move || {
+                let t = lang::current();
+                let Some(files) = rfd::FileDialog::new().set_title(t.choose_file_title).add_filter("Server files", &["json", "conf", "txt", "ovpn"]).pick_files() else { return };
+                let (mut added, mut problems) = (0usize, Vec::<String>::new());
+                for file in files {
+                    let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    let stem = file.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    // a server file is small; anything bigger is not one
+                    if std::fs::metadata(&file).is_ok_and(|m| m.len() > 2_000_000) {
+                        problems.push(strings::fill(t.file_too_large, &[("0", &name)]));
+                        continue;
+                    }
+                    match std::fs::read(&file) {
+                        Ok(bytes) => match engine.store().add(&String::from_utf8_lossy(&bytes), &stem) {
+                            Ok(sub) => added += sub.nodes.iter().filter(|n| !n.is_info()).count(),
+                            Err(e) => problems.push(format!("{name}: {e}")),
+                        },
+                        Err(e) => problems.push(format!("{name}: {e}")),
+                    }
+                }
+                dirty.store(true, Ordering::SeqCst);
+                let _ = weak.upgrade_in_event_loop(move |app| {
+                    if !problems.is_empty() {
+                        show_notice(&app, &notices, problems.join("\n").into(), true);
+                    } else if added > 0 {
+                        show_notice(&app, &notices, servers::added_message(lang::current(), added), false);
+                    }
+                });
+            });
+        });
+    }
+    {
+        let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(dirty), Arc::clone(&notices), app.as_weak());
+        app.on_add_warp(move || {
+            if let Some(app) = weak.upgrade() {
+                show_notice(&app, &notices, lang::current().warp_registering.into(), false);
+            }
+            let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(&dirty), Arc::clone(&notices), weak.clone());
+            std::thread::spawn(move || {
+                let outcome = engine.store().add_warp();
+                dirty.store(true, Ordering::SeqCst);
+                let _ = weak.upgrade_in_event_loop(move |app| match outcome {
+                    Ok(sub) => show_notice(&app, &notices, servers::added_message(lang::current(), sub.nodes.len()), false),
+                    Err(e) => show_notice(&app, &notices, e.into(), true),
+                });
+            });
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_show_qr(move |id| {
+            let (Some(app), Some(node)) = (weak.upgrade(), engine.store().node_by_id(&id)) else { return };
+            let link = node.share_link().unwrap_or_default().to_string();
+            let image = qr_image(&link);
+            app.set_qr_title(node.title().into());
+            app.set_qr_link(link.into());
+            app.set_qr_has_image(image.is_some());
+            app.set_qr_image(image.unwrap_or_default());
+            app.set_qr_open(true);
+        });
+    }
+    {
+        let (weak, notices) = (app.as_weak(), Arc::clone(&notices));
+        app.on_copy_link(move |link| {
+            if let Some(app) = weak.upgrade() {
+                if set_clipboard(&link) {
+                    show_notice(&app, &notices, lang::current().copied.into(), false);
+                }
+            }
+        });
+    }
+    {
+        let (engine, dirty, notices, weak) = (engine.clone(), Arc::clone(dirty), Arc::clone(&notices), app.as_weak());
+        app.on_check_site(move |input| {
+            let Some(app) = weak.upgrade() else { return };
+            let Some(url) = ember_subs::tester::normalize_site_url(&input) else {
+                show_notice(&app, &notices, lang::current().site_hint.into(), true);
+                return;
+            };
+            // a preset keeps its name; anything else is named by its host
+            let label = ember_subs::tester::SITE_PRESETS
+                .iter()
+                .find(|(_, address)| *address == input.trim())
+                .map(|(name, _)| (*name).to_string())
+                .unwrap_or_else(|| ember_subs::subscription::url_host(&url).unwrap_or_else(|| url.clone()).trim_start_matches("www.").to_string());
+            let nodes: Vec<_> = engine.store().all_nodes().into_iter().filter(|n| !n.is_info()).collect();
+            engine.check_site(nodes, label, url);
+            dirty.store(true, Ordering::SeqCst);
+        });
+    }
+    {
+        let (engine, dirty) = (engine.clone(), Arc::clone(dirty));
+        app.on_clear_site_check(move || {
+            engine.clear_site_check();
+            dirty.store(true, Ordering::SeqCst);
+        });
+    }
     {
         let (ui, dirty) = (Rc::clone(ui), Arc::clone(dirty));
         app.on_toggle_expanded(move |id| {
@@ -1117,6 +1275,7 @@ fn main() {
                 match event {
                     ember_win::tray::TrayEvent::Open | ember_win::tray::TrayEvent::Command(TRAY_OPEN) => {
                         let _ = app.show();
+                        style_window_soon(&app);
                     }
                     ember_win::tray::TrayEvent::Command(TRAY_TOGGLE) => {
                         if engine.snapshot().state == ConnState::Disconnected {
@@ -1191,6 +1350,7 @@ fn main() {
     // started with Windows: stay in the tray, no window
     if !(has("--minimized") && has_tray) {
         app.show().unwrap();
+        style_window_soon(&app);
     }
     slint::run_event_loop_until_quit().unwrap();
     drop(timer); // takes the tray icon with it

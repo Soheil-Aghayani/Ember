@@ -82,6 +82,14 @@ pub struct Snapshot {
     pub network: Option<String>,
     /// Two-letter country the internet sees for this connection (asked from Cloudflare once connected).
     pub exit_country: Option<String>,
+    /// A running or finished "which servers reach this website" check: the site's name and what each server got.
+    pub site_check: Option<SiteCheck>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SiteCheck {
+    pub label: String,
+    pub results: HashMap<String, ember_subs::tester::SiteResult>,
 }
 
 /// What an OpenVPN server asks for.
@@ -347,6 +355,15 @@ impl Engine {
     /// would use the tunnel.
     pub fn test_nodes(&self, nodes: Vec<Node>, speed: bool) {
         self.shared.test_nodes(nodes, speed);
+    }
+
+    /// Asks every server in `nodes` for `url` and records what each answered under `label`. Only while disconnected.
+    pub fn check_site(&self, nodes: Vec<Node>, label: String, url: String) {
+        self.shared.check_site(nodes, label, url);
+    }
+
+    pub fn clear_site_check(&self) {
+        self.shared.update(|s| s.site_check = None);
     }
 
     pub fn cancel_test(&self) {
@@ -1032,6 +1049,39 @@ impl Shared {
             if shared.is_current(generation) && shared.snapshot().state == ConnState::Connected {
                 shared.update(|s| s.exit_country = country);
             }
+        });
+    }
+
+    fn check_site(self: &Arc<Self>, nodes: Vec<Node>, label: String, url: String) {
+        let state = self.snapshot();
+        if nodes.is_empty() || state.state != ConnState::Disconnected || state.test_progress.is_some() {
+            return;
+        }
+        if !self.xray.is_available() {
+            self.update(|s| s.last_error = Some("The Xray program is missing from this installation.".to_string()));
+            return;
+        }
+        self.testing.store(true, Ordering::SeqCst);
+        self.update(|s| {
+            s.test_progress = Some("Starting…".to_string());
+            s.site_check = Some(SiteCheck { label, results: HashMap::new() });
+        });
+        let shared = Arc::clone(self);
+        std::thread::spawn(move || {
+            let progress = |text: &str| shared.update(|s| s.test_progress = Some(text.to_string()));
+            let result = |node: &Node, r| {
+                shared.update(|s| {
+                    if let Some(check) = s.site_check.as_mut() {
+                        check.results.insert(node.id.clone(), r);
+                    }
+                })
+            };
+            if let Err(e) = ember_subs::tester::check_site(&shared.xray, &nodes, &url, &ember_subs::tester::SiteEvents { progress: &progress, result: &result }) {
+                log::warn(TAG, &format!("the website check failed: {e}"));
+                shared.update(|s| s.last_error = Some(e.to_string()));
+            }
+            shared.testing.store(false, Ordering::SeqCst);
+            shared.update(|s| s.test_progress = None);
         });
     }
 

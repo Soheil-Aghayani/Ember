@@ -115,6 +115,31 @@ impl SubscriptionStore {
         Ok(subscription)
     }
 
+    /// Registers a free Cloudflare WARP device and keeps its WireGuard servers as a list of their own.
+    pub fn add_warp(&self) -> Result<Subscription, String> {
+        const NAME: &str = "Cloudflare WARP";
+        if self.subscriptions().iter().any(|s| s.name == NAME) {
+            return Err("Cloudflare WARP is already in your list.".to_string());
+        }
+        let http = ember_subs::http::Http::direct(std::time::Duration::from_secs(10), std::time::Duration::from_secs(20));
+        let registration = ember_subs::warp::register(&http).map_err(|e| e.to_string())?;
+        let nodes = ember_subs::warp::configs(&registration)
+            .into_iter()
+            .map(|(name, text)| ember_subs::config_files::wireguard(&text, &name).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let subscription = Subscription {
+            id: new_id(),
+            name: NAME.to_string(),
+            url: String::new(),
+            nodes,
+            usage: None,
+            updated_at_ms: crate::now_ms(),
+        };
+        self.lock().subscriptions.push(subscription.clone());
+        self.save();
+        Ok(subscription)
+    }
+
     /// Server links pasted directly (one per line): kept as a list without a link to refresh.
     fn add_pasted(&self, text: &str, name: &str) -> Result<Subscription, String> {
         let nodes = parse_pasted(text, name.trim())?;

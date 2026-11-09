@@ -44,7 +44,7 @@ export component AboutPage inherits Rectangle {
     Flickable {
         content-height: page.preferred-height + 48px;
         page := VerticalLayout {
-            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 12px; alignment: start;
+            y: 0px; padding-top: 0px; padding-bottom: 16px; spacing: 12px; alignment: start;
             Label { text: Tr.about; font-size: Type.headline-large; font-weight: 700; height: 40px; }
             Card {
                 height: facts.preferred-height;
@@ -137,7 +137,7 @@ export component WhatsNewPage inherits Rectangle {
     Flickable {
         content-height: page.preferred-height + 48px;
         page := VerticalLayout {
-            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 12px; alignment: start;
+            y: 0px; padding-top: 0px; padding-bottom: 16px; spacing: 12px; alignment: start;
             Label { text: Tr.whats-new; font-size: Type.headline-large; font-weight: 700; height: 40px; }
             Label { text: Tr.whats-new-intro; muted: true; font-size: Type.body-small; wrap: word-wrap; }
             for release in root.releases : ReleaseCard { release: release; }

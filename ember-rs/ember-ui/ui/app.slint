@@ -2,11 +2,11 @@
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
 import { Label, HRow, Button, TextField } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
-import { ServersPage, SubRow, NodeRow } from "servers.slint";
+import { ServersPage, SubRow, NodeRow, SitePreset } from "servers.slint";
 import { LogsPage } from "logs.slint";
 import { SettingsPage, SettingsData } from "settings.slint";
 import { AboutPage, WhatsNewPage, InfoItem, ReleaseRow } from "about.slint";
-export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow, InfoItem, ReleaseRow, SettingsData }
+export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow, SitePreset, InfoItem, ReleaseRow, SettingsData }
 
 component NavItem inherits Rectangle {
     in property <image> icon;
@@ -103,6 +103,19 @@ export component App inherits Window {
     callback refresh-subscription(string);
     callback remove-subscription(string);
     callback submit-subscription(string, string, string);
+    callback import-files();
+    callback add-warp();
+    callback show-qr(string);
+    callback copy-link(string);
+    callback check-site(string);
+    callback clear-site-check();
+    in property <[SitePreset]> site-presets;
+    in property <string> site-label;
+    in property <string> qr-title;
+    in property <string> qr-link;
+    in property <image> qr-image;
+    in property <bool> qr-has-image;
+    in-out property <bool> qr-open;
 
     title: "Ember";
     icon: @image-url("assets/ember_logo_128.png");
@@ -159,10 +172,18 @@ export component App inherits Window {
                     open-servers => { root.page = 1; }
                 }
                 if page == 1 : ServersPage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
                     subs: root.subs; testing: root.testing; can-test: root.can-pick; test-progress: root.test-progress;
                     notice: root.page-notice; notice-error: root.page-notice-error;
                     dialog-busy: root.dialog-busy; dialog-error: root.dialog-error; dialog-done: root.dialog-done; dialog-request: root.dialog-request; pasted-text: root.pasted-text; paste-serial: root.paste-serial;
+                    site-presets: root.site-presets; site-label: root.site-label;
+                    qr-title: root.qr-title; qr-link: root.qr-link; qr-image: root.qr-image; qr-has-image: root.qr-has-image; qr-open <=> root.qr-open;
+                    import-files => { root.import-files(); }
+                    add-warp => { root.add-warp(); }
+                    show-qr(id) => { root.show-qr(id); }
+                    copy-link(link) => { root.copy-link(link); }
+                    check-site(input) => { root.check-site(input); }
+                    clear-site-check => { root.clear-site-check(); }
                     toggle-expanded(id) => { root.toggle-expanded(id); }
                     select(id) => { root.choose(id); }
                     favorite(id) => { root.favorite(id); }
@@ -175,7 +196,7 @@ export component App inherits Window {
                     paste-request => { root.paste-request(); }
                 }
                 if page == 3 : LogsPage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
                     lines: root.log-lines; has-entries: root.log-has-entries; filter <=> root.log-filter;
                     filter-changed(f) => { root.log-filter-changed(f); }
                     copy => { root.copy-logs(); }
@@ -183,7 +204,7 @@ export component App inherits Window {
                     copy-report => { root.copy-report(); }
                 }
                 if page == 2 : SettingsPage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
                     d: root.settings-data; list-error: root.list-error;
                     app-mode-chosen(m) => { root.app-mode-chosen(m); }
                     list-add(kind, text) => { root.list-add(kind, text); }
@@ -198,11 +219,11 @@ export component App inherits Window {
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
                 }
                 if page == 4 : WhatsNewPage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
                     releases: root.releases;
                 }
                 if page == 5 : AboutPage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
                     info: root.about-info; licenses: root.about-licenses;
                     open-contact => { root.open-contact(); }
                 }

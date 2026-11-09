@@ -1,5 +1,5 @@
 // The Servers page. Port of SubscriptionsPage.kt: subscription cards with their servers, favourites, usage, and the
-// add / edit dialog. Not in this version: file import, QR codes, WARP, the website check.
+// add / edit dialog, file import, WARP, QR codes and the "which servers reach a website" check.
 import { Palette, Type, Icons, Tr } from "theme.slint";
 import { Card, Label, IconAction, HRow, Button, TextField } from "widgets.slint";
 
@@ -17,7 +17,11 @@ export struct NodeRow {
     bar: float,
     starred: bool,
     selected: bool,
+    has-qr: bool,
+    site: int,   // while a website check shows: 0 none, 1 reached, 2 refused or no answer
 }
+
+export struct SitePreset { name: string, address: string }
 
 export struct SubRow {
     id: string,
@@ -39,6 +43,7 @@ component ServerLine inherits Rectangle {
     in property <bool> first;
     callback select();
     callback favorite();
+    callback qr();
     height: 62px;
     background: entry.selected ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.08) : transparent);
     if !first : Rectangle { y: 0; height: 1px; x: 16px; width: parent.width - 32px; background: Palette.outline-variant; }
@@ -65,11 +70,17 @@ component ServerLine inherits Rectangle {
             if entry.has-result : Label {
                 x: 0px; width: parent.width; y: 10px; height: 22px;
                 text: entry.no-answer ? Tr.no-answer : (entry.speed != "" ? entry.speed : entry.ping); font-size: Type.body-medium;
-                color: entry.no-answer ? Palette.error : Palette.on-surface; horizontal-alignment: Palette.rtl ? left : right;
+                color: entry.no-answer || entry.site == 2 ? Palette.error : (entry.site == 1 ? Palette.tertiary : Palette.on-surface); horizontal-alignment: Palette.rtl ? left : right;
             }
             if entry.has-result && entry.speed != "" && entry.ping != "" : Label {
                 x: 0px; width: parent.width; y: 34px; height: 16px;
                 text: entry.ping; muted: true; font-size: 12px; horizontal-alignment: Palette.rtl ? left : right;
+            }
+        }
+        Rectangle {
+            width: 36px; height: 62px; horizontal-stretch: 0;   // explicit height: a flex row under-measures, and clicks outside the parent are lost
+            if entry.has-qr && entry.selected : IconAction {
+                x: 0px; y: (parent.height - self.height) / 2; icon: Icons.qr; tint: Palette.on-variant; clicked => { root.qr(); }
             }
         }
         IconAction {
@@ -89,6 +100,7 @@ component SubscriptionCard inherits Card {
     in property <bool> testing;
     in property <bool> can-test;
     callback toggle();
+    callback qr(string);
     callback select(string);
     callback favorite(string);
     callback ping();
@@ -159,6 +171,7 @@ component SubscriptionCard inherits Card {
                 entry: node; first: i == 0;
                 select => { root.select(node.id); }
                 favorite => { root.favorite(node.id); }
+                qr => { root.qr(node.id); }
             }
         }
     }
@@ -178,6 +191,19 @@ export component ServersPage inherits Rectangle {
     in property <string> pasted-text;
     in property <int> paste-serial;     // bumped when pasted-text holds new clipboard text
     callback paste-request();
+    in property <[SitePreset]> site-presets;
+    in property <string> site-label;     // the website a check is showing, or ""
+    in property <string> qr-title;
+    in property <string> qr-link;
+    in property <image> qr-image;
+    in property <bool> qr-has-image;
+    in-out property <bool> qr-open: false;
+    callback import-files();
+    callback add-warp();
+    callback show-qr(string);
+    callback copy-link(string);
+    callback check-site(string);   // what was typed or picked
+    callback clear-site-check();
     callback toggle-expanded(string);
     callback select(string);
     callback favorite(string);
@@ -193,6 +219,8 @@ export component ServersPage inherits Rectangle {
     property <string> dialog-title: "";
     property <string> dialog-link: "";
     property <string> dialog-name: "";
+    property <bool> site-open: false;
+    property <string> site-input: "";
 
     changed dialog-done => { dialog-open = false; }
     changed paste-serial => { dialog-link = dialog-link == "" ? pasted-text : dialog-link + "\n" + pasted-text; }
@@ -201,18 +229,25 @@ export component ServersPage inherits Rectangle {
     Flickable {
         content-height: page.preferred-height + 48px;
         page := VerticalLayout {
-            y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 0px; alignment: start;
+            y: 0px; padding-top: 0px; padding-bottom: 16px; spacing: 0px; alignment: start;
             Rectangle {
                 height: 44px;
-                // title and button share one centre line (a flex row left them 10 px apart)
+                // title and the four icon buttons share one centre line (a flex row left them 10 px apart)
                 add-button := IconAction {
                     x: Palette.rtl ? 0px : parent.width - self.width; y: 4px;
                     icon: Icons.plus; filled: true;   // icon only; the empty page below still says "Add servers" in words
                     clicked => { root.dialog-id = ""; root.dialog-title = Tr.add-link; root.dialog-link = ""; root.dialog-name = ""; root.dialog-open = true; }
                 }
+                IconAction { x: Palette.rtl ? 40px : parent.width - 80px; y: 4px; icon: Icons.cloud; tint: Palette.on-surface; clicked => { root.add-warp(); } }
+                IconAction { x: Palette.rtl ? 80px : parent.width - 120px; y: 4px; icon: Icons.import-file; tint: Palette.on-surface; clicked => { root.import-files(); } }
+                IconAction {
+                    x: Palette.rtl ? 120px : parent.width - 160px; y: 4px; icon: Icons.magnifier; tint: Palette.on-surface;
+                    enabled: root.can-test && !root.testing && root.subs.length > 0;
+                    clicked => { root.site-input = ""; root.site-open = true; }
+                }
                 Label {
-                    x: Palette.rtl ? add-button.width + 12px : 0px; y: 0px; height: 44px;
-                    width: parent.width - add-button.width - 12px;
+                    x: Palette.rtl ? 172px : 0px; y: 0px; height: 44px;
+                    width: parent.width - 172px;
                     text: Tr.subscriptions; font-size: Type.headline-medium; font-weight: 600;
                 }
             }
@@ -222,6 +257,23 @@ export component ServersPage inherits Rectangle {
             if notice != "" : Label {
                 text: root.notice; font-size: Type.body-small; wrap: word-wrap;
                 color: root.notice-error ? Palette.error : Palette.tertiary;
+            }
+            if site-label != "" : Rectangle { height: 12px; }
+            if site-label != "" : Rectangle {
+                height: 40px; border-radius: 12px; background: Palette.primary.with-alpha(0.10);
+                Image {
+                    source: Icons.magnifier; colorize: Palette.primary; width: 18px; height: 18px;
+                    x: Palette.rtl ? parent.width - self.width - 14px : 14px; y: (parent.height - self.height) / 2;
+                }
+                Label {
+                    x: 44px; width: parent.width - 88px; height: parent.height;
+                    text: root.site-label; font-size: Type.body-medium; font-weight: 600; overflow: elide;
+                    horizontal-alignment: Palette.rtl ? right : left;
+                }
+                IconAction {
+                    x: Palette.rtl ? 2px : parent.width - self.width - 2px; y: 2px; icon: Icons.close; tint: Palette.on-surface;
+                    clicked => { root.clear-site-check(); }
+                }
             }
             Rectangle { height: 16px; }
             if subs.length == 0 : Card {
@@ -247,6 +299,7 @@ export component ServersPage inherits Rectangle {
                     toggle => { root.toggle-expanded(sub.id); }
                     select(id) => { root.select(id); }
                     favorite(id) => { root.favorite(id); }
+                    qr(id) => { root.show-qr(id); }
                     ping => { root.ping(sub.id); }
                     test => { root.test(sub.id); }
                     stop-test => { root.stop-test(); }
@@ -289,6 +342,75 @@ export component ServersPage inherits Rectangle {
                         primary: true; enabled: !root.dialog-busy && root.dialog-link != "";
                         clicked => { root.submit(root.dialog-id, root.dialog-link, root.dialog-name); }
                     }
+                }
+            }
+        }
+    }
+
+    if site-open : Rectangle {
+        Rectangle {
+            x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
+            TouchArea { }
+        }
+        Rectangle {
+            width: min(480px, parent.width - 32px); height: sdlg.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            sdlg := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: Tr.check-site-title; font-size: Type.headline-small; font-weight: 600; }
+                Label { text: Tr.check-site-help; muted: true; font-size: Type.body-small; wrap: word-wrap; vertical-alignment: top; }
+                HRow {
+                    alignment: start; height: 36px; spacing: 8px;
+                    for preset in root.site-presets : Rectangle {
+                        height: 32px; width: chip.preferred-width + 24px; border-radius: 16px; horizontal-stretch: 0;
+                        border-width: 1px; border-color: root.site-input == preset.address ? Palette.primary : Palette.outline-variant;
+                        background: root.site-input == preset.address ? Palette.primary.with-alpha(0.14) : (chip-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent);
+                        chip := Label { x: 12px; y: 0px; height: parent.height; text: preset.name; font-size: Type.body-small; font-weight: 500; }
+                        chip-touch := TouchArea { mouse-cursor: pointer; clicked => { root.site-input = preset.address; } }
+                    }
+                }
+                TextField { placeholder: Tr.site-hint; text <=> root.site-input; accepted(t) => { if t != "" { root.site-open = false; root.check-site(t); } } }
+                HRow {
+                    alignment: end; height: 40px; spacing: 8px;
+                    Button { text: Tr.cancel; clicked => { root.site-open = false; } }
+                    // shown once there is something to check (a dimmed solid button is hard to read)
+                    if root.site-input != "" : Button {
+                        text: Tr.check-button; primary: true;
+                        clicked => { root.site-open = false; root.check-site(root.site-input); }
+                    }
+                }
+            }
+        }
+    }
+
+    if qr-open : Rectangle {
+        Rectangle {
+            x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
+            TouchArea { clicked => { root.qr-open = false; } }
+        }
+        Rectangle {
+            width: min(340px, parent.width - 32px); height: qdlg.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 4);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            qdlg := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: root.qr-title; font-size: Type.body-large; font-weight: 600; overflow: elide; }
+                // always on white, so a phone can read it in the dark theme too
+                if root.qr-has-image : Rectangle {
+                    height: 292px; border-radius: 12px; background: white;
+                    Image {
+                        source: root.qr-image; image-rendering: pixelated;
+                        x: 6px; y: 6px; width: parent.width - 12px; height: parent.height - 12px; image-fit: contain;
+                    }
+                }
+                Label { text: root.qr-has-image ? Tr.qr-hint : Tr.qr-too-long; muted: true; font-size: Type.body-small; wrap: word-wrap; horizontal-alignment: center; }
+                Rectangle {
+                    height: 40px;
+                    IconAction { x: Palette.rtl ? parent.width - self.width : 0px; y: 2px; icon: Icons.copy; tint: Palette.primary; clicked => { root.copy-link(root.qr-link); } }
+                    Button { x: Palette.rtl ? 0px : parent.width - self.width; y: 0px; text: Tr.close; clicked => { root.qr-open = false; } }
                 }
             }
         }

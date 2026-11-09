@@ -227,7 +227,7 @@ export component SettingsPage inherits Rectangle {
     Flickable {
         content-height: page.preferred-height + 48px;
         page := VerticalLayout {
-            y: 0px; padding-top: 32px; padding-bottom: 16px; alignment: start;
+            y: 0px; padding-top: 0px; padding-bottom: 16px; alignment: start;
             if section == 0 : VerticalLayout {
                 Label { text: Tr.settings; font-size: Type.headline-large; font-weight: 700; height: 40px; }
                 GroupLabel { text: Tr.settings-interface; }
