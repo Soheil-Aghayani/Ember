@@ -130,7 +130,9 @@ fn refresh(app: &App, engine: &Engine, model: &VecModel<ServerRow>, s: &strings:
         (None, false) => s.choose_server.to_string(),
     };
     app.set_server_title(title.into());
-    let image = node.as_ref().and_then(|n| n.flag_code()).as_deref().and_then(flag);
+    // once connected, the country the internet really sees beats the server's own label
+    let shown = snap.exit_country.clone().filter(|_| connected).or_else(|| node.as_ref().and_then(|n| n.flag_code()));
+    let image = shown.as_deref().and_then(flag);
     app.set_server_has_flag(image.is_some());
     app.set_server_flag(image.unwrap_or_default());
     app.set_server_detail(if connected {

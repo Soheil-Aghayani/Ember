@@ -80,6 +80,8 @@ pub struct Snapshot {
     pub credential_request: Option<CredentialRequest>,
     /// A name for the network the computer is on, refreshed every few seconds.
     pub network: Option<String>,
+    /// Two-letter country the internet sees for this connection (asked from Cloudflare once connected).
+    pub exit_country: Option<String>,
 }
 
 /// What an OpenVPN server asks for.
@@ -449,6 +451,7 @@ impl Shared {
         drop(lock(&self.credential_answer).take());
         self.update(|s| {
             s.connected_at_ms = None;
+            s.exit_country = None;
             s.connected_node = None;
             s.progress = None;
             s.whole_device = false;
@@ -606,6 +609,7 @@ impl Shared {
         self.settings.set_was_connected(true);
         self.watch_xray(generation);
         self.watch_health(generation);
+        self.check_exit(Some(self.socks_port), generation);
         if routed {
             self.check_routed_traffic(generation);
         }
@@ -730,6 +734,7 @@ impl Shared {
             // with the kill switch on, a crash or restart of Ember resumes the connection like whole-device mode
             self.settings.set_was_connected(self.openvpn_guard.load(Ordering::SeqCst));
             log::info(TAG, "OpenVPN is connected");
+            self.check_exit(None, generation);
         };
         let result = self.host.openvpn_session(&session_profile, &mut ask, &mut { progress }, &mut connected, cancel);
         if !self.is_current(generation) {
@@ -1013,6 +1018,23 @@ impl Shared {
         self.connect(next);
     }
 
+    /// Asks Cloudflare which country the connection comes out in (through Xray's port, or directly when OpenVPN carries
+    /// the traffic) and shows it instead of the server's own flag. Silent on failure.
+    fn check_exit(self: &Arc<Self>, socks_port: Option<u16>, generation: u64) {
+        let shared = Arc::clone(self);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1500));
+            if !shared.is_current(generation) {
+                return;
+            }
+            let country = exit_country(socks_port);
+            log::info(TAG, &format!("exit country: {}", country.as_deref().unwrap_or("unknown")));
+            if shared.is_current(generation) && shared.snapshot().state == ConnState::Connected {
+                shared.update(|s| s.exit_country = country);
+            }
+        });
+    }
+
     fn test_nodes(self: &Arc<Self>, nodes: Vec<Node>, speed: bool) {
         let nodes: Vec<Node> = nodes.into_iter().filter(|n| n.protocol != "openvpn").collect();
         let state = self.snapshot();
@@ -1120,6 +1142,21 @@ enum Stop {
     /// Another connect, a disconnect or a switch took over; leave the state alone.
     Cancelled,
     Failed(String),
+}
+
+/// The two-letter country code Cloudflare's trace page reports for this connection.
+fn exit_country(socks_port: Option<u16>) -> Option<String> {
+    if cfg!(test) {
+        return None; // tests must not reach the real internet
+    }
+    let (connect, read) = (Duration::from_secs(8), Duration::from_secs(8));
+    let http = match socks_port {
+        Some(port) => Http::socks(port, connect, read, Duration::from_secs(15), false),
+        None => Http::direct(connect, read),
+    };
+    let body = http.get("https://www.cloudflare.com/cdn-cgi/trace", &[]).ok()?.into_text(4096).ok()?;
+    let code = body.lines().find_map(|l| l.strip_prefix("loc="))?.trim().to_ascii_lowercase();
+    (code.len() == 2 && code.chars().all(|c| c.is_ascii_alphabetic())).then_some(code)
 }
 
 /// Milliseconds a small request through Xray's local port took, or `None` when it failed.
