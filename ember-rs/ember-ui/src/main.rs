@@ -33,6 +33,8 @@ struct OrbMotion {
     angle: f32,
     ripple: f32,
     pop: f32,
+    page_in: f32,
+    last_page: i32,
     last: Instant,
     previous: ConnState,
 }
@@ -1243,7 +1245,7 @@ fn main() {
     let weak = app.as_weak();
     let engine_for_timer = engine.clone();
     let mut motion =
-        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, last: Instant::now(), previous: ConnState::Disconnected };
+        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
     let mut sprite_px = 0u32;
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
@@ -1327,6 +1329,13 @@ fn main() {
             motion.pop = 0.94;
         }
         motion.previous = state;
+        // a page change restarts the short fade-and-rise of the page (eased out, a quarter of a second)
+        let page = app.get_page();
+        if page != motion.last_page {
+            motion.last_page = page;
+            motion.page_in = 0.0;
+        }
+        motion.page_in = (motion.page_in + dt / 0.25).min(1.0);
         let (lit_t, speed_t) = match state {
             ConnState::Disconnected => (0.0, 0.12),
             ConnState::Connecting => (0.55, 3.2),
@@ -1346,6 +1355,7 @@ fn main() {
         m.set_loader(motion.loader);
         m.set_ripple(motion.ripple);
         m.set_pop(motion.pop);
+        m.set_page_in(1.0 - (1.0 - motion.page_in).powi(3));
     });
     // started with Windows: stay in the tray, no window
     if !(has("--minimized") && has_tray) {

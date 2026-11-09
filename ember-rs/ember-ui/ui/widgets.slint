@@ -47,6 +47,7 @@ export component IconAction inherits Rectangle {
     width: caption == "" ? 36px : row.preferred-width + 20px;
     border-radius: 10px;
     background: filled ? (enabled ? Palette.primary : Palette.primary.with-alpha(0.5)) : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
+    animate background { duration: 120ms; easing: ease-out; }
     row := HRow {
         pad-start: 10px; pad-end: 10px; spacing: 8px;
         Image { source: icon; colorize: filled ? Palette.on-primary : tint; width: 18px; height: 18px; opacity: enabled ? 1 : 0.5; }
@@ -66,6 +67,7 @@ export component Button inherits Rectangle {
     width: label.preferred-width + 32px;
     border-radius: 12px;
     background: primary ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
+    animate background { duration: 120ms; easing: ease-out; }
     opacity: enabled ? 1 : 0.55;
     label := Label {
         x: 16px; y: 0px; width: parent.width - 32px; height: parent.height; text: root.text;
@@ -117,11 +119,14 @@ export component ToggleSwitch inherits Rectangle {
     border-width: 2px;
     border-color: checked ? Palette.primary : Palette.on-variant;
     background: checked ? Palette.primary : transparent;
+    animate background { duration: 150ms; easing: ease-out; }
+    animate border-color { duration: 150ms; easing: ease-out; }
     Rectangle {
         width: 18px; height: 18px; border-radius: 9px;
         x: checked ? 24px : 5px; y: 5px;
         background: checked ? Palette.on-primary : Palette.on-variant;
         animate x { duration: 150ms; easing: ease-out; }
+        animate background { duration: 150ms; easing: ease-out; }
     }
     TouchArea { enabled: root.enabled; mouse-cursor: enabled ? pointer : default; clicked => { root.toggled(!root.checked); } }
 }

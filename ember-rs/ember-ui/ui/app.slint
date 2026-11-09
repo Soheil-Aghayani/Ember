@@ -16,6 +16,7 @@ component NavItem inherits Rectangle {
     height: 42px;
     border-radius: 10px;
     background: active ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.09) : transparent);
+    animate background { duration: 120ms; easing: ease-out; }
     HRow {
         pad-start: 12px; spacing: 12px;
         Image { source: icon; colorize: active ? Palette.primary : Palette.on-surface; width: 20px; height: 20px; }
@@ -160,7 +161,7 @@ export component App inherits Window {
                 width: min(640px, parent.width);
                 x: (parent.width - self.width) / 2;
                 if page == 0 : HomePage {
-                    x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
+                    x: 32px; y: (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height; opacity: Motion.page-in;
                     state: root.state; status: root.status; secondary: root.secondary;
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
@@ -172,7 +173,7 @@ export component App inherits Window {
                     open-servers => { root.page = 1; }
                 }
                 if page == 1 : ServersPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
+                    x: 32px; y: 32px + (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
                     subs: root.subs; testing: root.testing; can-test: root.can-pick; test-progress: root.test-progress;
                     notice: root.page-notice; notice-error: root.page-notice-error;
                     dialog-busy: root.dialog-busy; dialog-error: root.dialog-error; dialog-done: root.dialog-done; dialog-request: root.dialog-request; pasted-text: root.pasted-text; paste-serial: root.paste-serial;
@@ -196,7 +197,7 @@ export component App inherits Window {
                     paste-request => { root.paste-request(); }
                 }
                 if page == 3 : LogsPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
+                    x: 32px; y: 32px + (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
                     lines: root.log-lines; has-entries: root.log-has-entries; filter <=> root.log-filter;
                     filter-changed(f) => { root.log-filter-changed(f); }
                     copy => { root.copy-logs(); }
@@ -204,7 +205,7 @@ export component App inherits Window {
                     copy-report => { root.copy-report(); }
                 }
                 if page == 2 : SettingsPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
+                    x: 32px; y: 32px + (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
                     d: root.settings-data; list-error: root.list-error;
                     app-mode-chosen(m) => { root.app-mode-chosen(m); }
                     list-add(kind, text) => { root.list-add(kind, text); }
@@ -219,11 +220,11 @@ export component App inherits Window {
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
                 }
                 if page == 4 : WhatsNewPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
+                    x: 32px; y: 32px + (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
                     releases: root.releases;
                 }
                 if page == 5 : AboutPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px;
+                    x: 32px; y: 32px + (1 - Motion.page-in) * 14px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
                     info: root.about-info; licenses: root.about-licenses;
                     open-contact => { root.open-contact(); }
                 }
@@ -299,6 +300,7 @@ export component App inherits Window {
     for glyph[i] in [Icons.minimize, Icons.maximize, Icons.window-close] : Rectangle {
         x: Palette.rtl ? i * 46px : parent.width - (3 - i) * 46px; y: 0px; width: 46px; height: 32px;
         background: wb.has-hover ? (i == 2 ? #e5484d : Palette.on-surface.with-alpha(0.10)) : transparent;
+        animate background { duration: 120ms; easing: ease-out; }
         Image { source: glyph; width: 16px; height: 16px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; colorize: wb.has-hover && i == 2 ? white : Palette.on-variant; }
         wb := TouchArea {
             mouse-cursor: pointer;

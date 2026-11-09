@@ -59,6 +59,7 @@ export component AboutPage inherits Rectangle {
                     Rectangle {
                         height: 52px;
                         background: contact-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+                        animate background { duration: 120ms; easing: ease-out; }
                         Image {
                             source: Icons.telegram; colorize: Palette.primary; width: 24px; height: 24px;
                             x: Palette.rtl ? parent.width - self.width - 16px : 16px; y: (parent.height - self.height) / 2;
@@ -73,6 +74,7 @@ export component AboutPage inherits Rectangle {
                     Rectangle {
                         height: 52px;
                         background: licenses-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+                        animate background { duration: 120ms; easing: ease-out; }
                         Label {
                             x: Palette.rtl ? 16px + 16px + 12px : 16px; width: parent.width - 32px - 28px; height: parent.height;
                             text: Tr.licenses; font-size: Type.body-large;

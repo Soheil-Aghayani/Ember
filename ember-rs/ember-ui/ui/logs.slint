@@ -14,6 +14,7 @@ component Chip inherits Rectangle {
     border-width: 1px;
     border-color: selected ? Palette.primary : Palette.outline-variant;
     background: selected ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.08) : transparent);
+    animate background { duration: 120ms; easing: ease-out; }
     label := Label {
         x: 16px; y: 0px; width: parent.width - 32px; height: parent.height; text: root.text;
         font-size: Type.body-small; font-weight: 500;

@@ -90,6 +90,7 @@ export component HomePage inherits Rectangle {
                     Rectangle {
                         height: 44px; border-radius: 10px;
                         background: t0.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
+                        animate background { duration: 120ms; easing: ease-out; }
                         HRow { alignment: stretch; pad-start: 12px; pad-end: 12px; spacing: 12px;
                             Image { source: Icons.bolt; colorize: Palette.primary; width: 24px; height: 24px; }
                             Label { text: Tr.fastest-server; horizontal-stretch: 1; }
@@ -100,6 +101,7 @@ export component HomePage inherits Rectangle {
                     for row in root.servers : Rectangle {
                         height: 44px; border-radius: 10px;
                         background: tr.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
+                        animate background { duration: 120ms; easing: ease-out; }
                         HRow { alignment: stretch; pad-start: 12px; pad-end: 12px; spacing: 12px;
                             if row.has-flag : Image { source: row.flag; width: 24px; height: 24px; image-fit: contain; }
                             if !row.has-flag : Image { source: Icons.subscriptions; colorize: Palette.on-variant; width: 24px; height: 24px; }
@@ -112,6 +114,7 @@ export component HomePage inherits Rectangle {
                     Rectangle {
                         height: 44px; border-radius: 10px;
                         background: tm.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
+                        animate background { duration: 120ms; easing: ease-out; }
                         Label { x: 12px; width: parent.width - 24px; text: Tr.manage-servers; }
                         tm := TouchArea { mouse-cursor: pointer; clicked => { popup.close(); root.open-servers(); } }
                     }

@@ -46,6 +46,7 @@ component ServerLine inherits Rectangle {
     callback qr();
     height: 62px;
     background: entry.selected ? Palette.primary.with-alpha(0.16) : (touch.has-hover ? Palette.primary.with-alpha(0.08) : transparent);
+    animate background { duration: 120ms; easing: ease-out; }
     if !first : Rectangle { y: 0; height: 1px; x: 16px; width: parent.width - 32px; background: Palette.outline-variant; }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.select(); } }
     HRow {
@@ -83,14 +84,18 @@ component ServerLine inherits Rectangle {
                 x: 0px; y: (parent.height - self.height) / 2; icon: Icons.qr; tint: Palette.on-variant; clicked => { root.qr(); }
             }
         }
-        IconAction {
-            icon: entry.starred ? Icons.star-filled : Icons.star;
-            tint: entry.starred ? Palette.primary : Palette.on-variant;
-            clicked => { root.favorite(); }
+        Rectangle {
+            width: 36px; height: 62px; horizontal-stretch: 0;
+            IconAction {
+                x: 0px; y: (parent.height - self.height) / 2;
+                icon: entry.starred ? Icons.star-filled : Icons.star;
+                tint: entry.starred ? Palette.primary : Palette.on-variant;
+                clicked => { root.favorite(); }
+            }
         }
         Rectangle {
-            width: 20px; horizontal-stretch: 0;
-            if entry.selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; }
+            width: 20px; height: 62px; horizontal-stretch: 0;
+            if entry.selected : Image { source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px; x: 0px; y: (parent.height - self.height) / 2; }
         }
     }
 }
@@ -219,6 +224,9 @@ export component ServersPage inherits Rectangle {
     property <string> dialog-title: "";
     property <string> dialog-link: "";
     property <string> dialog-name: "";
+    // dialogs fade in and rise a little (the property lives on the page, so it animates before the dialog exists)
+    property <float> dlg-t: (dialog-open || site-open || qr-open) ? 1 : 0;
+    animate dlg-t { duration: 180ms; easing: ease-out; }
     property <bool> site-open: false;
     property <string> site-input: "";
 
@@ -312,6 +320,7 @@ export component ServersPage inherits Rectangle {
     }
 
     if dialog-open : Rectangle {
+        opacity: root.dlg-t;
         // the page is inset from the window edges, so the dimming is far larger than the page (the window clips it)
         Rectangle {
             x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
@@ -319,7 +328,7 @@ export component ServersPage inherits Rectangle {
         }
         Rectangle {
             width: min(480px, parent.width - 32px); height: dlg.preferred-height + 48px;
-            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3) + (1 - root.dlg-t) * 14px;
             border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
             background: Palette.dark ? #24201c : #ffffff;
             dlg := VerticalLayout {
@@ -349,13 +358,14 @@ export component ServersPage inherits Rectangle {
     }
 
     if site-open : Rectangle {
+        opacity: root.dlg-t;
         Rectangle {
             x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
             TouchArea { }
         }
         Rectangle {
             width: min(480px, parent.width - 32px); height: sdlg.preferred-height + 48px;
-            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3) + (1 - root.dlg-t) * 14px;
             border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
             background: Palette.dark ? #24201c : #ffffff;
             sdlg := VerticalLayout {
@@ -368,6 +378,7 @@ export component ServersPage inherits Rectangle {
                         height: 32px; width: chip.preferred-width + 24px; border-radius: 16px; horizontal-stretch: 0;
                         border-width: 1px; border-color: root.site-input == preset.address ? Palette.primary : Palette.outline-variant;
                         background: root.site-input == preset.address ? Palette.primary.with-alpha(0.14) : (chip-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent);
+                        animate background { duration: 120ms; easing: ease-out; }
                         chip := Label { x: 12px; y: 0px; height: parent.height; text: preset.name; font-size: Type.body-small; font-weight: 500; }
                         chip-touch := TouchArea { mouse-cursor: pointer; clicked => { root.site-input = preset.address; } }
                     }
@@ -387,13 +398,14 @@ export component ServersPage inherits Rectangle {
     }
 
     if qr-open : Rectangle {
+        opacity: root.dlg-t;
         Rectangle {
             x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
             TouchArea { clicked => { root.qr-open = false; } }
         }
         Rectangle {
             width: min(340px, parent.width - 32px); height: qdlg.preferred-height + 48px;
-            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 4);
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 4) + (1 - root.dlg-t) * 14px;
             border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
             background: Palette.dark ? #24201c : #ffffff;
             qdlg := VerticalLayout {
