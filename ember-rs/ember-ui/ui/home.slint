@@ -123,14 +123,21 @@ export component HomePage inherits Rectangle {
             }
         }
         if (can-pick && servers.length > 0) || testing : Rectangle { height: 8px; }
-        if (can-pick && servers.length > 0) || testing : HRow {
-            alignment: start; height: 36px; spacing: 8px;
-            IconAction {
+        if (can-pick && servers.length > 0) || testing : Rectangle {
+            height: 36px;
+            // the icon lines up with the server card's content (16 px in; the action has 10 px of its own padding)
+            action := IconAction {
+                x: Palette.rtl ? parent.width - self.width - 6px : 6px;
                 icon: testing ? Icons.stop : Icons.bolt;
                 caption: testing ? Tr.stop-test : Tr.test-speed;
                 clicked => { if root.testing { root.cancel-test(); } else { root.test-speed(); } }
             }
-            if testing && test-progress != "" : Label { text: root.test-progress; muted: true; font-size: Type.body-small; overflow: elide; }
+            if testing && test-progress != "" : Label {
+                x: Palette.rtl ? 6px : action.x + action.width + 8px;
+                width: parent.width - action.width - 20px;
+                height: 36px;
+                text: root.test-progress; muted: true; font-size: Type.body-small; overflow: elide;
+            }
         }
         if caption != "" : Rectangle { height: 12px; }
         if caption != "" : Label { text: root.caption; muted: true; font-size: Type.body-small; horizontal-alignment: center; wrap: word-wrap; }

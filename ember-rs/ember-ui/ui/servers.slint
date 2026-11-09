@@ -92,31 +92,37 @@ component SubscriptionCard inherits Card {
     callback refresh();
     callback edit();
     callback remove();
-    height: inner.preferred-height + 16px;
+    height: inner.preferred-height;
     inner := VerticalLayout {
         padding-top: 8px; padding-bottom: 8px;
         Rectangle {
             height: 56px;
             TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
-            HRow {
-                alignment: space-between; pad-start: 16px; pad-end: 12px;
-                VerticalLayout {
-                    alignment: center;
-                    Label { text: sub.name; font-size: 17px; font-weight: 600; overflow: elide; }
-                    Label { text: sub.status; muted: true; font-size: Type.body-small; overflow: elide; }
+            // explicit positions: the name and status on the left, the four actions and the chevron on the right, all centred on the 56 px row
+            acts := Rectangle {
+                x: Palette.rtl ? 12px : parent.width - self.width - 12px; y: 10px; width: 178px; height: 36px;
+                // left to right: test, refresh, edit, delete, chevron (mirrored in a right-to-left language)
+                IconAction {
+                    x: Palette.rtl ? 142px : 0px; y: 0px;
+                    icon: testing ? Icons.stop : Icons.bolt;
+                    enabled: testing || can-test;
+                    clicked => { if root.testing { root.stop-test(); } else { root.test(); } }
                 }
-                HRow {
-                    alignment: start; spacing: 4px;
-                    IconAction {
-                        icon: testing ? Icons.stop : Icons.bolt;
-                        enabled: testing || can-test;
-                        clicked => { if root.testing { root.stop-test(); } else { root.test(); } }
-                    }
-                    IconAction { icon: Icons.refresh; enabled: sub.can-refresh && !sub.refreshing; tint: Palette.on-surface; clicked => { root.refresh(); } }
-                    IconAction { icon: Icons.edit; tint: Palette.on-surface; clicked => { root.edit(); } }
-                    IconAction { icon: Icons.trash; tint: Palette.on-surface; clicked => { root.remove(); } }
-                    Image { source: sub.expanded ? Icons.chevron-up : Icons.chevron-down; colorize: Palette.on-variant; width: 18px; height: 18px; }
+                IconAction { x: Palette.rtl ? 102px : 40px; y: 0px; icon: Icons.refresh; enabled: sub.can-refresh && !sub.refreshing; tint: Palette.on-surface; clicked => { root.refresh(); } }
+                IconAction { x: Palette.rtl ? 62px : 80px; y: 0px; icon: Icons.edit; tint: Palette.on-surface; clicked => { root.edit(); } }
+                IconAction { x: Palette.rtl ? 22px : 120px; y: 0px; icon: Icons.trash; tint: Palette.on-surface; clicked => { root.remove(); } }
+                Image {
+                    x: Palette.rtl ? 0px : 160px; y: 9px; width: 18px; height: 18px;
+                    source: sub.expanded ? Icons.chevron-up : Icons.chevron-down; colorize: Palette.on-variant;
                 }
+            }
+            Label {
+                x: Palette.rtl ? acts.x + acts.width + 8px : 16px; y: 7px; height: 24px; width: parent.width - acts.width - 12px - 16px - 8px;
+                text: sub.name; font-size: 17px; font-weight: 600; overflow: elide;
+            }
+            Label {
+                x: Palette.rtl ? acts.x + acts.width + 8px : 16px; y: 31px; height: 18px; width: parent.width - acts.width - 12px - 16px - 8px;
+                text: sub.status; muted: true; font-size: Type.body-small; overflow: elide;
             }
         }
         if sub.has-usage : VerticalLayout {
@@ -184,15 +190,21 @@ export component ServersPage inherits Rectangle {
         content-height: page.preferred-height + 48px;
         page := VerticalLayout {
             y: 0px; padding-top: 32px; padding-bottom: 16px; spacing: 0px; alignment: start;
-            HRow {
-                alignment: stretch; height: 40px; spacing: 8px;
-                Label { text: Tr.subscriptions; font-size: Type.headline-medium; font-weight: 600; horizontal-stretch: 1; }
-                IconAction {
+            Rectangle {
+                height: 44px;
+                // title and button share one centre line (a flex row left them 10 px apart)
+                add-button := IconAction {
+                    x: Palette.rtl ? 0px : parent.width - self.width; y: 4px;
                     icon: Icons.plus; caption: Tr.add-servers; filled: true;
                     clicked => { root.dialog-id = ""; root.dialog-title = Tr.add-link; root.dialog-link = ""; root.dialog-name = ""; root.dialog-open = true; }
                 }
+                Label {
+                    x: Palette.rtl ? add-button.width + 12px : 0px; y: 0px; height: 44px;
+                    width: parent.width - add-button.width - 12px;
+                    text: Tr.subscriptions; font-size: Type.headline-medium; font-weight: 600;
+                }
             }
-            Rectangle { height: 8px; }
+            Rectangle { height: 12px; }
             Label { text: Tr.subscriptions-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
             if notice != "" : Rectangle { height: 12px; }
             if notice != "" : Label {
