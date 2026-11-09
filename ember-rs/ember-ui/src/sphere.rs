@@ -31,6 +31,12 @@ fn ramp(stops: &[(f32, [f32; 3]); 6], t: f32) -> [f32; 3] {
 
 fn mix(base: [f32; 3], over: [f32; 3], a: f32) -> [f32; 3] { [0, 1, 2].map(|i| base[i] + (over[i] - base[i]) * a) }
 
+/// Interleaved gradient noise in -0.5..0.5 (fixed pattern, so the sprite looks the same every time).
+fn dither(x: u32, y: u32) -> f32 {
+    let v = 52.982_918 * (0.067_110_56 * x as f32 + 0.005_837_15 * y as f32).fract();
+    v.fract() - 0.5
+}
+
 /// `size` is the sphere's diameter; the buffer is `pad` pixels larger on every side so the renderer's rounding never clips it.
 fn pixels(size: u32, pad: u32, lit: f32) -> Vec<u8> {
     let r = size as f32 / 2.0;
@@ -54,11 +60,13 @@ fn pixels(size: u32, pad: u32, lit: f32) -> Vec<u8> {
             if u > 0.78 { c = mix(c, [0.0; 3], 0.30 * ((u - 0.78) / 0.22).clamp(0.0, 1.0)); }
             // thin bright rim on the upper half
             let rim = 1.5 / r * 2.0;
-            if d > 1.0 - rim && y < 0.0 {
-                c = mix(c, [255.0; 3], (0.22 + 0.28 * lit) * (-y).clamp(0.0, 1.0));
-            }
+            // (its inner edge is a one-pixel ramp, not a hard step, or the rim shows stair steps)
+            let inner = ((d - (1.0 - rim)) * r).clamp(0.0, 1.0);
+            c = mix(c, [255.0; 3], inner * (0.22 + 0.28 * lit) * (-y).clamp(0.0, 1.0));
+            // a touch of noise before rounding to 8 bits, so the smooth gradient has no visible bands
+            let n = dither(px, py);
             let i = ((py * total + px) * 4) as usize;
-            out[i] = c[0].round() as u8; out[i + 1] = c[1].round() as u8; out[i + 2] = c[2].round() as u8;
+            out[i] = (c[0] + n).round().clamp(0.0, 255.0) as u8; out[i + 1] = (c[1] + n).round().clamp(0.0, 255.0) as u8; out[i + 2] = (c[2] + n).round().clamp(0.0, 255.0) as u8;
             out[i + 3] = (edge * 255.0).round() as u8;
         }
     }
@@ -69,13 +77,11 @@ fn pixels(size: u32, pad: u32, lit: f32) -> Vec<u8> {
 /// Transparent border around the sphere in the sprite, in pixels.
 pub const PAD: u32 = 4;
 
-/// The off and on sprites: a sphere `diameter` pixels across inside a buffer `PAD` pixels larger on every side.
-pub fn sprites(diameter: u32) -> (Image, Image) {
+/// One sprite (`lit` 0 is the off sphere, 1 the on sphere): a sphere `diameter` pixels across inside a buffer `PAD`
+/// pixels larger on every side. It is drawn 1:1, so it is made again for every size the sphere takes while it pops.
+pub fn sprite(diameter: u32, lit: f32) -> Image {
     let total = diameter + 2 * PAD;
-    let make = |lit: f32| {
-        let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(total, total);
-        buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, PAD, lit));
-        Image::from_rgba8(buffer)
-    };
-    (make(0.0), make(1.0))
+    let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(total, total);
+    buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, PAD, lit));
+    Image::from_rgba8(buffer)
 }

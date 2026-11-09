@@ -44,6 +44,7 @@ export component App inherits Window {
     in property <bool> testing;
     in property <string> test-progress;
     callback orb-clicked();
+    callback orb-touch(int);
     callback choose(string);
     callback cancel-test();
     in property <[SubRow]> subs;
@@ -169,6 +170,7 @@ export component App inherits Window {
                     blocked-notice: root.blocked-notice; can-restore: root.can-restore;
                     restore-internet => { root.restore-internet(); }
                                 orb-clicked => { root.orb-clicked(); }
+                    orb-touch(s) => { root.orb-touch(s); }
                     choose(id) => { root.choose(id); }
                     open-servers => { root.page = 1; }
                 }

@@ -1,5 +1,5 @@
 // The About page and the What's new page. Ports of AboutPage.kt and WhatsNewPage.kt.
-import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Palette, Type, Icons, Tr, Motion, ListAnim } from "theme.slint";
 import { Card, Label, HRow } from "widgets.slint";
 import { AboutSlint } from "std-widgets.slint";
 
@@ -122,7 +122,9 @@ component BulletLine inherits Rectangle {
 
 component ReleaseCard inherits Card {
     in property <ReleaseRow> release;
+    in property <int> index;
     height: col.preferred-height;
+    opacity: ListAnim.enter(index, Motion.list-t);
     col := VerticalLayout {
         padding: 16px; spacing: 8px;
         HRow {
@@ -142,7 +144,7 @@ export component WhatsNewPage inherits Rectangle {
             y: 0px; padding-top: 0px; padding-bottom: 16px; spacing: 12px; alignment: start;
             Label { text: Tr.whats-new; font-size: Type.headline-large; font-weight: 700; height: 40px; }
             Label { text: Tr.whats-new-intro; muted: true; font-size: Type.body-small; wrap: word-wrap; }
-            for release in root.releases : ReleaseCard { release: release; }
+            for release[i] in root.releases : ReleaseCard { release: release; index: i; }
         }
     }
 }

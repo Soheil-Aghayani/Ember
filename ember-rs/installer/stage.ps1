@@ -15,9 +15,12 @@ foreach ($need in 'ember-helper.exe', 'ember-tunnel.ps1', 'tunnel') {
 }
 if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
 New-Item -ItemType Directory -Path $Out | Out-Null
-Copy-Item $exe $Out
-Copy-Item (Join-Path $root 'ember-ui\ui\assets\flags') (Join-Path $Out 'flags') -Recurse
-foreach ($need in 'ember-helper.exe', 'ember-tunnel.ps1', 'tunnel') { Copy-Item (Join-Path $Resources $need) $Out -Recurse }
+# one program in the folder; everything it needs sits in resources\
+Copy-Item $exe (Join-Path $Out 'Ember.exe')
+$inside = Join-Path $Out 'resources'
+New-Item -ItemType Directory -Path $inside | Out-Null
+Copy-Item (Join-Path $root 'ember-ui\ui\assets\flags') (Join-Path $inside 'flags') -Recurse
+foreach ($need in 'ember-helper.exe', 'ember-tunnel.ps1', 'tunnel') { Copy-Item (Join-Path $Resources $need) $inside -Recurse }
 $size = (Get-ChildItem $Out -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 'Staged {0:N0} MB in {1}' -f $size, $Out
 $iscc = (Get-Command ISCC -ErrorAction SilentlyContinue).Source

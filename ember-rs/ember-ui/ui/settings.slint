@@ -1,6 +1,6 @@
 // The Settings page. Port of SettingsPage.kt: a short list of groups; some rows open a sub-page, language and appearance
 // open a small menu. Backup and the MTU box are not in this build yet and are shown dimmed with a note.
-import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Palette, Type, Icons, Tr, Motion, ListAnim } from "theme.slint";
 import { Card, Label, IconAction, HRow, ToggleSwitch, Button, TextField } from "widgets.slint";
 
 export struct ChoiceOption {
@@ -236,6 +236,7 @@ export component SettingsPage inherits Rectangle {
                 Label { text: Tr.settings; font-size: Type.headline-large; font-weight: 700; height: 40px; }
                 GroupLabel { text: Tr.settings-interface; }
                 Card {
+                    opacity: ListAnim.enter(1, Motion.list-t);
                     height: list1.preferred-height;
                     list1 := VerticalLayout {
                         ChoiceRow {

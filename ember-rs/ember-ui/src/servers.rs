@@ -16,11 +16,15 @@ use crate::{App, NodeRow, SubRow};
 
 #[derive(Default)]
 pub struct ServersUi {
+    /// The card that was just opened; the motion timer starts the rows coming in for it.
+    pub opened: RefCell<Option<String>>,
     /// Cards that are open. Only the window thread touches it.
     pub expanded: RefCell<HashSet<String>>,
     /// Subscriptions being refreshed right now; worker threads add and remove ids.
     pub refreshing: Arc<Mutex<HashSet<String>>>,
     signature: RefCell<String>,
+    /// The page's list, updated in place (a new model would rebuild every card and restart their animations).
+    model: RefCell<Option<std::rc::Rc<VecModel<SubRow>>>>,
 }
 
 impl ServersUi {
@@ -212,7 +216,21 @@ pub fn apply(app: &App, engine: &Engine, s: &Strings, ui: &ServersUi) {
         return;
     }
     *ui.signature.borrow_mut() = new_signature;
-    app.set_subs(ModelRc::new(VecModel::from(rows)));
+    let mut slot = ui.model.borrow_mut();
+    let model = slot.get_or_insert_with(|| {
+        let model = std::rc::Rc::new(VecModel::<SubRow>::default());
+        app.set_subs(ModelRc::from(model.clone()));
+        model
+    });
+    use slint::Model;
+    let same_shape = model.row_count() == rows.len() && rows.iter().enumerate().all(|(i, r)| model.row_data(i).is_some_and(|old| old.id == r.id));
+    if same_shape {
+        for (i, row) in rows.into_iter().enumerate() {
+            model.set_row_data(i, row);
+        }
+    } else {
+        model.set_vec(rows);
+    }
 }
 
 /// What a successful add says.

@@ -30,6 +30,7 @@ export component HomePage inherits Rectangle {
     callback restore-internet();
     in property <int> menu-request;        // bump to open the server menu from outside (debug flag --menu)
     callback orb-clicked();
+    callback orb-touch(int);
     callback choose(string);
     callback open-servers();
 
@@ -44,9 +45,10 @@ export component HomePage inherits Rectangle {
             height: 260px;
             Orb {
                 x: (parent.width - 260px) / 2; width: 260px; height: 260px;
-                lit: Motion.lit; angle: Motion.angle; loader: Motion.loader; ripple: Motion.ripple; pop: Motion.pop;
+                lit: Motion.lit; angle: Motion.angle; loader: Motion.loader; ripple: Motion.ripple; pop: Motion.pop; feel: Motion.feel;
                 ink: Palette.orb-ink; off-sprite: Motion.sphere-off; on-sprite: Motion.sphere-on; sprite-size: Motion.sprite-size;
                 clicked => { root.orb-clicked(); }
+                touch-state(s) => { root.orb-touch(s); }
             }
             Image {
                 source: Icons.power; colorize: #ffffffeb; width: 44px; height: 44px;

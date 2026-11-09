@@ -7,7 +7,7 @@
 ; Kotlin ones (and drop the "EmberRust" scheduled-task folder) in one commit.
 
 #ifndef Version
-  #define Version "0.1.0"
+  #define Version "2.0.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "stage"
@@ -27,7 +27,7 @@ DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=Ember-Rust-{#Version}
 SetupIconFile=..\ember-ui\ui\assets\ember.ico
-UninstallDisplayIcon={app}\ember-ui.exe
+UninstallDisplayIcon={app}\Ember.exe
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -43,28 +43,27 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [InstallDelete]
 ; start from clean folders so no file of an older version can linger or go missing
-Type: filesandordirs; Name: "{app}\flags"
-Type: filesandordirs; Name: "{app}\tunnel"
+Type: filesandordirs; Name: "{app}\resources"
 
 [Files]
-; ember-ui.exe, flags\ (the round flags), ember-helper.exe, ember-tunnel.ps1 and tunnel\ (Xray, hev-socks5-tunnel, Wintun, sing-box)
+; Ember.exe, and resources\ with flags\ (the round flags), ember-helper.exe, ember-tunnel.ps1 and tunnel\ (Xray, hev-socks5-tunnel, Wintun, sing-box)
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{group}\Ember (Rust preview)"; Filename: "{app}\ember-ui.exe"
-Name: "{autodesktop}\Ember (Rust preview)"; Filename: "{app}\ember-ui.exe"; Tasks: desktopicon
+Name: "{group}\Ember (Rust preview)"; Filename: "{app}\Ember.exe"
+Name: "{autodesktop}\Ember (Rust preview)"; Filename: "{app}\Ember.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\ember-ui.exe"; Description: "Start Ember"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Ember.exe"; Description: "Start Ember"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; remove the scheduled tasks the app registered ("Connect without Windows prompts")
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Get-ScheduledTask -TaskPath '\EmberRust\' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveEmberRustTasks"
 ; lift any route or firewall rule Ember left behind (harmless when there is nothing to lift)
-Filename: "{app}\ember-helper.exe"; Parameters: "restore --config ""{userappdata}\Ember-Rust\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberRustNative"; Check: HelperExists
+Filename: "{app}\resources\ember-helper.exe"; Parameters: "restore --config ""{userappdata}\Ember-Rust\tunnel-state\config.json"""; Flags: runhidden waituntilterminated; RunOnceId: "RestoreEmberRustNative"; Check: HelperExists
 
 [Code]
 function HelperExists: Boolean;
 begin
-  Result := FileExists(ExpandConstant('{app}\ember-helper.exe'));
+  Result := FileExists(ExpandConstant('{app}\resources\ember-helper.exe'));
 end;

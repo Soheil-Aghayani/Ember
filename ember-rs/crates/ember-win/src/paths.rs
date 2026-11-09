@@ -15,11 +15,15 @@ fn data_dir_in(appdata: Option<std::ffi::OsString>, profile: Option<std::ffi::Os
 }
 
 /// The folder that holds `ember-helper.exe`, `ember-tunnel.ps1` and `tunnel\`. The Kotlin app reads it from
-/// `compose.application.resources.dir`; here `EMBER_RESOURCES_DIR` overrides the folder of the running exe.
+/// `compose.application.resources.dir`; here `EMBER_RESOURCES_DIR` overrides it, and otherwise it is the `resources`
+/// folder next to the exe (an install keeps every helper there, so the program folder holds one exe), or the exe's own
+/// folder when there is none (a build tree).
 pub fn resources_dir() -> Option<PathBuf> {
-    std::env::var_os("EMBER_RESOURCES_DIR")
-        .map(PathBuf::from)
-        .or_else(|| std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from)))
+    std::env::var_os("EMBER_RESOURCES_DIR").map(PathBuf::from).or_else(|| {
+        let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from))?;
+        let inside = exe_dir.join("resources");
+        Some(if inside.is_dir() { inside } else { exe_dir })
+    })
 }
 
 /// First file called [name] anywhere under [dir] (like Kotlin's `walkTopDown().firstOrNull`).

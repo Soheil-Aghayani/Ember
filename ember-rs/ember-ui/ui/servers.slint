@@ -1,6 +1,6 @@
 // The Servers page. Port of SubscriptionsPage.kt: subscription cards with their servers, favourites, usage, and the
 // add / edit dialog, file import, WARP, QR codes and the "which servers reach a website" check.
-import { Palette, Type, Icons, Tr } from "theme.slint";
+import { Palette, Type, Icons, Tr, Motion, ListAnim } from "theme.slint";
 import { Card, Label, IconAction, HRow, Button, TextField } from "widgets.slint";
 
 export struct NodeRow {
@@ -38,7 +38,7 @@ export struct SubRow {
     nodes: [NodeRow],
 }
 
-component ServerLine inherits Rectangle {
+component ServerLineBody inherits Rectangle {
     in property <NodeRow> entry;
     in property <bool> first;
     callback select();
@@ -100,8 +100,32 @@ component ServerLine inherits Rectangle {
     }
 }
 
+/// A row that rises and fades in when its card opens (`t` is the card's own clock, see SubscriptionCard).
+component ServerLine inherits Rectangle {
+    in property <NodeRow> entry;
+    in property <bool> first;
+    in property <int> index;
+    in property <float> t;
+    callback select();
+    callback favorite();
+    callback qr();
+    height: 62px;
+    property <float> p: ListAnim.enter(index, t);
+    ServerLineBody {
+        x: 0px; y: (1 - root.p) * 10px; width: parent.width; height: 62px; opacity: root.p;
+        entry: root.entry; first: root.first;
+        select => { root.select(); }
+        favorite => { root.favorite(); }
+        qr => { root.qr(); }
+    }
+}
+
 component SubscriptionCard inherits Card {
     in property <SubRow> sub;
+    in property <int> index;
+    // seconds since this card was opened (2 when it was not just opened); its rows read it to come in one by one
+    property <float> enter-t: Motion.row-card == sub.id ? Motion.row-t : 2.0;
+    opacity: ListAnim.enter(index, Motion.list-t);
     in property <bool> testing;
     in property <bool> can-test;
     callback toggle();
@@ -173,7 +197,7 @@ component SubscriptionCard inherits Card {
         if sub.expanded : Rectangle { height: 1px; background: Palette.outline-variant; }
         if sub.expanded : VerticalLayout {
             for node[i] in sub.nodes : ServerLine {
-                entry: node; first: i == 0;
+                entry: node; first: i == 0; index: i; t: root.enter-t;
                 select => { root.select(node.id); }
                 favorite => { root.favorite(node.id); }
                 qr => { root.qr(node.id); }
@@ -300,10 +324,10 @@ export component ServersPage inherits Rectangle {
                     }
                 }
             }
-            for sub in subs : VerticalLayout {
+            for sub[i] in subs : VerticalLayout {
                 padding-bottom: 16px;
                 SubscriptionCard {
-                    sub: sub; testing: root.testing; can-test: root.can-test && !root.testing;
+                    sub: sub; index: i; testing: root.testing; can-test: root.can-test && !root.testing;
                     toggle => { root.toggle-expanded(sub.id); }
                     select(id) => { root.select(id); }
                     favorite(id) => { root.favorite(id); }

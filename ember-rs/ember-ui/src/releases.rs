@@ -1,5 +1,6 @@
 //! The release history shown on the What's new page, ported from WhatsNewPage.kt (newest first; English and Persian
-//! lists of the same length). Generated from the Kotlin file; add new entries there and regenerate.
+//! lists of the same length). The entries from 1.0.101 down were generated from the Kotlin file; the Rust build adds its
+//! own at the top.
 
 pub struct Release {
     pub version: &'static str,
@@ -8,6 +9,27 @@ pub struct Release {
 }
 
 pub const RELEASES: &[Release] = &[
+    Release {
+        version: "2.0.0",
+        en: &[
+            "Ember is rebuilt as a native Windows app: it opens at once and sits at about 30 MB of memory when idle (about 23 MB in the tray).",
+            "A new look: choose Dark chocolate or Strawberry chocolate (Settings, Appearance), a smoother glass orb that springs when you connect and reacts to your pointer, and lists that glide in.",
+            "The window has its own title bar, rounded corners and a soft shadow; every page is laid out again for narrow windows and for Persian, which now uses the Vazirmatn font.",
+            "Servers: test only the delay (quick, almost no data) or the download speed as well, add servers from a file, add Cloudflare WARP, show a server as a QR code for your phone, and see which servers reach a website you care about.",
+            "Home shows the country that websites really see once you are connected, and the speed test no longer sits on the main page.",
+            "Settings: the MTU box, and Backup and restore.",
+            "Installing is tidier: one Ember program with everything else in a resources folder.",
+        ],
+        fa: &[
+            "Ember از نو به‌صورت یک برنامهٔ بومی ویندوز ساخته شد: بی‌درنگ باز می‌شود و در حالت آماده حدود ۳۰ مگابایت حافظه می‌گیرد (در سینی حدود ۲۳ مگابایت).",
+            "ظاهر تازه: «شکلات تلخ» یا «شکلات توت‌فرنگی» را انتخاب کنید (تنظیمات، ظاهر)، گوی شیشه‌ای نرم‌تر که هنگام اتصال فنری می‌جهد و به اشاره‌گر شما واکنش نشان می‌دهد، و فهرست‌هایی که نرم وارد می‌شوند.",
+            "پنجره نوار عنوان خودش، گوشه‌های گرد و سایهٔ ملایم دارد؛ همهٔ صفحه‌ها برای پنجرهٔ باریک و برای فارسی دوباره چیده شد و فارسی حالا از قلم وزیرمتن استفاده می‌کند.",
+            "سرورها: فقط تأخیر را بسنجید (سریع و تقریباً بدون مصرف داده) یا سرعت دانلود را هم، سرور را از فایل اضافه کنید، Cloudflare WARP را اضافه کنید، سرور را برای گوشی خود با کد QR نشان دهید، و ببینید کدام سرورها به وب‌سایت موردنظرتان می‌رسند.",
+            "صفحهٔ خانه کشوری را نشان می‌دهد که وب‌سایت‌ها پس از اتصال واقعاً می‌بینند، و آزمون سرعت دیگر روی صفحهٔ اصلی نیست.",
+            "تنظیمات: کادر MTU و پشتیبان‌گیری و بازیابی.",
+            "نصب مرتب‌تر شد: یک برنامهٔ Ember و بقیهٔ فایل‌ها در پوشهٔ resources.",
+        ],
+    },
     Release {
         version: "1.0.101",
         en: &[

@@ -34,11 +34,47 @@ struct OrbMotion {
     ripple: f32,
     pop: f32,
     pop_v: f32,
+    feel: f32,
+    list_t: f32,
+    row_t: f32,
+    row_card: String,
+    sprites: SpriteCache,
     frame: u32,
     page_in: f32,
     last_page: i32,
     last: Instant,
     previous: ConnState,
+}
+
+/// The sphere sprites for the size now shown. They are drawn 1:1 (a resampled sprite has jagged edges), so they are made
+/// again whenever the sphere's pixel size changes (the connect spring, hover, press); only the visible one is made.
+#[derive(Default)]
+struct SpriteCache {
+    diameter: u32,
+    scale: f32,
+    off: bool,
+    on: bool,
+}
+
+impl SpriteCache {
+    fn ensure(&mut self, app: &App, diameter: u32, scale: f32, lit: f32) {
+        let m = app.global::<Motion>();
+        let fresh = diameter != self.diameter || scale != self.scale;
+        if fresh {
+            *self = SpriteCache { diameter, scale, off: false, on: false };
+        }
+        if lit < 0.999 && !self.off {
+            self.off = true;
+            m.set_sphere_off(sphere::sprite(diameter, 0.0));
+        }
+        if lit > 0.001 && !self.on {
+            self.on = true;
+            m.set_sphere_on(sphere::sprite(diameter, 1.0));
+        }
+        if fresh {
+            m.set_sprite_size((diameter + 2 * sphere::PAD) as f32 / scale);
+        }
+    }
 }
 
 fn approach(v: f32, target: f32, dt: f32, seconds: f32) -> f32 {
@@ -48,9 +84,11 @@ fn approach(v: f32, target: f32, dt: f32, seconds: f32) -> f32 {
 /// A round flag from the bundled circle-flags set: next to the exe in an install, in the source tree when developing.
 pub(crate) fn flag(code: &str) -> Option<Image> {
     let name = format!("flags/{}.svg", code.to_lowercase());
-    let beside_exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(&name)));
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(std::path::Path::to_path_buf));
+    let beside_exe = exe_dir.as_ref().map(|d| d.join("resources").join(&name));
     let in_source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ui/assets").join(&name);
-    [beside_exe, Some(in_source)].into_iter().flatten().find(|p| p.exists()).and_then(|p| Image::load_from_path(&p).ok())
+    let next_to_exe = exe_dir.map(|d| d.join(&name));
+    [beside_exe, next_to_exe, Some(in_source)].into_iter().flatten().find(|p| p.exists()).and_then(|p| Image::load_from_path(&p).ok())
 }
 
 /// `--ports <socks> <http>`: other local proxy ports, so the Rust app can run beside the Kotlin app (which holds 10808).
@@ -933,9 +971,7 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
         app.on_toggle_expanded(move |id| {
             {
                 let mut open = ui.expanded.borrow_mut();
-                if !open.remove(id.as_str()) {
-                    open.insert(id.to_string());
-                }
+                if !open.remove(id.as_str()) { open.insert(id.to_string()); *ui.opened.borrow_mut() = Some(id.to_string()); }
             }
             ui.invalidate();
             dirty.store(true, Ordering::SeqCst);
@@ -1248,11 +1284,17 @@ fn main() {
     let engine_for_timer = engine.clone();
     let state_cell = Rc::new(std::cell::Cell::new(ConnState::Disconnected));
     let state_for_main = Rc::clone(&state_cell);
+    let servers_for_motion = Rc::clone(&servers_ui);
+    let touch_cell = Rc::new(std::cell::Cell::new(0i32));
+    {
+        let touch_cell = Rc::clone(&touch_cell);
+        app.on_orb_touch(move |s| touch_cell.set(s));
+    }
     let (demo_connecting, demo_connected, demo_settled) = (has("--demo-orb-connecting"), has("--demo-orb-connected"), has("--demo-orb-settled"));
     let mut motion =
-        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, frame: 0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
+        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), frame: 0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
-    let mut sprite_px = 0u32;
+    
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
     let dialog_at: u32 = if has("--dialog") { 40 } else { 0 }; // debug: open the add dialog after about a second
     let connect_at: u32 = if has("--connect") { 45 } else { 0 }; // debug: press Connect after about 1.5 seconds
@@ -1316,16 +1358,6 @@ fn main() {
                 push_settings(&app, engine);
             }
         }
-        // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
-        let px = (176.0 * app.window().scale_factor()).round() as u32;
-        if px != sprite_px {
-            sprite_px = px;
-            let (off, on) = sphere::sprites(px);
-            let m = app.global::<Motion>();
-            m.set_sphere_off(off);
-            m.set_sphere_on(on);
-            m.set_sprite_size((px + 2 * sphere::PAD) as f32 / app.window().scale_factor());
-        }
         // debug: --demo-orb-connecting / -connected (switches 0.4 s before a 5 s screenshot) / -settled show the orb states without a server
         let shown = if demo_connecting {
             ConnState::Connecting
@@ -1342,11 +1374,14 @@ fn main() {
     {
         let weak = app.as_weak();
         let state_cell = Rc::clone(&state_cell);
+        let touch_cell = Rc::clone(&touch_cell);
+        let servers_ui = Rc::clone(&servers_for_motion);
         motion_timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
             let Some(app) = weak.upgrade() else { return };
             let state = state_cell.get();
             let now = Instant::now();
             let dt = now.duration_since(motion.last).as_secs_f32().min(0.1);
+            let touch_target = [1.0, 1.02, 0.965][touch_cell.get().clamp(0, 2) as usize];
             // nothing is drawn while the window is hidden (tray); the orb catches up in a frame or two when it shows again
         if !app.window().is_visible() {
             motion.last = now;
@@ -1357,9 +1392,7 @@ fn main() {
         let settled = motion.ripple >= 1.0
             && (motion.pop - 1.0).abs() < 0.0005
             && motion.pop_v.abs() < 0.001
-            && motion.page_in >= 1.0
-            && motion.last_page == app.get_page()
-            && motion.loader < 0.002;
+            && motion.page_in >= 1.0 && motion.list_t >= 2.0 && motion.row_t >= 2.0 && motion.last_page == app.get_page() && (motion.feel - touch_target).abs() < 0.0005 && motion.loader < 0.002;
         let every = match state {
             ConnState::Disconnected if settled && motion.lit < 0.002 => 6,
             ConnState::Connected if settled && motion.lit > 0.995 => 3,
@@ -1379,10 +1412,12 @@ fn main() {
             // a page change restarts the short fade-and-rise of the page (eased out, a quarter of a second)
             let page = app.get_page();
             if page != motion.last_page {
-                motion.last_page = page;
-                motion.page_in = 0.0;
+                motion.last_page = page; motion.page_in = 0.0; motion.list_t = 0.0; } motion.page_in = (motion.page_in + dt / 0.25).min(1.0); motion.list_t = (motion.list_t + dt).min(2.0);
+            if let Some(id) = servers_ui.opened.borrow_mut().take() {
+                motion.row_card = id;
+                motion.row_t = 0.0;
             }
-            motion.page_in = (motion.page_in + dt / 0.25).min(1.0);
+            motion.row_t = (motion.row_t + dt).min(2.0); motion.feel = approach(motion.feel, touch_target, dt, 0.08);
             let (lit_t, speed_t) = match state {
                 ConnState::Disconnected => (0.0, 0.12),
                 ConnState::Connecting => (0.55, 3.2),
@@ -1403,7 +1438,15 @@ fn main() {
                 motion.pop += motion.pop_v * h;
                 left -= h;
             }
+            // the sphere itself is made again for its current pixel size (176 logical, scaled by the spring and the pointer)
+            let scale = app.window().scale_factor();
+            let diameter = ((176.0 * scale * motion.pop * motion.feel).round() as u32).max(16);
+            motion.sprites.ensure(&app, diameter, scale, motion.lit);
             let m = app.global::<Motion>();
+            m.set_feel(motion.feel);
+            m.set_list_t(motion.list_t);
+            m.set_row_t(motion.row_t);
+            m.set_row_card(motion.row_card.as_str().into());
             m.set_angle(motion.angle);
             m.set_lit(motion.lit);
             m.set_loader(motion.loader);

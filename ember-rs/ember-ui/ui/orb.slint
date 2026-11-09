@@ -61,26 +61,28 @@ export component Orb inherits Rectangle {
     in property <float> loader;     // 0..1, the running arc while connecting
     in property <float> ripple: 1;  // 0..1 expanding ring after connecting; 1 = none
     in property <float> pop: 1;
+    in property <float> feel: 1;     // hover lifts, press pushes in (a spring on the Rust side)
     in property <color> ink: #ffffff;
     in property <image> off-sprite;
     in property <image> on-sprite;
     in property <length> sprite-size;   // sprite edge, border included; shown 1:1 so its pixels are never resampled
     callback clicked();
+    callback touch-state(int);       // 0 away, 1 hovered, 2 pressed
 
     property <length> s: min(self.width, self.height);
     property <length> cx: self.width / 2;
     property <length> cy: self.height / 2;
-    // pressing pushes the sphere in a little, hovering lifts it a little
-    property <float> feel: touch.pressed ? 0.965 : (touch.has-hover ? 1.02 : 1.0);
-    animate feel { duration: 140ms; easing: ease-out; }
+    property <int> ts: touch.pressed ? 2 : (touch.has-hover ? 1 : 0);
+    changed ts => { root.touch-state(ts); }
     property <length> r: s * 0.34 * pop * feel;
 
     // back halves of both rings, then the sphere, then the front halves
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
 
-    Image { source: off-sprite; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop * feel; height: sprite-size * pop * feel; }
-    Image { source: on-sprite; opacity: lit; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size * pop * feel; height: sprite-size * pop * feel; }
+    // the sprites are drawn 1:1 at the size Rust made them for, so the edge is never resampled
+    Image { source: off-sprite; visible: lit < 0.999; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size; height: sprite-size; }
+    Image { source: on-sprite; visible: lit > 0.001; opacity: lit; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size; height: sprite-size; }
 
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: true; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }

@@ -79,12 +79,13 @@ mod tests {
 
     #[test]
     fn every_release_has_the_same_number_of_lines_in_both_languages() {
-        assert_eq!(RELEASES.len(), 32);
+        assert_eq!(RELEASES.len(), 33);
         for r in RELEASES {
             assert!(!r.en.is_empty(), "{}", r.version);
             assert_eq!(r.en.len(), r.fa.len(), "{}", r.version);
         }
-        assert_eq!(RELEASES[0].version, "1.0.101");
+        assert_eq!(RELEASES[0].version, "2.0.0");
+        assert_eq!(RELEASES[1].version, "1.0.101");
     }
 
     #[test]

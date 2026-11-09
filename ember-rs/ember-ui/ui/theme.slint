@@ -89,10 +89,22 @@ export global Motion {
     in property <float> loader;
     in property <float> ripple: 1;
     in property <float> pop: 1;
+    in property <float> feel: 1;      // the orb: 1 at rest, a little more hovered, a little less pressed
+    in property <string> row-card;   // the card whose rows are coming in (it was just opened)
+    in property <float> row-t: 2;     // seconds since it opened
+    in property <float> list-t: 2;    // seconds since the page changed; lists stagger their rows by it
     in property <float> page-in: 1;   // 0 right after a page change, eased up to 1
     in property <image> sphere-off;
     in property <image> sphere-on;
     in property <length> sprite-size: 184px;   // the sprite including its transparent border
+}
+
+/// Rows of a list come in one after another: 0 to 1 for item `index` when `t` seconds have passed, eased out.
+export global ListAnim {
+    pure public function enter(index: int, t: float) -> float {
+        let p = Math.min(1.0, Math.max(0.0, (t - Math.min(index * 1.0, 8.0) * 0.045) / 0.28));
+        return 1.0 - (1.0 - p) * (1.0 - p) * (1.0 - p);
+    }
 }
 
 /// Every string the .slint files show; filled from strings.rs when the language changes.
