@@ -1,6 +1,7 @@
 // The About page and the What's new page. Ports of AboutPage.kt and WhatsNewPage.kt.
 import { Palette, Type, Icons, Tr } from "theme.slint";
 import { Card, Label, HRow } from "widgets.slint";
+import { AboutSlint } from "std-widgets.slint";
 
 export struct InfoItem {
     label: string,
@@ -92,6 +93,8 @@ export component AboutPage inherits Rectangle {
                     }
                 }
             }
+            // The Slint royalty-free licence asks for this badge on the About screen.
+            AboutSlint { height: 120px; }
         }
     }
 }

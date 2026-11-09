@@ -21,7 +21,7 @@ const LICENSES: [(&str, &str); 8] = [
     ("Inter (font)", "SIL Open Font License 1.1"),
     ("Solar icons (480 Design)", "CC BY 4.0"),
     ("circle-flags", "MIT"),
-    ("Slint (user interface)", "GPL-3.0 or the Slint royalty-free licence"),
+    ("Slint (user interface)", "Slint royalty-free licence (made with Slint)"),
     ("Rust libraries (winit, ureq, regex, ...)", "MIT / Apache-2.0"),
 ];
 
