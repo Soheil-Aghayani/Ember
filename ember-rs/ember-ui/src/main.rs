@@ -364,11 +364,9 @@ fn wire_settings_page(
                 "autoFailover" => s.set_auto_failover(value),
                 "diagnosticLog" => s.set_diagnostic_log(value),
                 "keepInTray" => s.set_keep_in_tray(value),
-                "startWithWindows" => {
-                    if !ember_win::autostart::set_enabled(value) {
-                        // the switch goes back to what Windows really has (push_settings below)
-                        ember_engine::log::warn("Ember", "could not change the Windows startup entry");
-                    }
+                // the switch goes back to what Windows really has (push_settings below) when the change fails
+                "startWithWindows" if !ember_win::autostart::set_enabled(value) => {
+                    ember_engine::log::warn("Ember", "could not change the Windows startup entry");
                 }
                 _ => {}
             }
