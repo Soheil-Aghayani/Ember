@@ -138,9 +138,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn formats_utc_time() {
-        assert_eq!(format_time(0), "1970-01-01T00:00:00.000");
-        assert_eq!(format_time(1_700_000_000_123), "2023-11-14T22:13:20.123");
-        assert_eq!(format_time(1_709_164_800_000), "2024-02-29T00:00:00.000"); // a leap day
+    fn formats_a_clock_without_an_offset() {
+        assert_eq!(format_clock(0), "1970-01-01T00:00:00.000");
+        assert_eq!(format_clock(1_700_000_000_123), "2023-11-14T22:13:20.123");
+        assert_eq!(format_clock(1_709_164_800_000), "2024-02-29T00:00:00.000"); // a leap day
     }
 }
