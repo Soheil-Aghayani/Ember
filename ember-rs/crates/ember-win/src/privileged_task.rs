@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 
 use crate::{paths, proc, Error, Result};
 
-pub const UP_TASK: &str = r"\Ember\Tunnel Up";
-pub const RESTORE_TASK: &str = r"\Ember\Tunnel Restore";
+pub const UP_TASK: &str = r"\EmberRust\Tunnel Up";
+pub const RESTORE_TASK: &str = r"\EmberRust\Tunnel Restore";
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub struct PrivilegedTask {
@@ -104,8 +104,8 @@ impl PrivilegedTask {
     }
 }
 
-const UNREGISTER_SCRIPT: &str = "Unregister-ScheduledTask -TaskName 'Tunnel Up' -TaskPath '\\Ember\\' -Confirm:$false -ErrorAction SilentlyContinue; \
-Unregister-ScheduledTask -TaskName 'Tunnel Restore' -TaskPath '\\Ember\\' -Confirm:$false -ErrorAction SilentlyContinue";
+const UNREGISTER_SCRIPT: &str = "Unregister-ScheduledTask -TaskName 'Tunnel Up' -TaskPath '\\EmberRust\\' -Confirm:$false -ErrorAction SilentlyContinue; \
+Unregister-ScheduledTask -TaskName 'Tunnel Restore' -TaskPath '\\EmberRust\\' -Confirm:$false -ErrorAction SilentlyContinue";
 
 /// The PowerShell that registers the two tasks. [native] is `ember-helper.exe` when shipped; otherwise [helper] is the
 /// PowerShell script, run through powershell.exe.
@@ -129,7 +129,7 @@ function Reg($name, $mode) {{\n\
     {task_action}\n\
     $principal = New-ScheduledTaskPrincipal -UserId '{user}' -LogonType Interactive -RunLevel Highest\n\
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)\n\
-    Register-ScheduledTask -TaskName $name -TaskPath '\\Ember\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null\n\
+    Register-ScheduledTask -TaskName $name -TaskPath '\\EmberRust\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null\n\
 }}\n\
 Reg 'Tunnel Up' 'Up'\n\
 Reg 'Tunnel Restore' 'Restore'"

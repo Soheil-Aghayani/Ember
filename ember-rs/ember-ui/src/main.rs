@@ -159,15 +159,39 @@ fn refresh(app: &App, engine: &Engine, model: &VecModel<ServerRow>, s: &strings:
             duration(snap.connected_at_ms.map(|t| ((ember_engine::now_ms() - t) / 1000).max(0) as u64).unwrap_or(0)).into()
         }
     });
-    app.set_caption(if connected {
+    app.set_caption(if !connected || snap.using_openvpn {
+        SharedString::new()
+    } else if snap.whole_device {
+        s.whole_device_short.into()
+    } else if snap.app_rules {
+        s.app_rules.into()
+    } else {
         strings::fill(
             s.proxy_mode_caption,
             &[("socks", &format!("{LOCAL_BIND}:{}", ports.0)), ("http", &format!("{LOCAL_BIND}:{}", ports.1))],
         )
         .into()
-    } else {
-        SharedString::new()
     });
+    app.set_blocked_notice(if DEMO_BLOCKED.load(Ordering::SeqCst) {
+        "Ember closed while the kill switch was on, so internet access is still blocked.".into()
+    } else {
+        snap.blocked_notice.clone().unwrap_or_default().into()
+    });
+    app.set_can_restore(snap.state == ConnState::Disconnected);
+    match &snap.credential_request {
+        Some(request) => {
+            let template = if request.ask_user { s.openvpn_sign_in } else { s.key_password_for };
+            app.set_cred_title(strings::fill(template, &[("0", &request.server_name)]).into());
+            app.set_cred_ask_user(request.ask_user);
+            app.set_cred_open(true);
+        }
+        None if DEMO_CRED.load(Ordering::SeqCst) => {
+            app.set_cred_title(strings::fill(s.openvpn_sign_in, &[("0", "Office")]).into());
+            app.set_cred_ask_user(true);
+            app.set_cred_open(true);
+        }
+        None => app.set_cred_open(false),
+    }
     app.set_error(snap.last_error.clone().unwrap_or_default().into());
     app.set_testing(snap.test_progress.is_some());
     app.set_test_progress(snap.test_progress.clone().unwrap_or_default().into());
@@ -265,6 +289,32 @@ fn apply_language(app: &App, language: &str) {
     tr.set_contact(s.about_contact.into());
     tr.set_licenses(s.about_licenses.into());
     tr.set_current_version(s.current_version.into());
+    tr.set_whole_device_help(s.whole_device_help.into());
+    tr.set_whole_device_short(s.whole_device_short.into());
+    tr.set_auto_untrusted(s.auto_connect_untrusted.into());
+    tr.set_auto_untrusted_help(s.auto_connect_untrusted_help.into());
+    tr.set_trust_network(s.trust_this_network.into());
+    tr.set_no_trusted(s.no_trusted_networks.into());
+    tr.set_skip_help(s.skip_vpn_help.into());
+    tr.set_needs_whole(s.needs_whole_device.into());
+    tr.set_address_placeholder(s.address_placeholder.into());
+    tr.set_add_address(s.add_address.into());
+    tr.set_username(s.username.into());
+    tr.set_sign_in(s.sign_in.into());
+    tr.set_credentials_not_saved(s.credentials_not_saved.into());
+    tr.set_password(s.password.into());
+    tr.set_app_off(s.app_rules_off.into());
+    tr.set_app_skip(s.app_rules_skip.into());
+    tr.set_app_skip_help(s.app_rules_skip_help.into());
+    tr.set_app_only(s.app_rules_only.into());
+    tr.set_app_only_help(s.app_rules_only_help.into());
+    tr.set_app_note(s.app_rules_note.into());
+    tr.set_app_needs_whole(s.app_rules_needs_whole.into());
+    tr.set_apps_list(s.apps_list.into());
+    tr.set_add_app(s.add_app.into());
+    tr.set_no_apps(s.no_apps.into());
+    tr.set_internet_blocked(s.internet_blocked.into());
+    tr.set_restore_internet(s.restore_internet.into());
 }
 
 /// A short message at the bottom of the window.
@@ -306,16 +356,84 @@ fn is_dark(theme: &str, forced: Option<bool>) -> bool {
     })
 }
 
+static CAPABILITIES: std::sync::OnceLock<ember_engine::Capabilities> = std::sync::OnceLock::new();
+/// Whether Windows starts Ember at sign-in (asking launches `reg.exe`, so it is read at start and after a change).
+static AUTOSTART: AtomicBool = AtomicBool::new(false);
+/// Debug flags `--demo-blocked` and `--demo-cred` show the kill-switch notice and the OpenVPN sign-in without a real connection.
+static DEMO_BLOCKED: AtomicBool = AtomicBool::new(false);
+static DEMO_CRED: AtomicBool = AtomicBool::new(false);
+
+fn entries_text(count: usize) -> String {
+    let fa = lang::code() == "fa";
+    match (count, fa) {
+        (0, false) => "None".to_string(),
+        (0, true) => "\u{647}\u{6cc}\u{686}".to_string(),
+        (n, false) => format!("{n} entries"),
+        (n, true) => format!("{n} \u{645}\u{648}\u{631}\u{62f}"),
+    }
+}
+
+fn app_rules_text(mode: &str) -> &'static str {
+    match (mode, lang::code() == "fa") {
+        ("skip", false) => "VPN off for some",
+        ("only", false) => "VPN only for some",
+        ("skip", true) => "VPN \u{62e}\u{627}\u{645}\u{648}\u{634} \u{628}\u{631}\u{627}\u{6cc} \u{628}\u{639}\u{636}\u{6cc}",
+        ("only", true) => "VPN \u{641}\u{642}\u{637} \u{628}\u{631}\u{627}\u{6cc} \u{628}\u{639}\u{636}\u{6cc}",
+        (_, false) => "Off",
+        (_, true) => "\u{62e}\u{627}\u{645}\u{648}\u{634}",
+    }
+}
+
+fn network_name(id: &str, s: &strings::Strings) -> String {
+    if id.starts_with("wifi:") {
+        ember_win::network_identity::display_name(id)
+    } else {
+        s.wired_network.to_string()
+    }
+}
+
+fn text_model(items: Vec<String>) -> ModelRc<SharedString> {
+    ModelRc::new(VecModel::from(items.into_iter().map(SharedString::from).collect::<Vec<_>>()))
+}
+
 /// Puts the saved settings into the Settings page.
 fn push_settings(app: &App, engine: &Engine) {
     let s = engine.settings();
-    app.set_set_language(lang::code().into());
-    app.set_set_theme(s.theme().into());
-    app.set_set_auto_connect(s.auto_connect());
-    app.set_set_auto_failover(s.auto_failover());
-    app.set_set_diagnostic_log(s.diagnostic_log());
-    app.set_set_keep_in_tray(s.keep_in_tray());
-    app.set_set_start_with_windows(ember_win::autostart::is_enabled());
+    let t = lang::current();
+    let caps = *CAPABILITIES.get_or_init(|| engine.capabilities());
+    let snap = engine.snapshot();
+    let trusted = s.trusted_networks();
+    let (skip, apps) = (s.excluded_addresses(), s.app_rule_apps());
+    let mode = s.app_rule_mode();
+    let network = match &snap.network {
+        Some(id) => strings::fill(t.current_network, &[("0", &network_name(id, t))]),
+        None => t.offline.to_string(),
+    };
+    app.set_settings_data(SettingsData {
+        language: lang::code().into(),
+        theme: s.theme().into(),
+        auto_connect: s.auto_connect(),
+        auto_failover: s.auto_failover(),
+        diagnostic_log: s.diagnostic_log(),
+        keep_in_tray: s.keep_in_tray(),
+        start_with_windows: AUTOSTART.load(Ordering::SeqCst),
+        whole_device: s.whole_device() && caps.whole_device,
+        whole_available: caps.whole_device,
+        kill_switch: s.kill_switch(),
+        ipv6: s.ipv6(),
+        no_prompts: engine.setup_installed(),
+        auto_untrusted: s.auto_connect_untrusted(),
+        app_mode: mode.as_str().into(),
+        app_rules_available: caps.app_rules,
+        app_summary: app_rules_text(&mode).into(),
+        skip_summary: entries_text(skip.len()).into(),
+        trusted_summary: entries_text(trusted.len()).into(),
+        can_trust: snap.network.as_ref().is_some_and(|id| !trusted.contains(id)),
+        network: network.into(),
+        trusted: text_model(trusted.iter().map(|id| network_name(id, t)).collect()),
+        skip: text_model(skip),
+        apps: text_model(apps),
+    });
 }
 
 /// The Settings page's choices and switches.
@@ -364,14 +482,127 @@ fn wire_settings_page(
                 "autoFailover" => s.set_auto_failover(value),
                 "diagnosticLog" => s.set_diagnostic_log(value),
                 "keepInTray" => s.set_keep_in_tray(value),
-                // the switch goes back to what Windows really has (push_settings below) when the change fails
-                "startWithWindows" if !ember_win::autostart::set_enabled(value) => {
-                    ember_engine::log::warn("Ember", "could not change the Windows startup entry");
+                "wholeDevice" => s.set_whole_device(value),
+                "killSwitch" => s.set_kill_switch(value),
+                "ipv6" => s.set_ipv6(value),
+                "autoConnectUntrusted" => s.set_auto_connect_untrusted(value),
+                "noPrompts" => engine.set_setup(value), // one Windows prompt, on its own thread; the switch follows when it is done
+                "startWithWindows" => {
+                    if !ember_win::autostart::set_enabled(value) {
+                        ember_engine::log::warn("Ember", "could not change the Windows startup entry");
+                    }
+                    AUTOSTART.store(ember_win::autostart::is_enabled(), Ordering::SeqCst);
                 }
                 _ => {}
             }
             push_settings(&app, &engine);
         });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_app_mode_chosen(move |mode| {
+            let Some(app) = weak.upgrade() else { return };
+            engine.settings().set_app_rule_mode(&mode);
+            push_settings(&app, &engine);
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_list_add(move |kind, text| {
+            let Some(app) = weak.upgrade() else { return };
+            let t = lang::current();
+            let s = engine.settings();
+            let mut error = String::new();
+            match kind.as_str() {
+                "skip" => {
+                    let entry = site_or_address(text.as_str());
+                    let mut list = s.excluded_addresses();
+                    if !(ember_engine::skip::is_address(&entry) || ember_engine::skip::is_domain(&entry)) {
+                        error = t.address_validation.to_string();
+                    } else if list.len() >= 300 {
+                        error = t.address_limit.to_string();
+                    } else if !list.iter().any(|e| e.eq_ignore_ascii_case(&entry)) {
+                        list.push(entry);
+                        s.set_excluded_addresses(&list);
+                    }
+                }
+                "apps" => {
+                    let name = program_name(text.as_str());
+                    let mut list = s.app_rule_apps();
+                    if !list.iter().any(|e| e.eq_ignore_ascii_case(&name)) {
+                        list.push(name);
+                        s.set_app_rule_apps(&list);
+                    }
+                }
+                _ => {}
+            }
+            app.set_list_error(error.into());
+            push_settings(&app, &engine);
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_list_remove(move |kind, index| {
+            let Some(app) = weak.upgrade() else { return };
+            let s = engine.settings();
+            let i = index.max(0) as usize;
+            match kind.as_str() {
+                "skip" => {
+                    let mut list = s.excluded_addresses();
+                    if i < list.len() {
+                        list.remove(i);
+                        s.set_excluded_addresses(&list);
+                    }
+                }
+                "apps" => {
+                    let mut list = s.app_rule_apps();
+                    if i < list.len() {
+                        list.remove(i);
+                        s.set_app_rule_apps(&list);
+                    }
+                }
+                "trusted" => {
+                    if let Some(id) = s.trusted_networks().get(i) {
+                        engine.untrust_network(id);
+                    }
+                }
+                _ => {}
+            }
+            app.set_list_error(SharedString::new());
+            push_settings(&app, &engine);
+        });
+    }
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_trust_network(move || {
+            let Some(app) = weak.upgrade() else { return };
+            engine.trust_current_network();
+            push_settings(&app, &engine);
+        });
+    }
+}
+
+/// What the skip list stores for what was typed: a pasted link becomes its host name (as in the Kotlin app).
+fn site_or_address(text: &str) -> String {
+    let t = text.trim();
+    if ember_engine::skip::is_address(t) {
+        return t.to_string(); // an address or range stays as typed
+    }
+    let after_scheme = t.split_once("://").map_or(t, |(_, rest)| rest);
+    let host = after_scheme.split(['/', '?', '#']).next().unwrap_or("");
+    // drop a user name and a port
+    let host = host.rsplit('@').next().unwrap_or(host);
+    let host = if host.matches(':').count() == 1 { host.split(':').next().unwrap_or(host) } else { host };
+    host.to_lowercase()
+}
+
+/// A program file name for the app rules: what was typed, or the last part of a path, with `.exe` when it has no extension.
+fn program_name(text: &str) -> String {
+    let name = text.trim().trim_matches('"').rsplit(['\\', '/']).next().unwrap_or("").replace(';', "");
+    if name.is_empty() || name.contains('.') {
+        name
+    } else {
+        format!("{name}.exe")
     }
 }
 
@@ -611,12 +842,33 @@ fn main() {
     wire_servers_page(&app, &engine, &servers_ui, &dirty);
     let logs_ui = Rc::new(logs::LogsUi::default());
     wire_logs_page(&app, &logs_ui);
+    AUTOSTART.store(ember_win::autostart::is_enabled(), Ordering::SeqCst);
     wire_settings_page(&app, &engine, forced_theme, &servers_ui, &logs_ui, &dirty, &data_dir);
     push_settings(&app, &engine);
     push_static_pages(&app, &data_dir);
     app.on_open_contact(|| {
         ember_win::shell::open_url(about::CONTACT_LINK);
     });
+    {
+        let engine = engine.clone();
+        app.on_restore_internet(move || engine.restore_internet());
+    }
+    {
+        let engine = engine.clone();
+        app.on_cred_submit(move |user, pass| {
+            let ask_user = engine.snapshot().credential_request.is_some_and(|r| r.ask_user);
+            engine.answer_credentials(Some(ember_win::openvpn::OpenVpnCredentials {
+                username: ask_user.then(|| user.to_string()),
+                password: pass.to_string(),
+            }));
+        });
+    }
+    {
+        let engine = engine.clone();
+        app.on_cred_cancel(move || engine.answer_credentials(None));
+    }
+    DEMO_BLOCKED.store(has("--demo-blocked"), Ordering::SeqCst);
+    DEMO_CRED.store(has("--demo-cred"), Ordering::SeqCst);
     if has("--expand") {
         for sub in engine.store().subscriptions() {
             servers_ui.expanded.borrow_mut().insert(sub.id);
@@ -767,6 +1019,9 @@ fn main() {
         if dirty.swap(false, Ordering::SeqCst) || (state == ConnState::Connected && tick.is_multiple_of(30)) {
             refresh(&app, engine, &rows_model, lang::current(), ports);
             servers::apply(&app, engine, lang::current(), &servers_ui);
+            if app.get_page() == 2 {
+                push_settings(&app, engine);
+            }
         }
         // the sphere is drawn at the exact pixel size it is shown at (88 logical radius), again if the window moves to a screen with another scale
         let px = (176.0 * app.window().scale_factor()).round() as u32;
@@ -813,4 +1068,26 @@ fn main() {
     slint::run_event_loop_until_quit().unwrap();
     drop(timer); // takes the tray icon with it
     engine.shutdown();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_pasted_link_becomes_its_host_name_for_the_skip_list() {
+        assert_eq!(site_or_address("https://Bank.Example.com/login?x=1"), "bank.example.com");
+        assert_eq!(site_or_address("  open.spotify.com  "), "open.spotify.com");
+        assert_eq!(site_or_address("http://user:pw@example.com:8443/a"), "example.com");
+        assert_eq!(site_or_address("10.0.0.0/8"), "10.0.0.0/8");
+        assert_eq!(site_or_address("192.0.2.7"), "192.0.2.7");
+    }
+
+    #[test]
+    fn a_program_is_stored_by_file_name() {
+        assert_eq!(program_name(r#""C:\Program Files\Mozilla Firefox\firefox.exe""#), "firefox.exe");
+        assert_eq!(program_name("chrome"), "chrome.exe");
+        assert_eq!(program_name("a;b.exe"), "ab.exe");
+        assert_eq!(program_name("   "), "");
+    }
 }

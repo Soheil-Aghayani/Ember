@@ -1,12 +1,12 @@
 // The window: backdrop, sidebar, the current page. Port of MainShell/Sidebar in desktop/.../ui/App.kt.
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
-import { Label, HRow } from "widgets.slint";
+import { Label, HRow, Button, TextField } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
 import { ServersPage, SubRow, NodeRow } from "servers.slint";
 import { LogsPage } from "logs.slint";
-import { SettingsPage } from "settings.slint";
+import { SettingsPage, SettingsData } from "settings.slint";
 import { AboutPage, WhatsNewPage, InfoItem, ReleaseRow } from "about.slint";
-export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow, InfoItem, ReleaseRow }
+export { Palette, Motion, Tr, ServerRow, SubRow, NodeRow, InfoItem, ReleaseRow, SettingsData }
 
 component NavItem inherits Rectangle {
     in property <image> icon;
@@ -56,16 +56,26 @@ export component App inherits Window {
     in property <[string]> log-lines;
     in property <bool> log-has-entries;
     in-out property <int> log-filter: 0;
-    in property <string> set-language;
-    in property <string> set-theme;
-    in property <bool> set-auto-connect;
-    in property <bool> set-auto-failover;
-    in property <bool> set-diagnostic-log;
-    in property <bool> set-keep-in-tray;
-    in property <bool> set-start-with-windows;
+    in property <SettingsData> settings-data;
+    in property <string> list-error;
+    in property <string> blocked-notice;
+    in property <bool> can-restore: true;
+    in property <bool> cred-open;
+    in property <string> cred-title;
+    in property <bool> cred-ask-user;
+    property <string> cred-user;
+    property <string> cred-pass;
     callback language-chosen(string);
     callback theme-chosen(string);
     callback flag-toggled(string, bool);
+    callback app-mode-chosen(string);
+    callback list-add(string, string);
+    callback list-remove(string, int);
+    callback trust-network();
+    callback restore-internet();
+    callback cred-submit(string, string);
+    callback cred-cancel();
+    changed cred-open => { if cred-open { cred-user = ""; cred-pass = ""; } }
     in property <[InfoItem]> about-info;
     in property <[InfoItem]> about-licenses;
     in property <[ReleaseRow]> releases;
@@ -127,6 +137,8 @@ export component App inherits Window {
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
                     caption: root.caption; error: root.error; menu-request: root.menu-request; testing: root.testing; test-progress: root.test-progress;
+                    blocked-notice: root.blocked-notice; can-restore: root.can-restore;
+                    restore-internet => { root.restore-internet(); }
                                 orb-clicked => { root.orb-clicked(); }
                     choose(id) => { root.choose(id); }
                     open-servers => { root.page = 1; }
@@ -158,9 +170,11 @@ export component App inherits Window {
                 }
                 if page == 2 : SettingsPage {
                     x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
-                    language: root.set-language; theme: root.set-theme; auto-connect: root.set-auto-connect;
-                    auto-failover: root.set-auto-failover; diagnostic-log: root.set-diagnostic-log;
-                    keep-in-tray: root.set-keep-in-tray; start-with-windows: root.set-start-with-windows;
+                    d: root.settings-data; list-error: root.list-error;
+                    app-mode-chosen(m) => { root.app-mode-chosen(m); }
+                    list-add(kind, text) => { root.list-add(kind, text); }
+                    list-remove(kind, i) => { root.list-remove(kind, i); }
+                    trust-network => { root.trust-network(); }
                     language-chosen(v) => { root.language-chosen(v); }
                     theme-chosen(v) => { root.theme-chosen(v); }
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
@@ -173,6 +187,34 @@ export component App inherits Window {
                     x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
                     info: root.about-info; licenses: root.about-licenses;
                     open-contact => { root.open-contact(); }
+                }
+            }
+        }
+    }
+
+    if cred-open : Rectangle {
+        background: #00000088;
+        TouchArea { }   // blocks the window behind the dialog
+        Rectangle {
+            width: min(420px, parent.width - 32px); height: cred.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            cred := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: root.cred-title; font-size: Type.headline-small; font-weight: 600; wrap: word-wrap; }
+                if cred-ask-user : Label { text: Tr.username; muted: true; font-size: Type.body-small; }
+                if cred-ask-user : TextField { text <=> root.cred-user; }
+                Label { text: Tr.password; muted: true; font-size: Type.body-small; }
+                TextField { password: true; text <=> root.cred-pass; }
+                Label { text: Tr.credentials-not-saved; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                HRow {
+                    alignment: end; height: 40px; spacing: 8px;
+                    Button { text: Tr.cancel; clicked => { root.cred-cancel(); } }
+                    Button {
+                        text: Tr.sign-in; primary: true; enabled: root.cred-pass != "" && (!root.cred-ask-user || root.cred-user != "");
+                        clicked => { root.cred-submit(root.cred-user, root.cred-pass); }
+                    }
                 }
             }
         }

@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::{proc, Error, Result};
 
-const TASK: &str = r"\Ember\OpenVPN";
+const TASK: &str = r"\EmberRust\OpenVPN";
 pub const MANAGEMENT_PORT: u16 = 17505;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(90);
 const ENTER_PASSWORD: &str = "ENTER PASSWORD:";
@@ -132,7 +132,7 @@ pub fn task_arguments(profile: &Path, password_file: &Path, log_file: &Path) -> 
     )
 }
 
-/// The PowerShell that registers the `\Ember\OpenVPN` task.
+/// The PowerShell that registers the `\EmberRust\OpenVPN` task.
 pub fn build_install_script(exe: &Path, arguments: &str, dir: &Path, user: &str) -> Result<String> {
     let (exe_s, dir_s) = (exe.to_string_lossy(), dir.to_string_lossy());
     proc::check_quotes(&[&exe_s, &dir_s, user])?;
@@ -141,7 +141,7 @@ pub fn build_install_script(exe: &Path, arguments: &str, dir: &Path, user: &str)
 $action = New-ScheduledTaskAction -Execute '{exe_s}' -Argument '{arguments}' -WorkingDirectory '{dir_s}'\n\
 $principal = New-ScheduledTaskPrincipal -UserId '{user}' -LogonType S4U -RunLevel Highest\n\
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)\n\
-Register-ScheduledTask -TaskName 'OpenVPN' -TaskPath '\\Ember\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null"
+Register-ScheduledTask -TaskName 'OpenVPN' -TaskPath '\\EmberRust\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null"
     ))
 }
 

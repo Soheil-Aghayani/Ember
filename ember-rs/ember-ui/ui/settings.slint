@@ -1,9 +1,7 @@
 // The Settings page. Port of SettingsPage.kt: a short list of groups; some rows open a sub-page, language and appearance
-// open a small menu. Rows for features this build does not have yet (whole-device mode and what hangs on it, tray,
-// start with Windows, app rules, skip list, trusted networks, backup) are shown dimmed with a note instead of switches
-// that would do nothing.
+// open a small menu. Backup and the MTU box are not in this build yet and are shown dimmed with a note.
 import { Palette, Type, Icons, Tr } from "theme.slint";
-import { Card, Label, IconAction, HRow, ToggleSwitch } from "widgets.slint";
+import { Card, Label, IconAction, HRow, ToggleSwitch, Button, TextField } from "widgets.slint";
 
 export struct ChoiceOption {
     value: string,
@@ -115,20 +113,106 @@ component ChoiceRow inherits Rectangle {
     }
 }
 
+/// What the Settings page shows. Filled in by the Rust side (main.rs `push_settings`).
+export struct SettingsData {
+    language: string,
+    theme: string,
+    auto-connect: bool,
+    auto-failover: bool,
+    diagnostic-log: bool,
+    keep-in-tray: bool,
+    start-with-windows: bool,
+    whole-device: bool,
+    whole-available: bool,
+    kill-switch: bool,
+    ipv6: bool,
+    no-prompts: bool,
+    auto-untrusted: bool,
+    app-mode: string,        // "off", "skip" or "only"
+    app-rules-available: bool,
+    apps: [string],
+    skip: [string],
+    trusted: [string],       // names to show, in the order of the saved list
+    network: string,         // the current network, already worded ("Current network: Home"), or the offline text
+    can-trust: bool,
+    app-summary: string,     // "Off", "VPN off for some" ...
+    skip-summary: string,    // "None", "3 entries"
+    trusted-summary: string,
+}
+
+/// A list of text entries with a box to add one. `can-add: false` shows just the entries and a remove button each.
+component ListEditor inherits VerticalLayout {
+    in property <[string]> items;
+    in property <string> placeholder;
+    in property <string> add-caption;
+    in property <string> empty-text;
+    in property <string> error;
+    in property <bool> can-add: true;
+    callback add(string);
+    callback remove(int);
+    property <string> draft;
+    spacing: 8px;
+    if can-add : Rectangle {
+        height: 44px;
+        TextField {
+            x: Palette.rtl ? add-button.width + 8px : 0px; y: 0px; width: parent.width - add-button.width - 8px;
+            placeholder: root.placeholder; text <=> root.draft;
+        }
+        add-button := Button {
+            x: Palette.rtl ? 0px : parent.width - self.width; y: 2px;
+            text: root.add-caption; primary: true; enabled: root.draft != "";
+            clicked => { root.add(root.draft); root.draft = ""; }
+        }
+    }
+    if error != "" : Label { text: root.error; color: Palette.error; font-size: Type.body-small; wrap: word-wrap; }
+    if items.length == 0 && empty-text != "" : Label { text: root.empty-text; muted: true; font-size: Type.body-small; wrap: word-wrap; height: 32px; vertical-alignment: center; }
+    for item[i] in items : Rectangle {
+        height: 40px;
+        Label {
+            x: Palette.rtl ? 40px : 0px; y: 0px; width: parent.width - 40px; height: parent.height;
+            text: item; overflow: elide; vertical-alignment: center;
+        }
+        IconAction {
+            x: Palette.rtl ? 0px : parent.width - self.width; y: 2px;
+            icon: Icons.trash; tint: Palette.on-variant; clicked => { root.remove(i); }
+        }
+    }
+}
+
+/// A row you pick: a title, an explanation, and a check on the one that is chosen.
+component PickRow inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> selected;
+    callback clicked();
+    height: max(column.preferred-height + 24px, 56px);
+    background: touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
+    column := VerticalLayout {
+        x: Palette.rtl ? 16px + 20px + 12px : 16px; y: (root.height - self.preferred-height) / 2;
+        width: root.width - 16px - 20px - 12px - 16px; spacing: 2px; alignment: start;
+        Label { text: root.title; font-size: Type.body-large; wrap: word-wrap; }
+        if subtitle != "" : Label { text: root.subtitle; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+    }
+    if selected : Image {
+        source: Icons.check; colorize: Palette.primary; width: 20px; height: 20px;
+        x: Palette.rtl ? 16px : root.width - self.width - 16px; y: (root.height - self.height) / 2;
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
 export component SettingsPage inherits Rectangle {
-    in property <string> language;
-    in property <string> theme;
-    in property <bool> auto-connect;
-    in property <bool> auto-failover;
-    in property <bool> diagnostic-log;
-    in property <bool> keep-in-tray;
-    in property <bool> start-with-windows;
+    in property <SettingsData> d;
+    in property <string> list-error;
     callback language-chosen(string);
     callback theme-chosen(string);
     callback flag-toggled(string, bool);
+    callback app-mode-chosen(string);
+    callback list-add(string, string);      // which list ("skip", "apps"), the text
+    callback list-remove(string, int);      // which list ("skip", "apps", "trusted"), the position
+    callback trust-network();
 
-    // 0 the list; 1 startup and tray; 2 protection; 3 advanced
-    property <int> section: 0;
+    // 0 the list; 1 startup and tray; 2 protection; 3 advanced; 4 app rules; 5 skip list; 6 trusted networks
+    in-out property <int> section: 0;
 
     Flickable {
         content-height: page.preferred-height + 48px;
@@ -141,12 +225,12 @@ export component SettingsPage inherits Rectangle {
                     height: list1.preferred-height;
                     list1 := VerticalLayout {
                         ChoiceRow {
-                            title: Tr.language; selected: root.language; current-label: root.language == "fa" ? Tr.persian : Tr.english; picked(v) => { root.language-chosen(v); }
+                            title: Tr.language; selected: root.d.language; current-label: root.d.language == "fa" ? Tr.persian : Tr.english; picked(v) => { root.language-chosen(v); }
                             options: [{ value: "en", label: Tr.english }, { value: "fa", label: Tr.persian }];
                         }
                         Divider { }
                         ChoiceRow {
-                            title: Tr.appearance; selected: root.theme; current-label: root.theme == "Light" ? Tr.light : (root.theme == "Dark" ? Tr.dark : Tr.system); picked(v) => { root.theme-chosen(v); }
+                            title: Tr.appearance; selected: root.d.theme; current-label: root.d.theme == "Light" ? Tr.light : (root.d.theme == "Dark" ? Tr.dark : Tr.system); picked(v) => { root.theme-chosen(v); }
                             options: [{ value: "Light", label: Tr.light }, { value: "Dark", label: Tr.dark }, { value: "System", label: Tr.system }];
                         }
                         Divider { }
@@ -157,13 +241,13 @@ export component SettingsPage inherits Rectangle {
                 Card {
                     height: list2.preferred-height;
                     list2 := VerticalLayout {
-                        NavRow { title: Tr.protection; value: Tr.proxy-only; clicked => { root.section = 2; } }
+                        NavRow { title: Tr.protection; value: root.d.whole-device ? Tr.whole-device-short : Tr.proxy-only; clicked => { root.section = 2; } }
                         Divider { }
-                        NavRow { title: Tr.app-rules; value: Tr.not-yet; enabled: false; }
+                        NavRow { title: Tr.app-rules; value: root.d.app-summary; clicked => { root.section = 4; } }
                         Divider { }
-                        NavRow { title: Tr.skip-vpn; value: Tr.not-yet; enabled: false; }
+                        NavRow { title: Tr.skip-vpn; value: root.d.skip-summary; clicked => { root.section = 5; } }
                         Divider { }
-                        NavRow { title: Tr.trusted-networks; value: Tr.not-yet; enabled: false; }
+                        NavRow { title: Tr.trusted-networks; value: root.d.trusted-summary; clicked => { root.section = 6; } }
                     }
                 }
                 GroupLabel { text: Tr.settings-more; }
@@ -182,7 +266,7 @@ export component SettingsPage inherits Rectangle {
                     alignment: start; height: 40px; spacing: 8px;
                     IconAction { icon: Palette.rtl ? Icons.chevron-right : Icons.chevron-left; tint: Palette.on-surface; clicked => { root.section = 0; } }
                     Label {
-                        text: root.section == 1 ? Tr.startup-tray : (root.section == 2 ? Tr.protection : Tr.advanced);
+                        text: root.section == 1 ? Tr.startup-tray : (root.section == 2 ? Tr.protection : (root.section == 3 ? Tr.advanced : (root.section == 4 ? Tr.app-rules : (root.section == 5 ? Tr.skip-vpn : Tr.trusted-networks))));
                         font-size: Type.headline-medium; font-weight: 600;
                     }
                 }
@@ -190,17 +274,17 @@ export component SettingsPage inherits Rectangle {
                     height: startup.preferred-height;
                     startup := VerticalLayout {
                         SwitchRow {
-                            title: Tr.keep-in-tray; subtitle: Tr.tray-help; checked: root.keep-in-tray;
+                            title: Tr.keep-in-tray; subtitle: Tr.tray-help; checked: root.d.keep-in-tray;
                             toggled(v) => { root.flag-toggled("keepInTray", v); }
                         }
                         Divider { }
                         SwitchRow {
-                            title: Tr.start-with-windows; subtitle: Tr.start-quietly; checked: root.start-with-windows;
+                            title: Tr.start-with-windows; subtitle: Tr.start-quietly; checked: root.d.start-with-windows;
                             toggled(v) => { root.flag-toggled("startWithWindows", v); }
                         }
                         Divider { }
                         SwitchRow {
-                            title: Tr.auto-connect; subtitle: Tr.auto-connect-help; checked: root.auto-connect;
+                            title: Tr.auto-connect; subtitle: Tr.auto-connect-help; checked: root.d.auto-connect;
                             toggled(v) => { root.flag-toggled("autoConnect", v); }
                         }
                     }
@@ -208,25 +292,38 @@ export component SettingsPage inherits Rectangle {
                 if section == 2 : Card {
                     height: protection.preferred-height;
                     protection := VerticalLayout {
-                        SwitchRow { title: Tr.whole-device; subtitle: Tr.whole-device-unavailable; enabled: false; checked: false; }
-                        Divider { }
-                        SwitchRow { title: Tr.kill-switch; subtitle: Tr.not-yet; enabled: false; checked: false; }
-                        Divider { }
-                        SwitchRow { title: Tr.ipv6; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        SwitchRow {
+                            title: Tr.whole-device; subtitle: root.d.whole-available ? Tr.whole-device-help : Tr.whole-device-unavailable;
+                            enabled: root.d.whole-available || root.d.whole-device; checked: root.d.whole-device;
+                            toggled(v) => { root.flag-toggled("wholeDevice", v); }
+                        }
                         Divider { }
                         SwitchRow {
-                            title: Tr.auto-failover; subtitle: Tr.auto-failover-help; checked: root.auto-failover;
+                            title: Tr.kill-switch; subtitle: Tr.kill-switch-help; checked: root.d.kill-switch;
+                            toggled(v) => { root.flag-toggled("killSwitch", v); }
+                        }
+                        Divider { }
+                        SwitchRow {
+                            title: Tr.ipv6; subtitle: Tr.ipv6-help; checked: root.d.ipv6;
+                            toggled(v) => { root.flag-toggled("ipv6", v); }
+                        }
+                        Divider { }
+                        SwitchRow {
+                            title: Tr.auto-failover; subtitle: Tr.auto-failover-help; checked: root.d.auto-failover;
                             toggled(v) => { root.flag-toggled("autoFailover", v); }
                         }
                         Divider { }
-                        SwitchRow { title: Tr.no-prompts; subtitle: Tr.not-yet; enabled: false; checked: false; }
+                        SwitchRow {
+                            title: Tr.no-prompts; subtitle: Tr.no-prompts-help; checked: root.d.no-prompts; enabled: root.d.whole-available;
+                            toggled(v) => { root.flag-toggled("noPrompts", v); }
+                        }
                     }
                 }
                 if section == 3 : Card {
                     height: advanced.preferred-height;
                     advanced := VerticalLayout {
                         SwitchRow {
-                            title: Tr.diagnostic-log; subtitle: Tr.diagnostic-log-help; checked: root.diagnostic-log;
+                            title: Tr.diagnostic-log; subtitle: Tr.diagnostic-log-help; checked: root.d.diagnostic-log;
                             toggled(v) => { root.flag-toggled("diagnosticLog", v); }
                         }
                         Divider { }
@@ -234,6 +331,73 @@ export component SettingsPage inherits Rectangle {
                             padding: 16px; spacing: 6px;
                             Label { text: Tr.mtu-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
                             Label { text: Tr.not-yet; muted: true; font-size: Type.body-small; }
+                        }
+                    }
+                }
+                if section == 4 : VerticalLayout {
+                    spacing: 12px;
+                    Card {
+                        height: modes.preferred-height;
+                        modes := VerticalLayout {
+                            PickRow { title: Tr.app-off; selected: root.d.app-mode == "off"; clicked => { root.app-mode-chosen("off"); } }
+                            Divider { }
+                            PickRow { title: Tr.app-skip; subtitle: Tr.app-skip-help; selected: root.d.app-mode == "skip"; clicked => { root.app-mode-chosen("skip"); } }
+                            Divider { }
+                            PickRow { title: Tr.app-only; subtitle: Tr.app-only-help; selected: root.d.app-mode == "only"; clicked => { root.app-mode-chosen("only"); } }
+                        }
+                    }
+                    Label { text: Tr.app-note; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                    if !root.d.whole-device : Label { text: Tr.app-needs-whole; color: Palette.error; font-size: Type.body-small; wrap: word-wrap; }
+                    if root.d.app-mode != "off" : Label { text: Tr.apps-list; font-size: Type.title-small; font-weight: 500; }
+                    if root.d.app-mode != "off" : Card {
+                        height: apps.preferred-height + 24px;
+                        apps := ListEditor {
+                            x: 12px; y: 12px; width: parent.width - 24px;
+                            items: root.d.apps; placeholder: "firefox.exe"; add-caption: Tr.add-app; empty-text: Tr.no-apps; error: root.list-error;
+                            add(text) => { root.list-add("apps", text); }
+                            remove(i) => { root.list-remove("apps", i); }
+                        }
+                    }
+                }
+                if section == 5 : VerticalLayout {
+                    spacing: 12px;
+                    Label { text: Tr.skip-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                    if !root.d.whole-device : Label { text: Tr.needs-whole; color: Palette.error; font-size: Type.body-small; wrap: word-wrap; }
+                    Card {
+                        height: skips.preferred-height + 24px;
+                        skips := ListEditor {
+                            x: 12px; y: 12px; width: parent.width - 24px;
+                            items: root.d.skip; placeholder: Tr.address-placeholder; add-caption: Tr.add-address; error: root.list-error;
+                            add(text) => { root.list-add("skip", text); }
+                            remove(i) => { root.list-remove("skip", i); }
+                        }
+                    }
+                }
+                if section == 6 : VerticalLayout {
+                    spacing: 12px;
+                    Card {
+                        height: untrusted.preferred-height;
+                        untrusted := VerticalLayout {
+                            SwitchRow {
+                                title: Tr.auto-untrusted; subtitle: Tr.auto-untrusted-help; checked: root.d.auto-untrusted;
+                                toggled(v) => { root.flag-toggled("autoConnectUntrusted", v); }
+                            }
+                        }
+                    }
+                    Card {
+                        height: net-name.preferred-height + 8px + 40px + 32px;
+                        net-name := Label { x: 16px; y: 16px; width: parent.width - 32px; text: root.d.network; wrap: word-wrap; }
+                        Button {
+                            x: Palette.rtl ? parent.width - self.width - 16px : 16px; y: net-name.preferred-height + 24px;
+                            text: Tr.trust-network; primary: true; enabled: root.d.can-trust; clicked => { root.trust-network(); }
+                        }
+                    }
+                    Card {
+                        height: trusted.preferred-height + 24px;
+                        trusted := ListEditor {
+                            x: 12px; y: 12px; width: parent.width - 24px;
+                            can-add: false; items: root.d.trusted; empty-text: Tr.no-trusted;
+                            remove(i) => { root.list-remove("trusted", i); }
                         }
                     }
                 }

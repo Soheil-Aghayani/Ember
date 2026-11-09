@@ -117,6 +117,44 @@ pub fn guard_config(state_dir: &Path, edge_ips: &[String], parent_pid: u32) -> V
     })
 }
 
+/// hev-socks5-tunnel's YAML (port of `HevSocks5TunnelConfig.write`, with the IPv6 line when asked for).
+pub fn hev_config(socks_port: u16, mtu: i32, tcp_buffer: i32, ipv6: bool) -> String {
+    let yaml = format!(
+        "tunnel:
+  name: '{ADAPTER_NAME}'
+  mtu: {mtu}
+  ipv4: '{TUN_ADDRESS}'
+  icmp: 'reply'
+socks5:
+  port: {socks_port}
+  address: '127.0.0.1'
+  udp: 'udp'
+mapdns:
+  address: '{MAPDNS_ADDRESS}'
+  port: 53
+  network: '100.64.0.0'
+  netmask: '255.192.0.0'
+  cache-size: 10000
+misc:
+  task-stack-size: 86016
+  connect-timeout: 20000
+  tcp-read-write-timeout: 300000
+  udp-read-write-timeout: 60000
+  tcp-buffer-size: {tcp_buffer}
+  udp-recv-buffer-size: 524288
+  udp-copy-buffer-nums: 16
+  max-session-count: 0
+  limit-nofile: 65535
+  log-level: 'warn'
+"
+    );
+    if ipv6 {
+        add_ipv6_to_hev_yaml(&yaml)
+    } else {
+        yaml
+    }
+}
+
 /// hev needs its own IPv6 address to carry IPv6 packets; the helper gives the adapter the same one.
 pub fn add_ipv6_to_hev_yaml(yaml: &str) -> String {
     if yaml.contains("ipv6:") {
@@ -534,5 +572,33 @@ mod tests {
         assert!(launcher_failure("The operation was canceled by the user.", 1).contains("not allowed"));
         assert_eq!(launcher_failure("", 3), "Windows could not start the network helper: exit code 3");
         assert_eq!(launcher_failure(" boom ", 1), "Windows could not start the network helper: boom");
+    }
+
+    #[test]
+    fn hev_yaml_matches_the_kotlin_layout() {
+        let y = hev_config(10808, 1400, 65536, false);
+        assert!(y.starts_with("tunnel:
+  name: 'EmberTun'
+  mtu: 1400
+  ipv4: '10.8.0.2'
+  icmp: 'reply'
+socks5:
+  port: 10808
+"));
+        assert!(y.contains("mapdns:
+  address: '198.18.0.2'
+  port: 53
+  network: '100.64.0.0'
+  netmask: '255.192.0.0'
+  cache-size: 10000
+"));
+        assert!(y.contains("  tcp-buffer-size: 65536
+") && y.ends_with("  log-level: 'warn'
+"));
+        assert!(!y.contains("ipv6:"));
+        let v6 = hev_config(10808, 1500, 32768, true);
+        assert!(v6.contains("  ipv4: '10.8.0.2'
+  ipv6: 'fd00:8:0:1::2'
+") && v6.contains("mtu: 1500"));
     }
 }

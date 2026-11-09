@@ -80,6 +80,7 @@ export component Button inherits Rectangle {
 export component TextField inherits Rectangle {
     in property <string> placeholder;
     in property <bool> multiline: false;
+    in property <bool> password: false;
     in-out property <string> text <=> input.text;
     public function paste() { input.focus(); input.paste(); }
     height: multiline ? 96px : 44px;
@@ -91,6 +92,7 @@ export component TextField inherits Rectangle {
         x: 12px; y: multiline ? 10px : 0px;
         width: parent.width - 24px; height: multiline ? parent.height - 20px : parent.height;
         single-line: !multiline;
+        input-type: password ? InputType.password : InputType.text;
         wrap: multiline ? word-wrap : no-wrap;
         font-family: Type.family; font-size: Type.body-medium; color: Palette.on-surface;
         vertical-alignment: multiline ? top : center;

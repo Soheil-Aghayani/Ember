@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::{paths, proc, Error, Result};
 
-const TASK: &str = r"\Ember\Apps";
+const TASK: &str = r"\EmberRust\Apps";
 pub const ADAPTER: &str = "EmberApps";
 
 /// How the apps in the list are treated (the strings are stored in the settings file).
@@ -196,7 +196,7 @@ pub fn task_xml_ready(xml: &str, exe: &Path, config: &Path) -> bool {
     x.contains(&exe.to_string_lossy().to_lowercase()) && x.contains(&config.to_string_lossy().to_lowercase()) && x.contains("s4u")
 }
 
-/// The PowerShell that registers the `\Ember\Apps` task.
+/// The PowerShell that registers the `\EmberRust\Apps` task.
 pub fn build_install_script(exe: &Path, config: &Path, dir: &Path, user: &str) -> Result<String> {
     let (exe_s, config_s, dir_s) = (exe.to_string_lossy(), config.to_string_lossy(), dir.to_string_lossy());
     proc::check_quotes(&[&exe_s, &dir_s, user])?;
@@ -206,7 +206,7 @@ pub fn build_install_script(exe: &Path, config: &Path, dir: &Path, user: &str) -
 $action = New-ScheduledTaskAction -Execute '{exe_s}' -Argument '{arguments}' -WorkingDirectory '{dir_s}'\n\
 $principal = New-ScheduledTaskPrincipal -UserId '{user}' -LogonType S4U -RunLevel Highest\n\
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)\n\
-Register-ScheduledTask -TaskName 'Apps' -TaskPath '\\Ember\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null"
+Register-ScheduledTask -TaskName 'Apps' -TaskPath '\\EmberRust\\' -Action $action -Principal $principal -Settings $settings -Force | Out-Null"
     ))
 }
 
@@ -307,7 +307,7 @@ mod tests {
         let s = build_install_script(Path::new(r"C:\E\sing-box.exe"), Path::new(r"C:\D\config.json"), Path::new(r"C:\D"), r"PC\a").unwrap();
         assert!(s.contains("-Argument 'run -c \"C:\\D\\config.json\" -D \"C:\\D\"'"));
         assert!(s.contains("-LogonType S4U -RunLevel Highest"));
-        assert!(s.contains("-TaskName 'Apps' -TaskPath '\\Ember\\'"));
+        assert!(s.contains("-TaskName 'Apps' -TaskPath '\\EmberRust\\'"));
         assert!(build_install_script(Path::new(r"C:\E's.exe"), Path::new("c"), Path::new("d"), "u").is_err());
     }
 

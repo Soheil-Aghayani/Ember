@@ -1,6 +1,6 @@
 // The Home page. Port of HomePage in desktop/.../ui/App.kt (orb, status, server picker, notices).
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
-import { Card, Label, IconAction, HRow } from "widgets.slint";
+import { Card, Label, IconAction, HRow, Button } from "widgets.slint";
 import { Orb } from "orb.slint";
 
 export struct ServerRow {
@@ -25,6 +25,9 @@ export component HomePage inherits Rectangle {
     in property <[ServerRow]> servers;
     in property <string> caption;
     in property <string> error;
+    in property <string> blocked-notice;   // the kill switch is holding traffic (or Ember is reconnecting)
+    in property <bool> can-restore: true;
+    callback restore-internet();
     in property <bool> testing;
     in property <string> test-progress;
     in property <int> menu-request;        // bump to open the server menu from outside (debug flag --menu)
@@ -133,6 +136,19 @@ export component HomePage inherits Rectangle {
         if caption != "" : Label { text: root.caption; muted: true; font-size: Type.body-small; horizontal-alignment: center; wrap: word-wrap; }
         if error != "" : Rectangle { height: 16px; }
         if error != "" : Label { text: root.error; muted: true; font-size: Type.body-small; overflow: elide; }
+        if blocked-notice != "" : Rectangle { height: 16px; }
+        if blocked-notice != "" : Card {
+            height: nb-title.preferred-height + nb-body.preferred-height + (can-restore ? 48px : 0px) + 40px;
+            nb-title := Label { x: 16px; y: 16px; width: parent.width - 32px; text: Tr.internet-blocked; font-weight: 600; wrap: word-wrap; }
+            nb-body := Label {
+                x: 16px; y: 24px + nb-title.preferred-height; width: parent.width - 32px;
+                text: root.blocked-notice; muted: true; font-size: Type.body-small; wrap: word-wrap;
+            }
+            if can-restore : Button {
+                x: Palette.rtl ? parent.width - self.width - 16px : 16px; y: 32px + nb-title.preferred-height + nb-body.preferred-height;
+                text: Tr.restore-internet; primary: true; clicked => { root.restore-internet(); }
+            }
+        }
     }
 
 }
