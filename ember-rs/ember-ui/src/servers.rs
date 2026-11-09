@@ -123,16 +123,17 @@ fn repeats_usage(line: &str) -> bool {
     has_number && words.iter().any(|w| text.contains(w))
 }
 
-fn sub_row(
-    sub: &Subscription,
-    s: &Strings,
-    ui: &ServersUi,
-    results: &std::collections::HashMap<String, NodeResult>,
-    favorites: &HashSet<String>,
-    selected_id: &str,
-    testing: Option<&str>,
-    check: Option<&SiteCheck>,
-) -> SubRow {
+/// What the page shows beside the subscriptions themselves.
+struct PageData<'a> {
+    results: &'a std::collections::HashMap<String, NodeResult>,
+    favorites: &'a HashSet<String>,
+    selected_id: &'a str,
+    testing: Option<&'a str>,
+    check: Option<&'a SiteCheck>,
+}
+
+fn sub_row(sub: &Subscription, s: &Strings, ui: &ServersUi, d: &PageData) -> SubRow {
+    let PageData { results, favorites, selected_id, testing, check } = *d;
     let servers: Vec<Node> = sub.nodes.iter().filter(|n| !n.is_info()).cloned().collect();
     // a panel's own "traffic left" or "days left" line only repeats the usage bar below it, so it is dropped when the bar is there
     let has_usage = sub.usage.as_ref().is_some_and(|u| u.total > 0);
@@ -199,10 +200,11 @@ pub fn apply(app: &App, engine: &Engine, s: &Strings, ui: &ServersUi) {
     let results = store.results();
     let favorites = engine.settings().favorite_nodes();
     let testing = snap.test_progress.as_deref();
+    let data = PageData { results: &results, favorites: &favorites, selected_id: &snap.selected_id, testing, check: snap.site_check.as_ref() };
     let rows: Vec<SubRow> = store
         .subscriptions()
         .iter()
-        .map(|sub| sub_row(sub, s, ui, &results, &favorites, &snap.selected_id, testing, snap.site_check.as_ref()))
+        .map(|sub| sub_row(sub, s, ui, &data))
         .collect();
     app.set_site_label(snap.site_check.as_ref().map(|c| c.label.as_str()).unwrap_or("").into());
     let new_signature = signature(&rows, testing);

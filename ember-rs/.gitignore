@@ -1,3 +1,5 @@
 ﻿target/
 Cargo.lock.bak
 
+installer/stage/
+installer/Output/
