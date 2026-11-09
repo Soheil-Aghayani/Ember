@@ -4,10 +4,12 @@
 
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
+// Off: a calm slate-lavender pearl, light enough that the white power symbol reads and that the half-faded
+// "connecting" blend with ON stays colourful instead of muddy.
 const OFF: [(f32, [f32; 3]); 6] = [
-    (0.0, [0x7A as f32, 0x82 as f32, 0x92 as f32]), (0.22, [0x4A as f32, 0x50 as f32, 0x5C as f32]),
-    (0.42, [0x2B as f32, 0x30 as f32, 0x3B as f32]), (0.60, [0x22 as f32, 0x26 as f32, 0x30 as f32]),
-    (0.78, [0x3A as f32, 0x2E as f32, 0x2C as f32]), (1.0, [0x8A as f32, 0x4A as f32, 0x2A as f32]),
+    (0.0, [0xB4 as f32, 0xBC as f32, 0xD6 as f32]), (0.22, [0x92 as f32, 0x9B as f32, 0xBC as f32]),
+    (0.42, [0x76 as f32, 0x7F as f32, 0xA4 as f32]), (0.60, [0x6A as f32, 0x72 as f32, 0x98 as f32]),
+    (0.78, [0x8C as f32, 0x82 as f32, 0xA6 as f32]), (1.0, [0xD0 as f32, 0xA2 as f32, 0x94 as f32]),
 ];
 const ON: [(f32, [f32; 3]); 6] = [
     (0.0, [0x4E as f32, 0x1C as f32, 0xD6 as f32]), (0.22, [0x82 as f32, 0x22 as f32, 0xD6 as f32]),

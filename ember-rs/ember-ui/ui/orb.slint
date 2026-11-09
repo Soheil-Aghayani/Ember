@@ -22,14 +22,15 @@ component RingLayer inherits Rectangle {
     property <length> y0: cy + a * s;
     property <length> x1: cx - a * c;
     property <length> y1: cy - a * s;
-    property <float> core: 0.30 + 0.60 * lit;
+    property <float> core: 0.28 + 0.42 * lit;
 
     // front half: theta 0..pi (below the centre line of the ring); back half: pi..2pi
     Path {
         x: 0; y: 0; width: parent.width; height: parent.height;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: self.width / 1px; viewbox-height: self.height / 1px;
         fill: transparent;
-        stroke: ink.with-alpha(front ? core : core * 0.65);
-        stroke-width: 1.5px;
+        stroke: ink.with-alpha(front ? core * 0.7 : core * 0.5);
+        stroke-width: 1.2px;
         stroke-line-cap: round;
         MoveTo { x: front ? x0 / 1px : x1 / 1px; y: front ? y0 / 1px : y1 / 1px; }
         ArcTo {
@@ -85,8 +86,9 @@ export component Orb inherits Rectangle {
     Path {
         x: 0; y: 0; width: parent.width; height: parent.height;
         visible: loader > 0.01;
+        viewbox-x: 0; viewbox-y: 0; viewbox-width: self.width / 1px; viewbox-height: self.height / 1px;
         fill: transparent;
-        stroke: ink.with-alpha(0.85 * loader); stroke-width: 2.5px; stroke-line-cap: round;
+        stroke: ink.with-alpha(0.7 * loader); stroke-width: 2.5px; stroke-line-cap: round;
         property <float> ar: (r + 7px) / 1px;
         property <float> mx: cx / 1px;
         property <float> my: cy / 1px;
