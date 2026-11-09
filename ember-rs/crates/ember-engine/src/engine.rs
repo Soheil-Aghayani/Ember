@@ -8,7 +8,7 @@
 //! helper's tunnel and optional kill switch), app rules (Xray plus sing-box deciding per program) and OpenVPN. Everything
 //! that changes the computer goes through [`Host`], so the sequence can be tested with a stand-in.
 //!
-//! Not here yet: the exit-country check, the speed test on Home and stale-Xray clean-up.
+//! Not here yet: stale-Xray clean-up. (There is no speed test on Home on purpose; the exit-country check is `check_exit`.)
 
 use std::collections::{HashMap, HashSet};
 use std::net::TcpListener;

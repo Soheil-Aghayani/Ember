@@ -337,9 +337,10 @@ export component ServersPage inherits Rectangle {
                 HRow {
                     alignment: end; height: 40px; spacing: 8px;
                     Button { text: Tr.cancel; enabled: !root.dialog-busy; clicked => { root.dialog-open = false; } }
-                    Button {
+                    // shown once there is a link (a dimmed solid button is hard to read), and while it works
+                    if root.dialog-busy || root.dialog-link != "" : Button {
                         text: root.dialog-busy ? (root.dialog-id == "" ? Tr.adding : Tr.saving) : (root.dialog-id == "" ? Tr.add-link : Tr.save);
-                        primary: true; enabled: !root.dialog-busy && root.dialog-link != "";
+                        primary: true; enabled: !root.dialog-busy;
                         clicked => { root.submit(root.dialog-id, root.dialog-link, root.dialog-name); }
                     }
                 }

@@ -426,7 +426,7 @@ pub const FA: Strings = Strings {
     expand: "نمایش سرورها",
     no_answer: "بدون پاسخ",
     favorite: "علاقه‌مندی",
-    subscription_link: "لینک اشتراک (https://…) یا لینک سرورها",
+    subscription_link: "لینک اشتراک (https:\u{200e}//\u{200e}…\u{200e}) یا لینک سرورها",
     subscription_name_optional: "نام (اختیاری)",
     adding: "در حال افزودن…",
     saving: "در حال ذخیره…",

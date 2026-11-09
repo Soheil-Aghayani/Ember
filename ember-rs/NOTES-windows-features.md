@@ -35,9 +35,10 @@ set `EMBER_RESOURCES_DIR` to the resources folder of an installed Kotlin Ember.
 
 ## Not done
 
-- Backup and restore, the MTU box (the engine reads MTU from the settings file; there is no field yet).
-- File import, QR codes, WARP, website check (Servers page); exit-country check and a real speed test (Home).
-- Frameless window, installer, signing.
+- Reading a QR code out of a picture (file import takes JSON, WireGuard, OpenVPN and text files), and the "WARP through a
+  server of mine" chain (the Servers page adds plain WARP only).
+- Signing the installer, and building it: `installer\stage.ps1` collects the files and `installer\ember-rs.iss` is the
+  Inno Setup script, but Inno Setup is not installed on this computer, so no installer has been built yet.
 
 ## Needs the owner to test
 
