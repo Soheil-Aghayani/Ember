@@ -5,6 +5,7 @@
 //! Connects in proxy mode, whole-device mode, with app rules, or through OpenVPN (see `engine`). What changes the
 //! computer goes through `host::Host`.
 
+pub mod backup;
 pub mod diagnostics;
 pub mod engine;
 pub mod host;

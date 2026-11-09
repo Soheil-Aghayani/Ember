@@ -94,7 +94,12 @@ export component AboutPage inherits Rectangle {
                 }
             }
             // The Slint royalty-free licence asks for this badge on the About screen.
-            AboutSlint { height: 120px; }
+            // the badge's version and link are dark text, so in the dark theme it sits on a light plate
+            Rectangle {
+                height: 128px; border-radius: 16px;
+                background: Palette.dark ? #ffffffe6 : transparent;
+                AboutSlint { x: 0px; y: 4px; width: parent.width; height: 120px; }
+            }
         }
     }
 }

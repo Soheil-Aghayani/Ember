@@ -71,6 +71,14 @@ export component App inherits Window {
     callback list-add(string, string);
     callback list-remove(string, int);
     callback trust-network();
+    callback mtu-apply(string);
+    callback backup-save();
+    callback backup-restore();
+    callback restore-confirm();
+    callback restore-cancel();
+    in property <string> backup-message;
+    in property <bool> restore-open;
+    in property <string> restore-text;
     callback restore-internet();
     callback cred-submit(string, string);
     callback cred-cancel();
@@ -174,6 +182,10 @@ export component App inherits Window {
                     list-add(kind, text) => { root.list-add(kind, text); }
                     list-remove(kind, i) => { root.list-remove(kind, i); }
                     trust-network => { root.trust-network(); }
+                    backup-message: root.backup-message;
+                    mtu-apply(v) => { root.mtu-apply(v); }
+                    backup-save => { root.backup-save(); }
+                    backup-restore => { root.backup-restore(); }
                     language-chosen(v) => { root.language-chosen(v); }
                     theme-chosen(v) => { root.theme-chosen(v); }
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
@@ -186,6 +198,27 @@ export component App inherits Window {
                     x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
                     info: root.about-info; licenses: root.about-licenses;
                     open-contact => { root.open-contact(); }
+                }
+            }
+        }
+    }
+
+    if restore-open : Rectangle {
+        background: #00000088;
+        TouchArea { }
+        Rectangle {
+            width: min(420px, parent.width - 32px); height: rest.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            rest := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: Tr.restore-backup; font-size: Type.headline-small; font-weight: 600; wrap: word-wrap; }
+                Label { text: root.restore-text; muted: true; wrap: word-wrap; }
+                HRow {
+                    alignment: end; height: 40px; spacing: 8px;
+                    Button { text: Tr.cancel; clicked => { root.restore-cancel(); } }
+                    Button { text: Tr.restore-and-restart; primary: true; clicked => { root.restore-confirm(); } }
                 }
             }
         }

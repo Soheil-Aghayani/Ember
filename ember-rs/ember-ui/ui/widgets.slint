@@ -46,7 +46,7 @@ export component IconAction inherits Rectangle {
     // an icon-only button is a 36 px square; with a caption it is as wide as its content
     width: caption == "" ? 36px : row.preferred-width + 20px;
     border-radius: 10px;
-    background: filled ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
+    background: filled ? (enabled ? Palette.primary : Palette.primary.with-alpha(0.35)) : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
     row := HRow {
         pad-start: 10px; pad-end: 10px; spacing: 8px;
         Image { source: icon; colorize: filled ? Palette.on-primary : tint; width: 18px; height: 18px; opacity: enabled ? 1 : 0.38; }
@@ -82,6 +82,7 @@ export component TextField inherits Rectangle {
     in property <bool> multiline: false;
     in property <bool> password: false;
     in-out property <string> text <=> input.text;
+    callback accepted(string);      // Enter pressed
     public function paste() { input.focus(); input.paste(); }
     height: multiline ? 96px : 44px;
     border-radius: 12px;
@@ -97,6 +98,7 @@ export component TextField inherits Rectangle {
         font-family: Type.family; font-size: Type.body-medium; color: Palette.on-surface;
         vertical-alignment: multiline ? top : center;
         selection-background-color: Palette.primary.with-alpha(0.4);
+        accepted => { root.accepted(self.text); }
     }
     if input.text == "" : Text {
         x: 12px; y: multiline ? 10px : 0px; width: parent.width - 24px; height: multiline ? 24px : parent.height;

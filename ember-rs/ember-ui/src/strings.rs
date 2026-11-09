@@ -153,6 +153,10 @@ pub struct Strings {
     pub remove_app: &'static str,
     pub no_apps: &'static str,
     pub empty_apps_title: &'static str,
+    pub backup_hint: &'static str,
+    pub save_backup: &'static str,
+    pub restore_backup: &'static str,
+    pub restore_and_restart: &'static str,
     pub proxy_mode_caption: &'static str,
     pub connection_check_failed: &'static str,
     pub servers_count: &'static str,
@@ -163,6 +167,9 @@ pub struct Strings {
     pub mtu_validation: &'static str,
     pub days_left: &'static str,
     pub servers_added: &'static str,
+    pub restore_confirm: &'static str,
+    pub backup_saved: &'static str,
+    pub backup_failed: &'static str,
     pub servers_added_one: &'static str,
 }
 
@@ -316,6 +323,10 @@ pub const EN: Strings = Strings {
     remove_app: "Remove",
     no_apps: "No apps yet. Add Firefox, for example.",
     empty_apps_title: "No apps in the list",
+    backup_hint: "Saves your subscriptions and settings to one file, so you can set up another computer or recover after a reinstall. The file contains your account keys: keep it private.",
+    save_backup: "Save a backup…",
+    restore_backup: "Restore from a backup…",
+    restore_and_restart: "Restore and restart",
     proxy_mode_caption: "Proxy mode · {socks} (SOCKS5)  {http} (HTTP)",
     connection_check_failed: "Could not verify the connection: {0}",
     servers_count: "{0} servers",
@@ -326,6 +337,9 @@ pub const EN: Strings = Strings {
     mtu_validation: "Enter a whole number from {min} to {max}.",
     days_left: "{0} days left",
     servers_added: "Added {0} servers",
+    restore_confirm: "Replace your subscriptions and settings with the ones in {name}? Ember disconnects and restarts.",
+    backup_saved: "Saved {name}.",
+    backup_failed: "That did not work: {reason}",
     servers_added_one: "Added 1 server",
 };
 
@@ -479,6 +493,10 @@ pub const FA: Strings = Strings {
     remove_app: "حذف",
     no_apps: "هنوز برنامه‌ای اضافه نشده. مثلاً Firefox را اضافه کنید.",
     empty_apps_title: "برنامه‌ای در فهرست نیست",
+    backup_hint: "اشتراک‌ها و تنظیمات شما را در یک فایل ذخیره می‌کند تا بتوانید رایانهٔ دیگری را راه بیندازید یا پس از نصب دوباره همه‌چیز را برگردانید. این فایل کلیدهای حساب شما را دارد: آن را خصوصی نگه دارید.",
+    save_backup: "ذخیرهٔ پشتیبان…",
+    restore_backup: "بازیابی از پشتیبان…",
+    restore_and_restart: "بازیابی و راه‌اندازی دوباره",
     proxy_mode_caption: "حالت پروکسی · \u{2066}{socks} (SOCKS5)  {http} (HTTP)\u{2069}",
     connection_check_failed: "بررسی اتصال انجام نشد: {0}",
     servers_count: "{0} سرور",
@@ -489,6 +507,9 @@ pub const FA: Strings = Strings {
     mtu_validation: "یک عدد صحیح از {min} تا {max} وارد کنید.",
     days_left: "{0} روز مانده",
     servers_added: "{0} سرور اضافه شد",
+    restore_confirm: "اشتراک‌ها و تنظیمات فعلی با موارد داخل {name} جایگزین شوند؟ Ember قطع می‌شود و دوباره راه می‌افتد.",
+    backup_saved: "{name} ذخیره شد.",
+    backup_failed: "انجام نشد: {reason}",
     servers_added_one: "{0} سرور اضافه شد",
 };
 

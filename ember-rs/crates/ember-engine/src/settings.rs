@@ -230,7 +230,7 @@ fn distinct(items: impl Iterator<Item = String>) -> Vec<String> {
 // ---- Java .properties format ------------------------------------------------------------------------------------
 
 /// `Properties.load(InputStream)` reads ISO-8859-1.
-fn latin1(bytes: &[u8]) -> String {
+pub(crate) fn latin1(bytes: &[u8]) -> String {
     bytes.iter().map(|&b| b as char).collect()
 }
 

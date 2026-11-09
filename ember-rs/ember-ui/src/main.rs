@@ -289,6 +289,11 @@ fn apply_language(app: &App, language: &str) {
     tr.set_contact(s.about_contact.into());
     tr.set_licenses(s.about_licenses.into());
     tr.set_current_version(s.current_version.into());
+    tr.set_backup_hint(s.backup_hint.into());
+    tr.set_save_backup(s.save_backup.into());
+    tr.set_restore_backup(s.restore_backup.into());
+    tr.set_restore_and_restart(s.restore_and_restart.into());
+    tr.set_reset_default(s.reset_default.into());
     tr.set_whole_device_help(s.whole_device_help.into());
     tr.set_whole_device_short(s.whole_device_short.into());
     tr.set_auto_untrusted(s.auto_connect_untrusted.into());
@@ -428,6 +433,7 @@ fn push_settings(app: &App, engine: &Engine) {
         app_summary: app_rules_text(&mode).into(),
         skip_summary: entries_text(skip.len()).into(),
         trusted_summary: entries_text(trusted.len()).into(),
+        mtu: s.mtu().to_string().into(),
         can_trust: snap.network.as_ref().is_some_and(|id| !trusted.contains(id)),
         network: network.into(),
         trusted: text_model(trusted.iter().map(|id| network_name(id, t)).collect()),
@@ -574,10 +580,94 @@ fn wire_settings_page(
     }
     {
         let (engine, weak) = (engine.clone(), app.as_weak());
+        app.on_mtu_apply(move |text| {
+            let Some(app) = weak.upgrade() else { return };
+            let range = ember_engine::settings::MTU_RANGE;
+            match text.trim().parse::<i32>() {
+                Ok(v) if range.contains(&v) => {
+                    engine.settings().set_mtu(v);
+                    app.set_list_error(SharedString::new());
+                }
+                _ => {
+                    let message = strings::fill(lang::current().mtu_validation, &[("min", &range.start().to_string()), ("max", &range.end().to_string())]);
+                    app.set_list_error(message.into());
+                }
+            }
+            push_settings(&app, &engine);
+        });
+    }
+    wire_backup(app, engine, data_dir);
+    {
+        let (engine, weak) = (engine.clone(), app.as_weak());
         app.on_trust_network(move || {
             let Some(app) = weak.upgrade() else { return };
             engine.trust_current_network();
             push_settings(&app, &engine);
+        });
+    }
+}
+
+/// Backup and restore. The file dialogs block, so they run on their own thread and hand the answer back to the UI thread.
+fn wire_backup(app: &App, engine: &Engine, data_dir: &std::path::Path) {
+    let pending: Arc<std::sync::Mutex<Option<std::path::PathBuf>>> = Arc::default();
+    {
+        let (data_dir, weak) = (data_dir.to_path_buf(), app.as_weak());
+        app.on_backup_save(move || {
+            let (data_dir, weak) = (data_dir.clone(), weak.clone());
+            std::thread::spawn(move || {
+                let Some(target) = rfd::FileDialog::new().set_title(lang::current().save_backup).set_file_name("Ember-backup.zip").add_filter("Ember backup", &["zip"]).save_file() else { return };
+                let t = lang::current();
+                let name = target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let message = match ember_engine::backup::write(&data_dir, &target) {
+                    Ok(()) => strings::fill(t.backup_saved, &[("name", &name)]),
+                    Err(e) => strings::fill(t.backup_failed, &[("reason", &e)]),
+                };
+                let _ = weak.upgrade_in_event_loop(move |app| app.set_backup_message(message.into()));
+            });
+        });
+    }
+    {
+        let (pending, weak) = (Arc::clone(&pending), app.as_weak());
+        app.on_backup_restore(move || {
+            let (pending, weak) = (Arc::clone(&pending), weak.clone());
+            std::thread::spawn(move || {
+                let Some(file) = rfd::FileDialog::new().set_title(lang::current().restore_backup).add_filter("Ember backup", &["zip"]).pick_file() else { return };
+                let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                *pending.lock().unwrap() = Some(file);
+                let text = strings::fill(lang::current().restore_confirm, &[("name", &name)]);
+                let _ = weak.upgrade_in_event_loop(move |app| {
+                    app.set_restore_text(text.into());
+                    app.set_restore_open(true);
+                });
+            });
+        });
+    }
+    {
+        let (pending, weak) = (Arc::clone(&pending), app.as_weak());
+        app.on_restore_cancel(move || {
+            *pending.lock().unwrap() = None;
+            if let Some(app) = weak.upgrade() {
+                app.set_restore_open(false);
+            }
+        });
+    }
+    {
+        let (engine, data_dir, weak) = (engine.clone(), data_dir.to_path_buf(), app.as_weak());
+        app.on_restore_confirm(move || {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_restore_open(false);
+            let Some(file) = pending.lock().unwrap().take() else { return };
+            let (engine, data_dir) = (engine.clone(), data_dir.clone());
+            std::thread::spawn(move || {
+                // stop everything first: the running app would write its own copies of these files over the restored ones
+                engine.shutdown();
+                if let Err(e) = ember_engine::backup::restore(&data_dir, &file) {
+                    ember_engine::log::warn("Ember", &format!("restore failed: {e}"));
+                }
+                // start again either way: the app is stopped now, and a failed restore left the old files as they were
+                let _ = ember_win::single_instance::relaunch(&["--restarted"]);
+                std::process::exit(0);
+            });
         });
     }
 }
@@ -816,7 +906,17 @@ fn main() {
     let _single = if custom_dir {
         None
     } else {
-        match ember_win::single_instance::acquire() {
+        // a copy started by a restore waits a moment for the old one to let go of the lock
+        let tries = if has("--restarted") { 50 } else { 1 };
+        let mut guard = None;
+        for _ in 0..tries {
+            guard = ember_win::single_instance::acquire();
+            if guard.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        match guard {
             Some(guard) => Some(guard),
             None => return,
         }

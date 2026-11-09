@@ -9,3 +9,4 @@ ember-subs = { path = "../ember-subs" }
 ember-win = { path = "../ember-win" }
 serde_json = "1"
 regex = { version = "1", default-features = false, features = ["std", "unicode-perl", "unicode-case"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }

@@ -138,6 +138,7 @@ export struct SettingsData {
     app-summary: string,     // "Off", "VPN off for some" ...
     skip-summary: string,    // "None", "3 entries"
     trusted-summary: string,
+    mtu: string,
 }
 
 /// A list of text entries with a box to add one. `can-add: false` shows just the entries and a remove button each.
@@ -210,6 +211,13 @@ export component SettingsPage inherits Rectangle {
     callback list-add(string, string);      // which list ("skip", "apps"), the text
     callback list-remove(string, int);      // which list ("skip", "apps", "trusted"), the position
     callback trust-network();
+    callback mtu-apply(string);
+    callback backup-save();
+    callback backup-restore();
+    in property <string> backup-message;
+
+    property <string> mtu-draft;
+    changed section => { if section == 3 { mtu-draft = d.mtu; } }
 
     // 0 the list; 1 startup and tray; 2 protection; 3 advanced; 4 app rules; 5 skip list; 6 trusted networks
     in-out property <int> section: 0;
@@ -254,7 +262,7 @@ export component SettingsPage inherits Rectangle {
                 Card {
                     height: list3.preferred-height;
                     list3 := VerticalLayout {
-                        NavRow { title: Tr.backup; value: Tr.not-yet; enabled: false; }
+                        NavRow { title: Tr.backup; clicked => { root.section = 7; } }
                         Divider { }
                         NavRow { title: Tr.advanced; clicked => { root.section = 3; } }
                     }
@@ -266,7 +274,7 @@ export component SettingsPage inherits Rectangle {
                     alignment: start; height: 40px; spacing: 8px;
                     IconAction { icon: Palette.rtl ? Icons.chevron-right : Icons.chevron-left; tint: Palette.on-surface; clicked => { root.section = 0; } }
                     Label {
-                        text: root.section == 1 ? Tr.startup-tray : (root.section == 2 ? Tr.protection : (root.section == 3 ? Tr.advanced : (root.section == 4 ? Tr.app-rules : (root.section == 5 ? Tr.skip-vpn : Tr.trusted-networks))));
+                        text: root.section == 1 ? Tr.startup-tray : (root.section == 2 ? Tr.protection : (root.section == 3 ? Tr.advanced : (root.section == 4 ? Tr.app-rules : (root.section == 5 ? Tr.skip-vpn : (root.section == 7 ? Tr.backup : Tr.trusted-networks)))));
                         font-size: Type.headline-medium; font-weight: 600;
                     }
                 }
@@ -328,11 +336,44 @@ export component SettingsPage inherits Rectangle {
                         }
                         Divider { }
                         VerticalLayout {
-                            padding: 16px; spacing: 6px;
+                            padding: 16px; spacing: 10px;
+                            Label { text: "MTU"; font-size: Type.body-large; }
                             Label { text: Tr.mtu-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
-                            Label { text: Tr.not-yet; muted: true; font-size: Type.body-small; }
+                            Rectangle {
+                                height: 44px;
+                                // the box, then apply (check) and reset to the default (refresh); icons only
+                                mtu-box := TextField {
+                                    x: Palette.rtl ? parent.width - self.width : 0px; width: 120px;
+                                    text <=> root.mtu-draft;
+                                    accepted(v) => { root.mtu-apply(v); }
+                                }
+                                IconAction {
+                                    x: Palette.rtl ? parent.width - 120px - 8px - self.width : 128px; y: 4px;
+                                    icon: Icons.check; filled: true; enabled: root.mtu-draft != root.d.mtu;
+                                    clicked => { root.mtu-apply(root.mtu-draft); }
+                                }
+                                IconAction {
+                                    x: Palette.rtl ? parent.width - 120px - 8px - 36px - 4px - self.width : 168px; y: 4px;
+                                    icon: Icons.refresh; tint: Palette.on-surface; enabled: root.d.mtu != "1400";
+                                    clicked => { root.mtu-draft = "1400"; root.mtu-apply("1400"); }
+                                }
+                            }
+                            if root.list-error != "" : Label { text: root.list-error; color: Palette.error; font-size: Type.body-small; wrap: word-wrap; }
                         }
                     }
+                }
+                if section == 7 : VerticalLayout {
+                    spacing: 12px;
+                    Label { text: Tr.backup-hint; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                    Card {
+                        height: backup-rows.preferred-height;
+                        backup-rows := VerticalLayout {
+                            NavRow { title: Tr.save-backup; clicked => { root.backup-save(); } }
+                            Divider { }
+                            NavRow { title: Tr.restore-backup; clicked => { root.backup-restore(); } }
+                        }
+                    }
+                    if root.backup-message != "" : Label { text: root.backup-message; font-size: Type.body-small; wrap: word-wrap; }
                 }
                 if section == 4 : VerticalLayout {
                     spacing: 12px;

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 arboard = { version = "3", default-features = false }
+rfd = { version = "0.16", default-features = false }
 ember-engine = { path = "../crates/ember-engine" }
 ember-win = { path = "../crates/ember-win" }
 ember-subs = { path = "../crates/ember-subs" }
