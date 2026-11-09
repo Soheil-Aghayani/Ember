@@ -13,9 +13,11 @@ component Divider inherits Rectangle {
     Rectangle { x: Palette.rtl ? 0px : 16px; width: parent.width - 16px; height: 1px; background: Palette.outline-variant; }
 }
 
-component GroupLabel inherits Label {
-    font-size: Type.title-small; font-weight: 500; muted: true;
-    height: 44px; vertical-alignment: bottom;
+/// The small heading above a group; a gap under it keeps the letters off the card below.
+component GroupLabel inherits Rectangle {
+    in property <string> text;
+    height: 50px;
+    Label { x: 0px; y: 0px; width: parent.width; height: 38px; text: root.text; font-size: Type.title-small; font-weight: 500; muted: true; vertical-alignment: bottom; }
 }
 
 /// A row with a switch. `subtitle` is the explanation under the title.
@@ -27,7 +29,7 @@ component SwitchRow inherits Rectangle {
     callback toggled(bool);
     property <length> text-width: root.width - 16px - 48px - 12px - 16px;
     height: max(column.preferred-height + 28px, 60px);
-    opacity: enabled ? 1 : 0.45;
+    opacity: enabled ? 1 : 0.6;
     column := VerticalLayout {
         x: Palette.rtl ? 16px + 48px + 12px : 16px;
         y: (root.height - self.preferred-height) / 2;
@@ -50,7 +52,7 @@ component NavRow inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked();
     height: 52px;
-    opacity: enabled ? 1 : 0.45;
+    opacity: enabled ? 1 : 0.6;
     background: touch.has-hover && enabled ? Palette.primary.with-alpha(0.06) : transparent;
     Label {
         x: Palette.rtl ? 16px + 16px + 8px + value-label.preferred-width + 8px : 16px;
@@ -349,12 +351,12 @@ export component SettingsPage inherits Rectangle {
                                 }
                                 IconAction {
                                     x: Palette.rtl ? parent.width - 120px - 8px - self.width : 128px; y: 4px;
-                                    icon: Icons.check; filled: true; enabled: root.mtu-draft != root.d.mtu;
+                                    icon: Icons.check; filled: true; visible: root.mtu-draft != root.d.mtu;
                                     clicked => { root.mtu-apply(root.mtu-draft); }
                                 }
                                 IconAction {
                                     x: Palette.rtl ? parent.width - 120px - 8px - 36px - 4px - self.width : 168px; y: 4px;
-                                    icon: Icons.refresh; tint: Palette.on-surface; enabled: root.d.mtu != "1400";
+                                    icon: Icons.refresh; tint: Palette.on-surface; visible: root.d.mtu != "1400" || root.mtu-draft != "1400";
                                     clicked => { root.mtu-draft = "1400"; root.mtu-apply("1400"); }
                                 }
                             }

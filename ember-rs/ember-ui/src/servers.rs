@@ -86,6 +86,14 @@ fn node_row(
     }
 }
 
+/// True for a panel's information line that only restates the usage (traffic left, days left, expiry).
+fn repeats_usage(line: &str) -> bool {
+    let text = line.to_lowercase();
+    let has_number = text.chars().any(|c| c.is_ascii_digit());
+    let words = ["traffic", "left", "remaining", "expire", "quota", "used", "volume", "gb", "tb", "day", "\u{62d}\u{62c}\u{645}", "\u{628}\u{627}\u{642}\u{6cc}", "\u{631}\u{648}\u{632}", "\u{627}\u{646}\u{642}\u{636}\u{627}", "\u{62a}\u{631}\u{627}\u{641}\u{6cc}\u{6a9}"];
+    has_number && words.iter().any(|w| text.contains(w))
+}
+
 fn sub_row(
     sub: &Subscription,
     s: &Strings,
@@ -96,7 +104,14 @@ fn sub_row(
     testing: Option<&str>,
 ) -> SubRow {
     let servers: Vec<Node> = sub.nodes.iter().filter(|n| !n.is_info()).cloned().collect();
-    let info: Vec<&str> = sub.nodes.iter().filter(|n| n.is_info()).map(|n| n.name.as_str()).collect();
+    // a panel's own "traffic left" or "days left" line only repeats the usage bar below it, so it is dropped when the bar is there
+    let has_usage = sub.usage.as_ref().is_some_and(|u| u.total > 0);
+    let mut info: Vec<&str> = Vec::new();
+    for line in sub.nodes.iter().filter(|n| n.is_info()).map(|n| n.name.as_str()) {
+        if !(has_usage && repeats_usage(line)) && !info.contains(&line) {
+            info.push(line);
+        }
+    }
     let sorted = ember_subs::sort::sort_nodes(&servers, results, favorites);
     let fastest = sorted.iter().filter_map(|n| results.get(&n.id).and_then(|r| r.mbps)).fold(0.0, f64::max);
     let nodes: Vec<NodeRow> = sorted.iter().map(|n| node_row(n, results.get(&n.id), selected_id, favorites, fastest)).collect();

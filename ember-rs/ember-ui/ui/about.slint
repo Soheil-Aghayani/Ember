@@ -55,18 +55,17 @@ export component AboutPage inherits Rectangle {
             Card {
                 height: more.preferred-height;
                 more := VerticalLayout {
+                    // the Telegram mark and the handle say it all; no second word for it
                     Rectangle {
-                        height: 64px;
+                        height: 52px;
                         background: contact-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
                         Image {
                             source: Icons.telegram; colorize: Palette.primary; width: 24px; height: 24px;
                             x: Palette.rtl ? parent.width - self.width - 16px : 16px; y: (parent.height - self.height) / 2;
                         }
-                        VerticalLayout {
-                            x: Palette.rtl ? 16px : 16px + 24px + 12px; y: 10px;
-                            width: parent.width - 16px - 24px - 12px - 16px - (Palette.rtl ? 0px : 0px); alignment: center; height: parent.height - 20px;
-                            Label { text: Tr.contact; muted: true; font-size: Type.body-small; }
-                            Label { text: "Telegram  @env_soh"; color: Palette.primary; font-size: Type.body-large; }
+                        Label {
+                            x: Palette.rtl ? 16px : 16px + 24px + 12px; width: parent.width - 16px - 24px - 12px - 16px; height: parent.height;
+                            text: "@env_soh"; color: Palette.primary; font-size: Type.body-large;
                         }
                         contact-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-contact(); } }
                     }
@@ -75,13 +74,12 @@ export component AboutPage inherits Rectangle {
                         height: 52px;
                         background: licenses-touch.has-hover ? Palette.primary.with-alpha(0.06) : transparent;
                         Label {
-                            x: Palette.rtl ? 16px + 80px : 16px; width: parent.width - 32px - 80px; height: parent.height;
+                            x: Palette.rtl ? 16px + 16px + 12px : 16px; width: parent.width - 32px - 28px; height: parent.height;
                             text: Tr.licenses; font-size: Type.body-large;
                         }
-                        Label {
-                            x: Palette.rtl ? 16px : parent.width - 16px - 80px; width: 80px; height: parent.height;
-                            text: root.show-licenses ? Tr.hide : Tr.show; color: Palette.primary; font-size: Type.body-medium;
-                            horizontal-alignment: Palette.rtl ? left : right;
+                        Image {
+                            source: root.show-licenses ? Icons.chevron-up : Icons.chevron-down; colorize: Palette.on-variant; width: 16px; height: 16px;
+                            x: Palette.rtl ? 16px : parent.width - self.width - 16px; y: (parent.height - self.height) / 2;
                         }
                         licenses-touch := TouchArea { mouse-cursor: pointer; clicked => { root.show-licenses = !root.show-licenses; } }
                     }
@@ -93,12 +91,15 @@ export component AboutPage inherits Rectangle {
                     }
                 }
             }
-            // The Slint royalty-free licence asks for this badge on the About screen.
-            // the badge's version and link are dark text, so in the dark theme it sits on a light plate
+            // The Slint royalty-free licence requires its badge on the About screen, so it stays, small. Its version and
+            // link are dark text, so in the dark theme it sits on a light plate.
             Rectangle {
-                height: 128px; border-radius: 16px;
-                background: Palette.dark ? #ffffffe6 : transparent;
-                AboutSlint { x: 0px; y: 4px; width: parent.width; height: 120px; }
+                height: 118px;
+                Rectangle {
+                    width: 200px; height: 118px; x: (parent.width - self.width) / 2; border-radius: 14px;
+                    background: Palette.dark ? #ffffffe6 : transparent;
+                    AboutSlint { x: 0px; y: 0px; width: parent.width; height: parent.height; }
+                }
             }
         }
     }

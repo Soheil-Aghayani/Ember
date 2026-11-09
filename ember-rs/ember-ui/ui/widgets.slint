@@ -46,10 +46,10 @@ export component IconAction inherits Rectangle {
     // an icon-only button is a 36 px square; with a caption it is as wide as its content
     width: caption == "" ? 36px : row.preferred-width + 20px;
     border-radius: 10px;
-    background: filled ? (enabled ? Palette.primary : Palette.primary.with-alpha(0.35)) : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
+    background: filled ? (enabled ? Palette.primary : Palette.primary.with-alpha(0.5)) : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
     row := HRow {
         pad-start: 10px; pad-end: 10px; spacing: 8px;
-        Image { source: icon; colorize: filled ? Palette.on-primary : tint; width: 18px; height: 18px; opacity: enabled ? 1 : 0.38; }
+        Image { source: icon; colorize: filled ? Palette.on-primary : tint; width: 18px; height: 18px; opacity: enabled ? 1 : 0.5; }
         if caption != "" : Label { text: caption; color: filled ? Palette.on-primary : tint; font-size: Type.body-small; font-weight: 500; }
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
@@ -66,7 +66,7 @@ export component Button inherits Rectangle {
     width: label.preferred-width + 32px;
     border-radius: 12px;
     background: primary ? Palette.primary : (touch.has-hover && enabled ? Palette.primary.with-alpha(0.09) : transparent);
-    opacity: enabled ? 1 : 0.45;
+    opacity: enabled ? 1 : 0.55;
     label := Label {
         x: 16px; y: 0px; width: parent.width - 32px; height: parent.height; text: root.text;
         font-size: Type.body-medium; font-weight: 500;

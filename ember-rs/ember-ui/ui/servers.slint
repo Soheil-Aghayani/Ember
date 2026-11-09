@@ -47,9 +47,10 @@ component ServerLine inherits Rectangle {
         alignment: stretch; pad-start: 16px; pad-end: 8px; spacing: 12px;
         if entry.has-flag : Image { source: entry.flag; width: 24px; height: 24px; image-fit: contain; }
         VerticalLayout {
-            horizontal-stretch: 1; spacing: 2px; alignment: center;
-            Label { text: entry.title; font-size: Type.body-large; overflow: elide; }
-            Label { text: entry.protocol; muted: true; font-size: 12px; font-weight: 500; }
+            // lines at fixed heights, so the numbers on the right sit level with the name and the protocol
+            horizontal-stretch: 1; spacing: 2px; padding-top: 10px; alignment: start;
+            Label { height: 22px; text: entry.title; font-size: Type.body-large; overflow: elide; }
+            Label { height: 16px; text: entry.protocol; muted: true; font-size: 12px; font-weight: 500; }
             if entry.has-bar : Rectangle {
                 height: 3px;
                 Rectangle { width: parent.width - 12px; height: 3px; border-radius: 2px; background: Palette.outline-variant.with-alpha(0.5); }
@@ -60,12 +61,15 @@ component ServerLine inherits Rectangle {
             }
         }
         Rectangle {
-            width: 120px; horizontal-stretch: 0;
-            if entry.has-result : VerticalLayout {
-                alignment: center;
-                Label { text: entry.no-answer ? Tr.no-answer : (entry.speed != "" ? entry.speed : entry.ping); font-size: Type.body-medium;
-                        color: entry.no-answer ? Palette.error : Palette.on-surface; horizontal-alignment: Palette.rtl ? left : right; }
-                if entry.speed != "" && entry.ping != "" : Label { text: entry.ping; muted: true; font-size: 12px; horizontal-alignment: Palette.rtl ? left : right; }
+            width: 120px; height: 62px; horizontal-stretch: 0;
+            if entry.has-result : Label {
+                x: 0px; width: parent.width; y: 10px; height: 22px;
+                text: entry.no-answer ? Tr.no-answer : (entry.speed != "" ? entry.speed : entry.ping); font-size: Type.body-medium;
+                color: entry.no-answer ? Palette.error : Palette.on-surface; horizontal-alignment: Palette.rtl ? left : right;
+            }
+            if entry.has-result && entry.speed != "" && entry.ping != "" : Label {
+                x: 0px; width: parent.width; y: 34px; height: 16px;
+                text: entry.ping; muted: true; font-size: 12px; horizontal-alignment: Palette.rtl ? left : right;
             }
         }
         IconAction {
