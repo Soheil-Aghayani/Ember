@@ -1086,7 +1086,7 @@ impl Shared {
                         && shared.snapshot().state == ConnState::Disconnected
                     {
                         log::info(TAG, "measuring the servers in the background (fastest-server mode)");
-                        shared.test_nodes(all, true);
+                        shared.test_nodes(all, false); // delay only: no download unless the user asks for a speed test
                     }
                 }
                 if !sleep(REFRESH_CHECK) {
