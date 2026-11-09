@@ -87,6 +87,7 @@ component SubscriptionCard inherits Card {
     callback toggle();
     callback select(string);
     callback favorite(string);
+    callback ping();
     callback test();
     callback stop-test();
     callback refresh();
@@ -100,19 +101,24 @@ component SubscriptionCard inherits Card {
             TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
             // explicit positions: the name and status on the left, the four actions and the chevron on the right, all centred on the 56 px row
             acts := Rectangle {
-                x: Palette.rtl ? 12px : parent.width - self.width - 12px; y: 10px; width: 178px; height: 36px;
-                // left to right: test, refresh, edit, delete, chevron (mirrored in a right-to-left language)
+                x: Palette.rtl ? 12px : parent.width - self.width - 12px; y: 10px; width: 218px; height: 36px;
+                // left to right: delay only, delay and speed (or stop), refresh, edit, delete, chevron (mirrored in a right-to-left language)
                 IconAction {
-                    x: Palette.rtl ? 142px : 0px; y: 0px;
+                    x: Palette.rtl ? 182px : 0px; y: 0px;
+                    icon: Icons.ping; enabled: !testing && can-test;
+                    clicked => { root.ping(); }
+                }
+                IconAction {
+                    x: Palette.rtl ? 142px : 40px; y: 0px;
                     icon: testing ? Icons.stop : Icons.bolt;
                     enabled: testing || can-test;
                     clicked => { if root.testing { root.stop-test(); } else { root.test(); } }
                 }
-                IconAction { x: Palette.rtl ? 102px : 40px; y: 0px; icon: Icons.refresh; enabled: sub.can-refresh && !sub.refreshing; tint: Palette.on-surface; clicked => { root.refresh(); } }
-                IconAction { x: Palette.rtl ? 62px : 80px; y: 0px; icon: Icons.edit; tint: Palette.on-surface; clicked => { root.edit(); } }
-                IconAction { x: Palette.rtl ? 22px : 120px; y: 0px; icon: Icons.trash; tint: Palette.on-surface; clicked => { root.remove(); } }
+                IconAction { x: Palette.rtl ? 102px : 80px; y: 0px; icon: Icons.refresh; enabled: sub.can-refresh && !sub.refreshing; tint: Palette.on-surface; clicked => { root.refresh(); } }
+                IconAction { x: Palette.rtl ? 62px : 120px; y: 0px; icon: Icons.edit; tint: Palette.on-surface; clicked => { root.edit(); } }
+                IconAction { x: Palette.rtl ? 22px : 160px; y: 0px; icon: Icons.trash; tint: Palette.on-surface; clicked => { root.remove(); } }
                 Image {
-                    x: Palette.rtl ? 0px : 160px; y: 9px; width: 18px; height: 18px;
+                    x: Palette.rtl ? 0px : 200px; y: 9px; width: 18px; height: 18px;
                     source: sub.expanded ? Icons.chevron-up : Icons.chevron-down; colorize: Palette.on-variant;
                 }
             }
@@ -137,8 +143,9 @@ component SubscriptionCard inherits Card {
             }
             Label { text: sub.usage-text; muted: true; font-size: Type.body-small; }
         }
-        if sub.expanded && sub.info != "" : Label {
-            text: sub.info; muted: true; font-size: Type.body-small; wrap: word-wrap;
+        if sub.expanded && sub.info != "" : VerticalLayout {
+            padding-left: 16px; padding-right: 16px;
+            Label { text: sub.info; muted: true; font-size: Type.body-small; wrap: word-wrap; }
         }
         if !testing && !can-test : Label { text: Tr.test-needs-disconnect; muted: true; font-size: Type.body-small; }
         if sub.expanded : Rectangle { height: 8px; }
@@ -170,6 +177,7 @@ export component ServersPage inherits Rectangle {
     callback toggle-expanded(string);
     callback select(string);
     callback favorite(string);
+    callback ping(string);
     callback test(string);
     callback stop-test();
     callback refresh(string);
@@ -195,7 +203,7 @@ export component ServersPage inherits Rectangle {
                 // title and button share one centre line (a flex row left them 10 px apart)
                 add-button := IconAction {
                     x: Palette.rtl ? 0px : parent.width - self.width; y: 4px;
-                    icon: Icons.plus; caption: Tr.add-servers; filled: true;
+                    icon: Icons.plus; filled: true;   // icon only; the empty page below still says "Add servers" in words
                     clicked => { root.dialog-id = ""; root.dialog-title = Tr.add-link; root.dialog-link = ""; root.dialog-name = ""; root.dialog-open = true; }
                 }
                 Label {
@@ -235,6 +243,7 @@ export component ServersPage inherits Rectangle {
                     toggle => { root.toggle-expanded(sub.id); }
                     select(id) => { root.select(id); }
                     favorite(id) => { root.favorite(id); }
+                    ping => { root.ping(sub.id); }
                     test => { root.test(sub.id); }
                     stop-test => { root.stop-test(); }
                     refresh => { root.refresh(sub.id); }
@@ -246,8 +255,11 @@ export component ServersPage inherits Rectangle {
     }
 
     if dialog-open : Rectangle {
-        background: #00000088;
-        TouchArea { }   // blocks the page behind the dialog
+        // the page is inset from the window edges, so the dimming is far larger than the page (the window clips it)
+        Rectangle {
+            x: -2000px; y: -2000px; width: 4000px; height: 4000px; background: #00000088;
+            TouchArea { }   // blocks the page behind the dialog
+        }
         Rectangle {
             width: min(480px, parent.width - 32px); height: dlg.preferred-height + 48px;
             x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);

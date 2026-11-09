@@ -120,9 +120,10 @@ pub struct TestEvents<'a> {
     pub address: &'a (dyn Fn(&Node, Ipv4Addr) + Sync),
 }
 
-/// Tests every server: first how fast each answers, then the download speed of the quickest ones one after another so
-/// they do not share the bandwidth.
-pub fn test_nodes(xray: &XrayRunner, nodes: &[Node], events: &TestEvents) -> Result<(), TestError> {
+/// Tests every server: first how fast each answers, then (when `speed` is set) the download speed of the quickest ones
+/// one after another so they do not share the bandwidth. Without `speed` only the delay is measured, which is quick and
+/// uses almost no data.
+pub fn test_nodes(xray: &XrayRunner, nodes: &[Node], speed: bool, events: &TestEvents) -> Result<(), TestError> {
     // OpenVPN servers do not run through Xray, so they cannot be tested this way.
     let candidates: Vec<Node> = nodes.iter().filter(|n| !n.is_info() && n.protocol != "openvpn").cloned().collect();
     (events.progress)("Looking up the servers…");
@@ -135,12 +136,12 @@ pub fn test_nodes(xray: &XrayRunner, nodes: &[Node], events: &TestEvents) -> Res
     if reachable.is_empty() {
         return Ok(());
     }
-    let outcome = run_tests(xray, reachable, events);
+    let outcome = run_tests(xray, reachable, speed, events);
     xray.stop();
     outcome
 }
 
-fn run_tests(xray: &XrayRunner, reachable: Vec<(Node, Ipv4Addr)>, events: &TestEvents) -> Result<(), TestError> {
+fn run_tests(xray: &XrayRunner, reachable: Vec<(Node, Ipv4Addr)>, speed_too: bool, events: &TestEvents) -> Result<(), TestError> {
     let entries = start_xray(xray, reachable)?;
     (events.progress)("Measuring delay…");
     let done = AtomicUsize::new(0);
@@ -151,6 +152,9 @@ fn run_tests(xray: &XrayRunner, reachable: Vec<(Node, Ipv4Addr)>, events: &TestE
         (events.result)(node, NodeResult { ping_ms: ping, mbps: None, tested_at_ms: now_ms() });
         (i, ping)
     });
+    if !speed_too {
+        return Ok(());
+    }
     let mut answered: Vec<(usize, Option<i32>)> = pings.into_iter().filter(|p| p.1.is_some()).collect();
     answered.sort_by_key(|p| p.1);
     answered.truncate(SPEED_TOP);

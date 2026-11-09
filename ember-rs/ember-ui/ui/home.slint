@@ -1,6 +1,6 @@
 // The Home page. Port of HomePage in desktop/.../ui/App.kt (orb, status, server picker, notices).
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
-import { Card, Label, IconAction, HRow, Button } from "widgets.slint";
+import { Card, Label, HRow, Button } from "widgets.slint";
 import { Orb } from "orb.slint";
 
 export struct ServerRow {
@@ -28,14 +28,10 @@ export component HomePage inherits Rectangle {
     in property <string> blocked-notice;   // the kill switch is holding traffic (or Ember is reconnecting)
     in property <bool> can-restore: true;
     callback restore-internet();
-    in property <bool> testing;
-    in property <string> test-progress;
     in property <int> menu-request;        // bump to open the server menu from outside (debug flag --menu)
     callback orb-clicked();
     callback choose(string);
     callback open-servers();
-    callback test-speed();
-    callback cancel-test();
 
     changed menu-request => { popup.show(); }
 
@@ -120,23 +116,6 @@ export component HomePage inherits Rectangle {
                         tm := TouchArea { mouse-cursor: pointer; clicked => { popup.close(); root.open-servers(); } }
                     }
                 }
-            }
-        }
-        if (can-pick && servers.length > 0) || testing : Rectangle { height: 8px; }
-        if (can-pick && servers.length > 0) || testing : Rectangle {
-            height: 36px;
-            // the icon lines up with the server card's content (16 px in; the action has 10 px of its own padding)
-            action := IconAction {
-                x: Palette.rtl ? parent.width - self.width - 6px : 6px;
-                icon: testing ? Icons.stop : Icons.bolt;
-                caption: testing ? Tr.stop-test : Tr.test-speed;
-                clicked => { if root.testing { root.cancel-test(); } else { root.test-speed(); } }
-            }
-            if testing && test-progress != "" : Label {
-                x: Palette.rtl ? 6px : action.x + action.width + 8px;
-                width: parent.width - action.width - 20px;
-                height: 36px;
-                text: root.test-progress; muted: true; font-size: Type.body-small; overflow: elide;
             }
         }
         if caption != "" : Rectangle { height: 12px; }

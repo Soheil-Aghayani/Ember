@@ -44,7 +44,6 @@ export component App inherits Window {
     in property <string> test-progress;
     callback orb-clicked();
     callback choose(string);
-    callback test-speed();
     callback cancel-test();
     in property <[SubRow]> subs;
     in property <string> page-notice;
@@ -92,6 +91,7 @@ export component App inherits Window {
     callback toggle-expanded(string);
     callback favorite(string);
     callback test-subscription(string);
+    callback ping-subscription(string);
     callback refresh-subscription(string);
     callback remove-subscription(string);
     callback submit-subscription(string, string, string);
@@ -136,14 +136,12 @@ export component App inherits Window {
                     state: root.state; status: root.status; secondary: root.secondary;
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
-                    caption: root.caption; error: root.error; menu-request: root.menu-request; testing: root.testing; test-progress: root.test-progress;
+                    caption: root.caption; error: root.error; menu-request: root.menu-request;
                     blocked-notice: root.blocked-notice; can-restore: root.can-restore;
                     restore-internet => { root.restore-internet(); }
                                 orb-clicked => { root.orb-clicked(); }
                     choose(id) => { root.choose(id); }
                     open-servers => { root.page = 1; }
-                    test-speed => { root.test-speed(); }
-                    cancel-test => { root.cancel-test(); }
                 }
                 if page == 1 : ServersPage {
                     x: 32px; y: 0; width: parent.width - 64px; height: parent.height;
@@ -153,6 +151,7 @@ export component App inherits Window {
                     toggle-expanded(id) => { root.toggle-expanded(id); }
                     select(id) => { root.choose(id); }
                     favorite(id) => { root.favorite(id); }
+                    ping(id) => { root.ping-subscription(id); }
                     test(id) => { root.test-subscription(id); }
                     stop-test => { root.cancel-test(); }
                     refresh(id) => { root.refresh-subscription(id); }

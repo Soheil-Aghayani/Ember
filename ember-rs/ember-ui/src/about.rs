@@ -14,11 +14,12 @@ const TUNNEL_VERSION: &str = "hev-socks5-tunnel 2.19.1 \u{b7} Wintun 0.14.1";
 
 pub const CONTACT_LINK: &str = "https://t.me/env_soh";
 
-const LICENSES: [(&str, &str); 8] = [
+const LICENSES: [(&str, &str); 9] = [
     ("Xray-core", "MPL-2.0"),
     ("hev-socks5-tunnel", "MIT"),
     ("Wintun", "WireGuard LLC prebuilt binaries licence"),
     ("Inter (font)", "SIL Open Font License 1.1"),
+    ("Vazirmatn (Persian font)", "SIL Open Font License 1.1"),
     ("Solar icons (480 Design)", "CC BY 4.0"),
     ("circle-flags", "MIT"),
     ("Slint (user interface)", "Slint royalty-free licence (made with Slint)"),

@@ -699,7 +699,15 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
         let engine = engine.clone();
         app.on_test_subscription(move |id| {
             if let Some(sub) = engine.store().subscriptions().into_iter().find(|s| s.id == id.as_str()) {
-                engine.test_nodes(sub.nodes);
+                engine.test_nodes(sub.nodes, true);
+            }
+        });
+    }
+    {
+        let engine = engine.clone();
+        app.on_ping_subscription(move |id| {
+            if let Some(sub) = engine.store().subscriptions().into_iter().find(|s| s.id == id.as_str()) {
+                engine.test_nodes(sub.nodes, false);
             }
         });
     }
@@ -917,13 +925,6 @@ fn main() {
     {
         let engine = engine.clone();
         app.on_choose(move |id| engine.choose_server(&id));
-    }
-    {
-        let engine = engine.clone();
-        app.on_test_speed(move || {
-            let nodes: Vec<_> = engine.store().all_nodes().into_iter().filter(|n| !n.is_info()).collect();
-            engine.test_nodes(nodes);
-        });
     }
     {
         let engine = engine.clone();

@@ -341,9 +341,10 @@ impl Engine {
         }
     }
 
-    /// Measures delay and download speed of `nodes`. Only while disconnected, or the test would use the tunnel.
-    pub fn test_nodes(&self, nodes: Vec<Node>) {
-        self.shared.test_nodes(nodes);
+    /// Measures the delay of `nodes`, and with `speed` their download speed too. Only while disconnected, or the test
+    /// would use the tunnel.
+    pub fn test_nodes(&self, nodes: Vec<Node>, speed: bool) {
+        self.shared.test_nodes(nodes, speed);
     }
 
     pub fn cancel_test(&self) {
@@ -1012,7 +1013,7 @@ impl Shared {
         self.connect(next);
     }
 
-    fn test_nodes(self: &Arc<Self>, nodes: Vec<Node>) {
+    fn test_nodes(self: &Arc<Self>, nodes: Vec<Node>, speed: bool) {
         let nodes: Vec<Node> = nodes.into_iter().filter(|n| n.protocol != "openvpn").collect();
         let state = self.snapshot();
         if nodes.is_empty() || state.state != ConnState::Disconnected || state.test_progress.is_some() {
@@ -1027,9 +1028,17 @@ impl Shared {
         let shared = Arc::clone(self);
         std::thread::spawn(move || {
             let progress = |text: &str| shared.update(|s| s.test_progress = Some(text.to_string()));
-            let result = |node: &Node, r| shared.store.record_result(node, r);
+            // a delay-only pass keeps the download speed measured earlier for a server that still answers
+            let result = |node: &Node, r: ember_subs::subscription::NodeResult| {
+                let r = if speed || r.ping_ms.is_none() {
+                    r
+                } else {
+                    ember_subs::subscription::NodeResult { mbps: shared.store.results().get(&node.id).and_then(|old| old.mbps), ..r }
+                };
+                shared.store.record_result(node, r);
+            };
             let address = |node: &Node, ip: std::net::Ipv4Addr| shared.store.remember_address(node, &ip.to_string());
-            let outcome = test_nodes(&shared.xray, &nodes, &TestEvents { progress: &progress, result: &result, address: &address });
+            let outcome = test_nodes(&shared.xray, &nodes, speed, &TestEvents { progress: &progress, result: &result, address: &address });
             if let Err(e) = outcome {
                 log::warn(TAG, &format!("the server test failed: {e}"));
                 shared.update(|s| s.last_error = Some(e.to_string()));
@@ -1077,7 +1086,7 @@ impl Shared {
                         && shared.snapshot().state == ConnState::Disconnected
                     {
                         log::info(TAG, "measuring the servers in the background (fastest-server mode)");
-                        shared.test_nodes(all);
+                        shared.test_nodes(all, true);
                     }
                 }
                 if !sleep(REFRESH_CHECK) {

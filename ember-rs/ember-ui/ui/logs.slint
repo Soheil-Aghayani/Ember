@@ -1,7 +1,7 @@
 // The Logs page. Port of LogsPage in desktop/.../ui/App.kt: a filter, copy, clear, a redacted report for asking for help,
 // and the recent log, newest first. Only the newest lines are drawn (the log can hold thousands); copying takes all of them.
 import { Palette, Type, Icons, Tr } from "theme.slint";
-import { Card, Label, IconAction, HRow, Button } from "widgets.slint";
+import { Card, Label, IconAction, HRow } from "widgets.slint";
 
 component Chip inherits Rectangle {
     in property <string> text;
@@ -46,9 +46,10 @@ export component LogsPage inherits Rectangle {
             Rectangle { height: 4px; }
             HRow {
                 alignment: start; cross-axis-alignment: stretch; height: 40px; spacing: 4px;
-                IconAction { icon: Icons.copy; caption: Tr.copy; enabled: lines.length > 0; clicked => { root.copy(); } }
-                IconAction { icon: Icons.trash; caption: Tr.clear; enabled: has-entries; clicked => { root.clear(); } }
-                Button { text: Tr.copy-report; clicked => { root.copy-report(); } }
+                // icon only: copy the log, clear it, and (clipboard) copy the redacted report that the hint below describes
+                IconAction { icon: Icons.copy; enabled: lines.length > 0; clicked => { root.copy(); } }
+                IconAction { icon: Icons.trash; enabled: has-entries; clicked => { root.clear(); } }
+                IconAction { icon: Icons.clipboard; clicked => { root.copy-report(); } }
             }
             Label { text: Tr.copy-report-hint; muted: true; font-size: Type.body-small; wrap: word-wrap; }
             Rectangle { height: 12px; }
