@@ -305,6 +305,8 @@ fn apply_language(app: &App, language: &str) {
     tr.set_advanced(s.advanced.into());
     tr.set_back(s.back.into());
     tr.set_keep_in_tray(s.keep_in_tray.into());
+    tr.set_sounds(s.sounds.into());
+    tr.set_sounds_help(s.sounds_help.into());
     tr.set_tray_help(s.tray_help.into());
     tr.set_start_with_windows(s.start_with_windows.into());
     tr.set_start_quietly(s.start_quietly.into());
@@ -518,6 +520,7 @@ fn push_settings(app: &App, engine: &Engine) {
         auto_failover: s.auto_failover(),
         diagnostic_log: s.diagnostic_log(),
         keep_in_tray: s.keep_in_tray(),
+        sounds: s.sounds(),
         start_with_windows: AUTOSTART.load(Ordering::SeqCst),
         whole_device: s.whole_device() && caps.whole_device,
         whole_available: caps.whole_device,
@@ -585,6 +588,7 @@ fn wire_settings_page(
                 "autoFailover" => s.set_auto_failover(value),
                 "diagnosticLog" => s.set_diagnostic_log(value),
                 "keepInTray" => s.set_keep_in_tray(value),
+                "sounds" => s.set_sounds(value),
                 "wholeDevice" => s.set_whole_device(value),
                 "killSwitch" => s.set_kill_switch(value),
                 "ipv6" => s.set_ipv6(value),
@@ -1278,6 +1282,7 @@ fn main() {
     }
     let has_tray = tray.is_some();
     let mut tray_state = None;
+    let mut chimed = ConnState::Disconnected;
 
     let timer = slint::Timer::default();
     let weak = app.as_weak();
@@ -1319,6 +1324,17 @@ fn main() {
             engine.connect_selected();
         }
         let state = engine.snapshot().state;
+        // a soft chime when the connection comes up, and a lower one when it was up and goes down
+        if state != chimed {
+            if engine.settings().sounds() {
+                if state == ConnState::Connected {
+                    let _ = ember_win::sound::play(ember_win::sound::Chime::Connected);
+                } else if chimed == ConnState::Connected {
+                    let _ = ember_win::sound::play(ember_win::sound::Chime::Disconnected);
+                }
+            }
+            chimed = state;
+        }
         if let Some((tray, events)) = &tray {
             while let Ok(event) = events.try_recv() {
                 match event {

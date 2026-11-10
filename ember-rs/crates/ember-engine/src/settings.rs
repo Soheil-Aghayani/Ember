@@ -65,6 +65,14 @@ impl Settings {
         self.put("keepInTray", v.to_string());
     }
 
+    /// A soft chime when the connection comes up or goes down.
+    pub fn sounds(&self) -> bool {
+        self.flag("sounds", true)
+    }
+    pub fn set_sounds(&self, v: bool) {
+        self.put("sounds", v.to_string());
+    }
+
     pub fn auto_connect(&self) -> bool {
         self.flag("autoConnect", false)
     }

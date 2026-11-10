@@ -126,6 +126,7 @@ export struct SettingsData {
     auto-failover: bool,
     diagnostic-log: bool,
     keep-in-tray: bool,
+    sounds: bool,
     start-with-windows: bool,
     whole-device: bool,
     whole-available: bool,
@@ -291,6 +292,11 @@ export component SettingsPage inherits Rectangle {
                         SwitchRow {
                             title: Tr.keep-in-tray; subtitle: Tr.tray-help; checked: root.d.keep-in-tray;
                             toggled(v) => { root.flag-toggled("keepInTray", v); }
+                        }
+                        Divider { }
+                        SwitchRow {
+                            title: Tr.sounds; subtitle: Tr.sounds-help; checked: root.d.sounds;
+                            toggled(v) => { root.flag-toggled("sounds", v); }
                         }
                         Divider { }
                         SwitchRow {

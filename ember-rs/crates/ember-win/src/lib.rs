@@ -14,6 +14,7 @@ pub mod privileged_task;
 pub mod proc;
 pub mod shell;
 pub mod single_instance;
+pub mod sound;
 pub mod theme;
 pub mod tray;
 pub mod windows_tunnel;

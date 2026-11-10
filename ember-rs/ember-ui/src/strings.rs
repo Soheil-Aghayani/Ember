@@ -187,6 +187,8 @@ pub struct Strings {
     pub backup_saved: &'static str,
     pub backup_failed: &'static str,
     pub servers_added_one: &'static str,
+    pub sounds: &'static str,
+    pub sounds_help: &'static str,
 }
 
 pub const EN: Strings = Strings {
@@ -373,6 +375,8 @@ pub const EN: Strings = Strings {
     backup_saved: "Saved {name}.",
     backup_failed: "That did not work: {reason}",
     servers_added_one: "Added 1 server",
+    sounds: "Play a soft sound when connecting and disconnecting",
+    sounds_help: "A short chime, quiet by design.",
 };
 
 pub const FA: Strings = Strings {
@@ -559,6 +563,8 @@ pub const FA: Strings = Strings {
     backup_saved: "{name} ذخیره شد.",
     backup_failed: "انجام نشد: {reason}",
     servers_added_one: "{0} سرور اضافه شد",
+    sounds: "پخش صدای ملایم هنگام اتصال و قطع",
+    sounds_help: "یک زنگ کوتاه و آرام.",
 };
 
 pub fn for_language(code: &str) -> &'static Strings {
