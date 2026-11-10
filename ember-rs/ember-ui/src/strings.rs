@@ -257,9 +257,9 @@ pub const EN: Strings = Strings {
     language: "Language",
     english_language: "English",
     persian_language: "فارسی",
-    appearance: "Appearance",
-    light: "Strawberry chocolate",
-    dark: "Dark chocolate",
+    appearance: "Chocolate flavour",
+    light: "Strawberry",
+    dark: "Dark Choco",
     system: "System",
     startup_and_tray: "Startup and tray",
     protection: "Protection",
@@ -378,7 +378,7 @@ pub const EN: Strings = Strings {
     servers_added_one: "Added 1 server",
     sounds: "Play a soft sound when connecting and disconnecting",
     sounds_help: "A short chime, quiet by design.",
-    mint: "Mint chocolate",
+    mint: "Mint",
 };
 
 pub const FA: Strings = Strings {
@@ -446,8 +446,8 @@ pub const FA: Strings = Strings {
     language: "زبان",
     english_language: "English",
     persian_language: "فارسی",
-    appearance: "ظاهر",
-    light: "شکلات توت‌فرنگی",
+    appearance: "طعم شکلات",
+    light: "توت‌فرنگی",
     dark: "شکلات تلخ",
     system: "سیستم",
     startup_and_tray: "اجرا و کنار ساعت",
@@ -567,7 +567,7 @@ pub const FA: Strings = Strings {
     servers_added_one: "{0} سرور اضافه شد",
     sounds: "پخش صدای ملایم هنگام اتصال و قطع",
     sounds_help: "یک زنگ کوتاه و آرام.",
-    mint: "شکلات نعنایی",
+    mint: "نعنا",
 };
 
 pub fn for_language(code: &str) -> &'static Strings {
