@@ -9,28 +9,32 @@ import "assets/fonts/vazirmatn_semibold.ttf";
 import "assets/fonts/vazirmatn_bold.ttf";
 
 export global Palette {
-    in property <bool> dark: true;
+    // the look: 0 Strawberry chocolate (light), 1 Dark chocolate, 2 Mint chocolate (light, minty)
+    in property <int> flavour: 1;
+    out property <bool> dark: flavour == 1;
+    out property <bool> mint: flavour == 2;
     // right-to-left languages (Persian): the whole window is mirrored, then text and pictures are flipped back
     in property <bool> rtl: false;
-    out property <color> primary: dark ? #ff8d5c : #9c3107;
+    out property <color> primary: dark ? #ff8d5c : (mint ? #0a6b52 : #9c3107);
     out property <color> on-primary: dark ? #1a1714 : #ffffff;
-    out property <color> inverse-surface: dark ? #f3eee6 : #2f2a24;
-    out property <color> inverse-on: dark ? #2b2620 : #f5efe6;
-    out property <color> toast-ok: dark ? #14301d : #ddf1e2;
+    out property <color> inverse-surface: dark ? #f3eee6 : (mint ? #2b211c : #2f2a24);
+    out property <color> inverse-on: dark ? #2b2620 : (mint ? #f1faf5 : #f5efe6);
+    out property <color> toast-ok: dark ? #14301d : (mint ? #d3f0df : #ddf1e2);
     out property <color> toast-bad: dark ? #5c1a14 : #ffdad6;
-    out property <color> on-surface: dark ? #f3eee6 : #1f1b16;
-    out property <color> on-variant: dark ? #cdc5ba : #534c44;
+    out property <color> on-surface: dark ? #f3eee6 : (mint ? #231712 : #1f1b16);
+    out property <color> on-variant: dark ? #cdc5ba : (mint ? #51443c : #534c44);
     out property <color> tertiary: dark ? #5fd17f : #1e7a3c;
     out property <color> error: dark ? #ffb4ab : #ba1a1a;
-    out property <color> background: dark ? #1a1714 : #faf7f2;
-    out property <color> surface-variant: dark ? #3a342d : #f1ece3;
-    out property <color> outline-variant: dark ? #3a342d : #e4ddd1;
+    out property <color> background: dark ? #1a1714 : (mint ? #f1faf5 : #faf7f2);
+    out property <color> surface-variant: dark ? #3a342d : (mint ? #e3f0e8 : #f1ece3);
+    out property <color> outline-variant: dark ? #3a342d : (mint ? #cbe2d6 : #e4ddd1);
     // The glass panels: the Kotlin fill is a vertical gradient, but the software renderer cannot round the corners of a
     // gradient, so this is the average of its two ends.
     out property <color> glass: dark ? #1f1829.with-alpha(0.60) : #ffffff.with-alpha(0.72);
     out property <color> glass-edge: dark ? #ffffff.with-alpha(0.16) : #ffffff.with-alpha(0.65);
     out property <color> divider: dark ? #ffffff.with-alpha(0.10) : #ffffff.with-alpha(0.65);
-    out property <color> orb-ink: dark ? #ffffff : #7a5bc0;
+    out property <color> orb-ink: dark ? #ffffff : (mint ? #2f8f78 : #7a5bc0);
+    out property <color> ripple: mint ? #3fd6a0 : #ff8a3d;
 }
 
 export global Type {
@@ -158,6 +162,7 @@ export global Tr {
     in property <string> appearance: "";
     in property <string> light: "";
     in property <string> dark: "";
+    in property <string> mint: "";
     in property <string> system: "";
     in property <string> startup-tray: "";
     in property <string> protection: "";

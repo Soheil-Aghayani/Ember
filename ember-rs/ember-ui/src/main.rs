@@ -52,24 +52,25 @@ struct OrbMotion {
 struct SpriteCache {
     diameter: u32,
     scale: f32,
+    mint: bool,
     off: bool,
     on: bool,
 }
 
 impl SpriteCache {
-    fn ensure(&mut self, app: &App, diameter: u32, scale: f32, lit: f32) {
+    fn ensure(&mut self, app: &App, diameter: u32, scale: f32, lit: f32, mint: bool) {
         let m = app.global::<Motion>();
-        let fresh = diameter != self.diameter || scale != self.scale;
+        let fresh = diameter != self.diameter || scale != self.scale || mint != self.mint;
         if fresh {
-            *self = SpriteCache { diameter, scale, off: false, on: false };
+            *self = SpriteCache { diameter, scale, mint, off: false, on: false };
         }
         if lit < 0.999 && !self.off {
             self.off = true;
-            m.set_sphere_off(sphere::sprite(diameter, 0.0));
+            m.set_sphere_off(sphere::sprite(diameter, 0.0, mint));
         }
         if lit > 0.001 && !self.on {
             self.on = true;
-            m.set_sphere_on(sphere::sprite(diameter, 1.0));
+            m.set_sphere_on(sphere::sprite(diameter, 1.0, mint));
         }
         if fresh {
             m.set_sprite_size((diameter + 2 * sphere::PAD) as f32 / scale);
@@ -295,6 +296,7 @@ fn apply_language(app: &App, language: &str) {
     tr.set_appearance(s.appearance.into());
     tr.set_light(s.light.into());
     tr.set_dark(s.dark.into());
+    tr.set_mint(s.mint.into());
     tr.set_system(s.system.into());
     tr.set_startup_tray(s.startup_and_tray.into());
     tr.set_protection(s.protection.into());
@@ -451,12 +453,13 @@ fn push_static_pages(app: &App, data_dir: &std::path::Path) {
     app.set_releases(about::releases(lang::code(), env!("CARGO_PKG_VERSION")));
 }
 
-/// Whether the window is dark for an Appearance value ("Light", "Dark" or "System").
-fn is_dark(theme: &str, forced: Option<bool>) -> bool {
+/// The look for an Appearance value ("Light", "Dark", "Mint" or "System"): 0 Strawberry chocolate, 1 Dark chocolate, 2 Mint chocolate.
+fn flavour(theme: &str, forced: Option<i32>) -> i32 {
     forced.unwrap_or_else(|| match theme {
-        "Light" => false,
-        "Dark" => true,
-        _ => ember_win::theme::apps_use_dark(),
+        "Light" => 0,
+        "Dark" => 1,
+        "Mint" => 2,
+        _ => i32::from(ember_win::theme::apps_use_dark()),
     })
 }
 
@@ -546,7 +549,7 @@ fn push_settings(app: &App, engine: &Engine) {
 fn wire_settings_page(
     app: &App,
     engine: &Engine,
-    forced_theme: Option<bool>,
+    forced_theme: Option<i32>,
     servers_ui: &Rc<servers::ServersUi>,
     logs_ui: &Rc<logs::LogsUi>,
     dirty: &Arc<AtomicBool>,
@@ -574,7 +577,7 @@ fn wire_settings_page(
         app.on_theme_chosen(move |theme| {
             let Some(app) = weak.upgrade() else { return };
             engine.settings().set_theme(&theme);
-            app.global::<Palette>().set_dark(is_dark(&theme, forced_theme));
+            app.global::<Palette>().set_flavour(flavour(&theme, forced_theme));
             push_settings(&app, &engine);
         });
     }
@@ -1144,8 +1147,8 @@ fn main() {
 
     let app = App::new().unwrap();
     // --light / --dark force the look (for screenshots); otherwise the Appearance setting decides
-    let forced_theme = if has("--light") { Some(false) } else if has("--dark") { Some(true) } else { None };
-    app.global::<Palette>().set_dark(is_dark(&engine.settings().theme(), forced_theme));
+    let forced_theme = if has("--light") { Some(0) } else if has("--dark") { Some(1) } else if has("--mint") { Some(2) } else { None };
+    app.global::<Palette>().set_flavour(flavour(&engine.settings().theme(), forced_theme));
     let language = if has("--fa") { "fa".to_string() } else { engine.settings().language() };
     lang::set(&language);
     apply_language(&app, &language);
@@ -1309,9 +1312,9 @@ fn main() {
         tick += 1;
         // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
         if forced_theme.is_none() && tick.is_multiple_of(60) && engine.settings().theme() == "System" {
-            let dark = ember_win::theme::apps_use_dark();
-            if app.global::<Palette>().get_dark() != dark {
-                app.global::<Palette>().set_dark(dark);
+            let now = flavour("System", None);
+            if app.global::<Palette>().get_flavour() != now {
+                app.global::<Palette>().set_flavour(now);
             }
         }
         if menu_at != 0 && tick == menu_at {
@@ -1457,7 +1460,7 @@ fn main() {
             // the sphere itself is made again for its current pixel size (176 logical, scaled by the spring and the pointer)
             let scale = app.window().scale_factor();
             let diameter = ((176.0 * scale * motion.pop * motion.feel).round() as u32).max(16);
-            motion.sprites.ensure(&app, diameter, scale, motion.lit);
+            motion.sprites.ensure(&app, diameter, scale, motion.lit, app.global::<Palette>().get_mint());
             let m = app.global::<Motion>();
             m.set_feel(motion.feel);
             m.set_list_t(motion.list_t);

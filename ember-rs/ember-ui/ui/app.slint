@@ -133,7 +133,7 @@ export component App inherits Window {
     background: Palette.background;
 
     Image {
-        source: Palette.dark ? @image-url("assets/art/bg-dark.png") : @image-url("assets/art/bg-light.png");
+        source: Palette.dark ? @image-url("assets/art/bg-dark.png") : (Palette.mint ? @image-url("assets/art/bg-mint.png") : @image-url("assets/art/bg-light.png"));
         width: parent.width; height: parent.height; image-fit: cover;
     }
     if Palette.dark : Rectangle { background: #0000004d; }

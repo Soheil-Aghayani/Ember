@@ -2,6 +2,8 @@
 // because the software renderer cannot clip a gradient to a circle), two tilted orbit rings with dots, a running arc
 // while connecting and one ripple after connecting. All motion comes from the four in-properties.
 
+import { Palette } from "theme.slint";
+
 component RingLayer inherits Rectangle {
     in property <float> lit;
     in property <float> angle;      // radians, wraps after ten turns (see LOOP in Kotlin)
@@ -111,7 +113,7 @@ export component Orb inherits Rectangle {
         visible: ripple < 1;
         property <length> rr: r * (1.02 + 0.5 * (1 - (1 - ripple) * (1 - ripple)));
         x: cx - rr; y: cy - rr; width: 2 * rr; height: 2 * rr; border-radius: rr;
-        border-width: 3px; border-color: #ff8a3d.with-alpha(0.85 * (1 - ripple) * (1 - ripple));
+        border-width: 3px; border-color: Palette.ripple.with-alpha(0.85 * (1 - ripple) * (1 - ripple));
     }
 
     touch := TouchArea { x: cx - s * 0.34; y: cy - s * 0.34; width: 2 * s * 0.34; height: 2 * s * 0.34; mouse-cursor: pointer; clicked => { root.clicked(); } }
