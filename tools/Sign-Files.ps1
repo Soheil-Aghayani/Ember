@@ -1,16 +1,16 @@
 # Signs files (exe, dll, msi) with an Authenticode certificate. Used by release.ps1; can be run on its own.
 #
-#   .\Sign-Files.ps1 -Files Ember.exe -PfxPath C:\keys\agseyl.pfx -RequireTrustedCertificate
+#   .\Sign-Files.ps1 -Files Ember.exe -PfxPath C:\keys\ember-signing.pfx -ExpectedPublisher Ember
 #   .\Sign-Files.ps1 -Files Ember.exe -CertThumbprint 0123ABCD... -RequireTrustedCertificate
 #
 # The certificate password is read from the EMBER_PFX_PASSWORD environment variable, or asked for. It is never written
 # anywhere, and the .pfx file must stay outside the repository (the .gitignore excludes *.pfx). The default publisher
-# must be Agseyl; public releases should pass -RequireTrustedCertificate.
+# must be Ember; public releases should pass -RequireTrustedCertificate.
 param(
     [Parameter(Mandatory = $true)][string[]]$Files,
     [string]$PfxPath,
     [string]$CertThumbprint,
-    [string]$ExpectedPublisher = 'agseyl',
+    [string]$ExpectedPublisher = 'Ember',
     [switch]$RequireTrustedCertificate,
     # A timestamp keeps the signature valid after the certificate expires. Pass '' to sign without one (offline).
     [string]$TimestampServer = 'http://timestamp.digicert.com'
