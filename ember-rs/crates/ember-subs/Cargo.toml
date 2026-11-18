@@ -10,6 +10,8 @@ base64 = "0.22"
 url = "2"
 ureq = { version = "2", default-features = false, features = ["tls", "socks-proxy"] }
 qrcode = { version = "0.14", default-features = false }
+image = { version = "0.25", default-features = false, features = ["bmp", "jpeg", "png", "webp"] }
+rqrr = { version = "0.11", default-features = false, features = ["img"] }
 thiserror = "2"
 # OS randomness for WARP device keys (already a transitive dependency of rustls/ring).
 getrandom = "0.3"

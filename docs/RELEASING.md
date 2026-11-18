@@ -1,4 +1,22 @@
-# Releasing Ember (local only)
+# Releasing Ember (local build instructions)
+
+## Current native Windows preview
+
+The Rust/Slint build is a separate preview installer that installs side-by-side with the older Kotlin desktop app. It is not the default replacement, and whole-device networking still needs owner testing.
+
+```powershell
+Set-Location ember-rs
+cargo test --workspace
+cargo build --release -p ember-ui
+cargo build --release --manifest-path ..\helper\Cargo.toml
+powershell -File installer\stage.ps1 -Resources 'C:\Program Files\Ember\app\resources' -Out .\stage
+& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.1 `
+  "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\Output" installer\ember-rs.iss
+```
+
+Keep the stage and output directories task-specific if an existing `ember-rs/installer/stage` is in use. Do not run the installer or network helper during an agent task.
+
+## Earlier Kotlin desktop installer
 
 `tools/release.ps1` does everything from the source folder to the installer in `Downloads\Programs`:
 

@@ -14,7 +14,7 @@ const TUNNEL_VERSION: &str = "hev-socks5-tunnel 2.19.1 \u{b7} Wintun 0.14.1";
 
 pub const CONTACT_LINK: &str = "https://t.me/env_soh";
 
-const LICENSES: [(&str, &str); 9] = [
+const LICENSES: [(&str, &str); 10] = [
     ("Xray-core", "MPL-2.0"),
     ("hev-socks5-tunnel", "MIT"),
     ("Wintun", "WireGuard LLC prebuilt binaries licence"),
@@ -22,6 +22,7 @@ const LICENSES: [(&str, &str); 9] = [
     ("Vazirmatn (Persian font)", "SIL Open Font License 1.1"),
     ("Solar icons (480 Design)", "CC BY 4.0"),
     ("circle-flags", "MIT"),
+    ("sing-box", "GPL-3.0-or-later"),
     ("Slint (user interface)", "Slint royalty-free licence (made with Slint)"),
     ("Rust libraries (winit, ureq, regex, ...)", "MIT / Apache-2.0"),
 ];
@@ -79,13 +80,14 @@ mod tests {
 
     #[test]
     fn every_release_has_the_same_number_of_lines_in_both_languages() {
-        assert_eq!(RELEASES.len(), 33);
+        assert_eq!(RELEASES.len(), 34);
         for r in RELEASES {
             assert!(!r.en.is_empty(), "{}", r.version);
             assert_eq!(r.en.len(), r.fa.len(), "{}", r.version);
         }
-        assert_eq!(RELEASES[0].version, "2.0.0");
-        assert_eq!(RELEASES[1].version, "1.0.101");
+        assert_eq!(RELEASES[0].version, "2.0.1");
+        assert_eq!(RELEASES[1].version, "2.0.0");
+        assert_eq!(RELEASES[2].version, "1.0.101");
     }
 
     #[test]
@@ -94,5 +96,10 @@ mod tests {
         let rows = releases("en", "1.0.99");
         assert_eq!(rows.iter().filter(|r| r.current).count(), 1);
         assert_eq!(releases("fa", "0.1.0").iter().filter(|r| r.current).count(), 0);
+    }
+
+    #[test]
+    fn bundled_sing_box_license_is_disclosed() {
+        assert!(LICENSES.contains(&("sing-box", "GPL-3.0-or-later")));
     }
 }

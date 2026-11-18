@@ -864,6 +864,12 @@ fn lock_set(set: &std::sync::Mutex<std::collections::HashSet<String>>) -> std::s
     set.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+fn is_qr_image(file: &PathBuf) -> bool {
+    file.extension().and_then(|ext| ext.to_str()).is_some_and(|extension| {
+        ["png", "jpg", "jpeg", "webp", "bmp"].iter().any(|supported| extension.eq_ignore_ascii_case(supported))
+    })
+}
+
 /// The Servers page's buttons.
 fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, dirty: &Arc<AtomicBool>) {
     let notices = Arc::new(AtomicU32::new(0));
@@ -878,21 +884,46 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
             // the file dialog blocks, and reading a link can take a while, so both happen off the window's thread
             std::thread::spawn(move || {
                 let t = lang::current();
-                let Some(files) = rfd::FileDialog::new().set_title(t.choose_file_title).add_filter("Server files", &["json", "conf", "txt", "ovpn"]).pick_files() else { return };
+                let Some(files) = rfd::FileDialog::new()
+                    .set_title(t.choose_file_title)
+                    .add_filter("Server files and QR pictures", &["json", "conf", "txt", "ovpn", "png", "jpg", "jpeg", "webp", "bmp"])
+                    .pick_files()
+                else {
+                    return;
+                };
                 let (mut added, mut problems) = (0usize, Vec::<String>::new());
                 for file in files {
                     let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                     let stem = file.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                    // a server file is small; anything bigger is not one
-                    if std::fs::metadata(&file).is_ok_and(|m| m.len() > 2_000_000) {
+                    // Text configs should be small; QR pictures need a little more room but stay bounded.
+                    let size_limit = if is_qr_image(&file) { 16_000_000 } else { 2_000_000 };
+                    if std::fs::metadata(&file).is_ok_and(|m| m.len() > size_limit) {
                         problems.push(strings::fill(t.file_too_large, &[("0", &name)]));
                         continue;
                     }
-                    match std::fs::read(&file) {
-                        Ok(bytes) => match engine.store().add(&String::from_utf8_lossy(&bytes), &stem) {
-                            Ok(sub) => added += sub.nodes.iter().filter(|n| !n.is_info()).count(),
-                            Err(e) => problems.push(format!("{name}: {e}")),
-                        },
+                    let result = if is_qr_image(&file) {
+                        match ember_subs::qr::decode_image_file(&file) {
+                            Ok(text) => engine.store().add(&text, &stem),
+                            Err(error) => {
+                                let message = match error {
+                                    ember_subs::qr::QrImageError::MultipleCodes => t.qr_multiple_codes,
+                                    _ => t.qr_image_error,
+                                };
+                                problems.push(format!("{name}: {message}"));
+                                continue;
+                            }
+                        }
+                    } else {
+                        match std::fs::read(&file) {
+                            Ok(bytes) => engine.store().add(&String::from_utf8_lossy(&bytes), &stem),
+                            Err(e) => {
+                                problems.push(format!("{name}: {e}"));
+                                continue;
+                            }
+                        }
+                    };
+                    match result {
+                        Ok(sub) => added += sub.nodes.iter().filter(|n| !n.is_info()).count(),
                         Err(e) => problems.push(format!("{name}: {e}")),
                     }
                 }

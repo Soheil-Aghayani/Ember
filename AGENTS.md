@@ -6,7 +6,7 @@ Ember is a free, open-source VPN client (MIT) for Windows. The user adds subscri
 
 | Target | Status | Compatibility rule |
 |---|---|---|
-| Windows PC | Current target | Windows desktop app (subscription links, Xray); whole-device mode is experimental and must not be run by an agent. |
+| Windows PC | Current native preview in `ember-rs/`; the earlier Kotlin app remains in `desktop/` | Subscription links and Xray; whole-device mode is experimental and must not be run by an agent. |
 | Android phone | Converted, not yet tried on a device | The Android app (`android/`) opens subscription links, files, QR codes and WARP like the desktop app and connects with Xray (packaged as `libxray.so`) plus hev-socks5-tunnel, for 64-bit ARM only. It shares the server code in `core/src/main/kotlin/ember/subs/`. It also has the Apps setting (Android's own per-app VPN rules), the website check, automatic failover, a quick-settings tile, a 2x2 home-screen widget (one tap connects or disconnects), a QR code for sharing a server, frosted-glass panels (shared look with the desktop app) and a Disconnect button in its notification. It is in English and Persian (with a language choice in Settings). OpenVPN and the kill switch are desktop-only. To test on the emulator build with `-Pemulator` (x86 Xray; the emulator cannot run the ARM one). |
 | Sony Smart TV | Initial Android TV experience implemented; physical-device validation pending | Known target: Sony BRAVIA BF1, Android TV OS 12. Keep TV screens remote-first and do not call TV support verified until the owner checks it on this device. |
 
@@ -18,7 +18,8 @@ Keep this platform status in sync with `README.md` and `docs/PROJECT_MAP.md`. A 
 |---|---|
 | `android/` | Android phone and Android TV app (Kotlin, Jetpack Compose, Material 3). Package `com.soheil.ember`; TV UI is selected from the Leanback device feature. |
 | `core/` | JVM-only code. The Windows app uses only its logging, connection-check and tunnel-config helpers; the Firefox sign-in, proxy pass and HTTP/2 tunnel belong to the older Android client. No Android APIs allowed here. |
-| `desktop/` | Compose Desktop app for Windows. `desktop/.../subs/` reads subscriptions and runs Xray; `desktop/.../engine/` owns the connection; `desktop/appResources/windows-x64/ember-tunnel.ps1` is the fallback elevated tunnel helper. |
+| `ember-rs/` | Current native Rust/Slint Windows preview, with pure Rust subscription and engine crates plus Inno Setup packaging. It installs side-by-side with the Kotlin app. |
+| `desktop/` | Earlier Compose Desktop app for Windows. `desktop/.../subs/` reads subscriptions and runs Xray; `desktop/.../engine/` owns that app's connection; `desktop/appResources/windows-x64/ember-tunnel.ps1` is its fallback elevated tunnel helper. |
 | `design/` | Design tokens (`tokens.json`), brand assets, store graphics, and the orb and background pictures (`orb-*.png`, `bg-*.png`, `widget-orb.png`, made in GPT). The apps use converted copies: `android/.../res/drawable-nodpi/*.webp` and `desktop/.../resources/art/*.webp`; the orbs there have real transparency (alpha from brightness). |
 | `docs/` | Project map, platform status, and contributor-facing architecture notes. |
 | `helper/` | Native Rust helper for Windows whole-device tunnel setup. Do not run it. |

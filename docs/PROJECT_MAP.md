@@ -6,8 +6,8 @@ This page is the maintained index for the repository. It labels code by responsi
 
 | Target | Status | Current implementation | Evidence required before calling it supported |
 |---|---|---|---|
-| Windows PC | Current | `desktop/` (subscription links, Xray, UI) plus `helper/` and files under `desktop/appResources/windows-x64/` for the tunnel; `core/` only for logging, connection checks and tunnel config. | Build the app and installer; the owner validates Windows UI and any real network behavior. Never run the tunnel helper or installer as an agent. |
-| Android phone | Not converted | `android/` plus `core/`: the older Firefox-account client. It cannot use subscription links until it runs Xray. | Build and install on an emulator or phone; separately verify camera/QR behavior on a device with a camera. |
+| Windows PC | Current preview: native Rust app 2.0.1 | `ember-rs/` plus `helper/` and its staged resources. The earlier Kotlin app remains in `desktop/`. | Build the app and installer; the owner validates Windows UI and any real network behavior. Never run the tunnel helper or installer as an agent. |
+| Android phone | Current: 2.7.2 | `android/` plus shared subscription logic in `core/`; arm64 release build. | Build and install on an emulator or phone; separately verify camera/QR behavior on a device with a camera. |
 | Sony Smart TV | Initial Android TV experience implemented; device validation pending | Same `android/` package with an optional Leanback launcher, remote-first home/login flow, and shared VPN service. Target: Sony BRAVIA BF1, Android TV OS 12. | Debug APK assembly and launcher metadata inspection are complete; verify launcher visibility, D-pad/Select/Back navigation, sign-in, and VPN behavior on the actual BRAVIA BF1. |
 
 Sony uses both Android-based TVs and other TV operating systems. The identified target is Sony BRAVIA BF1 with Android TV OS 12. A successful APK build does not prove TV runtime support; the owner still needs to verify remote input and VPN behavior on the physical TV. See [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) for the device profile and acceptance checklist. References: [Sony's model/OS identification guide](https://www.sony.com/electronics/support/audio-video/articles/00200248), [Android TV navigation](https://developer.android.com/design/ui/tv/guides/foundations/navigation-on-tv), and [Android TV controller requirements](https://developer.android.com/training/tv/get-started/controllers).
@@ -17,7 +17,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 | Category | Location | Owns | Boundary |
 |---|---|---|---|
 | Android client | `android/` | Phone UI, Android lifecycle, permissions, VPN service, app resources, and phone/TV packaging. | Android APIs stay here. TV screens branch on Leanback and must remain D-pad operable. |
-| Windows client | `desktop/` | Desktop UI, Windows-specific resources, distributable and installer packaging. | Do not execute the installer or network-changing helper. |
+| Windows clients | `ember-rs/`, `desktop/` | Current Rust/Slint preview and earlier Kotlin/Compose app, including Windows resources and installer packaging. | Do not execute the installer or network-changing helper. |
 | Shared code | `core/` | Logging, connection check, tunnel config; and the older Android client's Firefox account flows, Mozilla proxy pass, HTTP/2 tunnel and local proxies. | JVM only; no Android or Compose dependencies. |
 | Windows native support | `helper/`, `desktop/appResources/windows-x64/` | Native helper sources and packaged Windows tunnel resources. | Do not edit or execute the elevated PowerShell tunnel helper unless the task explicitly requires source changes; never run network-altering code. |
 | Design system | `design/` | Brand, tokens, UI assets, and asset attribution. | `design/tokens.json` is the visual source of truth. |
@@ -30,7 +30,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 - Login and session-transfer screens belong in each platform UI (`android/` or `desktop/`); keep shared behavior in `core/` instead of duplicating it.
 - Android camera scanning, permissions, TV declarations, and Android lifecycle code belong in `android/`.
 - Android TV launcher, focus treatment, remote-first screens, and the Sony device profile belong in `android/` and `docs/ANDROID_TV_SUPPORT.md`.
-- Windows tray, installer, native helper integration, and Windows settings belong in `desktop/` or `helper/`, according to ownership in `AGENTS.md`.
+- Current Windows tray, installer, UI settings, and native integration belong in `ember-rs/` or `helper/`; the earlier Kotlin desktop app remains in `desktop/`.
 - Brand-wide colors, spacing, typography, and icons belong in `design/` and its platform mirrors.
 
 ## Android sign-in flows (older client)

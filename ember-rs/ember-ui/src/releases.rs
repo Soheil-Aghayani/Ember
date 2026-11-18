@@ -10,6 +10,11 @@ pub struct Release {
 
 pub const RELEASES: &[Release] = &[
     Release {
+        version: "2.0.1",
+        en: &["Add a server from a QR-code picture (PNG, JPEG, WebP or BMP). The picture is decoded locally."],
+        fa: &["اکنون می‌توانید سرور را از تصویر کد QR (PNG، JPEG، WebP یا BMP) اضافه کنید؛ تصویر فقط روی دستگاه شما خوانده می‌شود."],
+    },
+    Release {
         version: "2.0.0",
         en: &[
             "Ember is rebuilt as a native Windows app: it opens at once and sits at about 30 MB of memory when idle (about 23 MB in the tray).",
