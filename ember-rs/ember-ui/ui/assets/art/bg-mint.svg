@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EAF6EE" />
+      <stop offset="0.52" stop-color="#F4FBF7" />
+      <stop offset="1" stop-color="#E7F4F0" />
+    </linearGradient>
+    <radialGradient id="mint-wash" cx="5%" cy="88%" r="72%">
+      <stop offset="0" stop-color="#BFE7D0" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#BFE7D0" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="cool-wash" cx="100%" cy="14%" r="72%">
+      <stop offset="0" stop-color="#C8E9E6" stop-opacity="0.28" />
+      <stop offset="1" stop-color="#C8E9E6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="center-glow" cx="48%" cy="38%" r="72%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.64" />
+      <stop offset="0.56" stop-color="#FFFFFF" stop-opacity="0.2" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1200" fill="url(#base)" />
+  <rect width="1600" height="1200" fill="url(#mint-wash)" />
+  <rect width="1600" height="1200" fill="url(#cool-wash)" />
+  <rect width="1600" height="1200" fill="url(#center-glow)" />
+</svg>

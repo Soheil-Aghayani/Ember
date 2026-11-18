@@ -24,6 +24,7 @@ use std::{
 
 /// Same wrap as `LOOP` in GlassOrb.kt: ten full turns, so every dot returns to where it started.
 const LOOP: f32 = 20.0 * std::f32::consts::PI;
+const ORBIT_FRAME_INTERVAL: Duration = Duration::from_nanos(6_944_444); // 144 Hz
 
 /// The orb's motion: eased towards where the connection state says it should be, a few times a second.
 struct OrbMotion {
@@ -39,7 +40,6 @@ struct OrbMotion {
     row_t: f32,
     row_card: String,
     sprites: SpriteCache,
-    frame: u32,
     page_in: f32,
     last_page: i32,
     last: Instant,
@@ -1300,7 +1300,7 @@ fn main() {
     }
     let (demo_connecting, demo_connected, demo_settled) = (has("--demo-orb-connecting"), has("--demo-orb-connected"), has("--demo-orb-settled"));
     let mut motion =
-        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), frame: 0, page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
+        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
     
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
@@ -1395,43 +1395,33 @@ fn main() {
         let state_cell = Rc::clone(&state_cell);
         let touch_cell = Rc::clone(&touch_cell);
         let servers_ui = Rc::clone(&servers_for_motion);
-        motion_timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+        motion_timer.start(slint::TimerMode::Repeated, ORBIT_FRAME_INTERVAL, move || {
             let Some(app) = weak.upgrade() else { return };
             let state = state_cell.get();
             let now = Instant::now();
             let dt = now.duration_since(motion.last).as_secs_f32().min(0.1);
             let touch_target = [1.0, 1.02, 0.965][touch_cell.get().clamp(0, 2) as usize];
             // nothing is drawn while the window is hidden (tray); the orb catches up in a frame or two when it shows again
-        if !app.window().is_visible() {
+            if !app.window().is_visible() {
+                motion.last = now;
+                return;
+            }
+            // The orbit dots keep moving in every connection state, so update them at the display cadence.
             motion.last = now;
-            return;
-        }
-        // frames are the CPU cost, so the orb only runs at 60 per second while it really moves: connecting, a change in
-        // progress. Settled and connected it drifts at 20, and disconnected at rest at 10.
-        let settled = motion.ripple >= 1.0
-            && (motion.pop - 1.0).abs() < 0.0005
-            && motion.pop_v.abs() < 0.001
-            && motion.page_in >= 1.0 && motion.list_t >= 2.0 && motion.row_t >= 2.0 && motion.last_page == app.get_page() && (motion.feel - touch_target).abs() < 0.0005 && motion.loader < 0.002;
-        let every = match state {
-            ConnState::Disconnected if settled && motion.lit < 0.002 => 6,
-            ConnState::Connected if settled && motion.lit > 0.995 => 3,
-            _ => 1,
-        };
-        motion.frame = motion.frame.wrapping_add(1);
-        if !motion.frame.is_multiple_of(every) {
-            return;
-        }
-        motion.last = now;
             if state == ConnState::Connected && motion.previous != ConnState::Connected {
                 motion.ripple = 0.0;
                 motion.pop = 0.93;
                 motion.pop_v = 0.0;
             }
             motion.previous = state;
-            // a page change restarts the short fade-and-rise of the page (eased out, a quarter of a second)
+            // A page change gets a short fade; list rows stay settled so navigation feels immediate.
             let page = app.get_page();
             if page != motion.last_page {
-                motion.last_page = page; motion.page_in = 0.0; motion.list_t = 0.0; } motion.page_in = (motion.page_in + dt / 0.25).min(1.0); motion.list_t = (motion.list_t + dt).min(2.0);
+                motion.last_page = page;
+                motion.page_in = 0.0;
+            }
+            motion.page_in = (motion.page_in + dt / 0.14).min(1.0);
+            motion.list_t = (motion.list_t + dt).min(2.0);
             if let Some(id) = servers_ui.opened.borrow_mut().take() {
                 motion.row_card = id;
                 motion.row_t = 0.0;
