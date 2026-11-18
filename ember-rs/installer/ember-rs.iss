@@ -20,7 +20,7 @@
 AppId={{B7E1F3A4-52D8-4C6E-8A19-7D0C4E2B9F35}
 AppName=Ember (Rust preview)
 AppVersion={#Version}
-AppPublisher=Ember
+AppPublisher=agseyl
 DefaultDirName={autopf}\Ember-Rust
 DefaultGroupName=Ember (Rust preview)
 DisableProgramGroupPage=yes

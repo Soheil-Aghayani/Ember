@@ -19,7 +19,7 @@
 AppId={{6F1B7C52-3E0A-4C2B-9D56-E3B8A1D4F7C0}
 AppName=Ember
 AppVersion={#Version}
-AppPublisher=Ember
+AppPublisher=agseyl
 AppPublisherURL=https://github.com/Soheil-Aghayani/Ember
 DefaultDirName={autopf}\Ember
 DefaultGroupName=Ember
