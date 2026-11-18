@@ -1,7 +1,7 @@
-# Builds the Windows installer end to end, signs it when a certificate is given, and puts it in your Programs folder.
+# Builds and signs a Windows direct-download installer, then puts it in your Programs folder.
 #
 #   .\tools\release.ps1 -Version 1.0.89
-#   .\tools\release.ps1 -Version 1.0.89 -PfxPath D:\keys\ember\ember-signing.pfx
+#   .\tools\release.ps1 -Version 1.0.89 -PfxPath D:\keys\agseyl\agseyl-signing.pfx
 #
 # Needs the tools named in AGENTS.md (Gradle, JDK 21, Inno Setup, cargo). Runs locally only; nothing is published.
 param(
@@ -30,7 +30,14 @@ $iscc = 'D:\Programming\tools\InnoSetup\ISCC.exe'
 if (-not $env:JAVA_HOME) { $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot' }
 $env:Path += ";$env:USERPROFILE\.cargo\bin"
 $sign = [bool]($PfxPath -or $CertThumbprint)
-$signArgs = @{ PfxPath = $PfxPath; CertThumbprint = $CertThumbprint; TimestampServer = $TimestampServer }
+if (-not $sign) { throw 'A direct-download release needs an Agseyl code-signing certificate. Build unsigned locally for development.' }
+$signArgs = @{
+    PfxPath = $PfxPath
+    CertThumbprint = $CertThumbprint
+    TimestampServer = $TimestampServer
+    ExpectedPublisher = 'agseyl'
+    RequireTrustedCertificate = $true
+}
 
 Write-Host "== Building the app folder ($Version)"
 $env:EMBER_VERSION = $Version

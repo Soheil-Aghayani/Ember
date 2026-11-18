@@ -1,14 +1,17 @@
 # Signs files (exe, dll, msi) with an Authenticode certificate. Used by release.ps1; can be run on its own.
 #
-#   .\Sign-Files.ps1 -Files Ember-1.0.88.exe -PfxPath C:\keys\ember.pfx
-#   .\Sign-Files.ps1 -Files Ember.exe -CertThumbprint 0123ABCD...        (certificate in the Windows store)
+#   .\Sign-Files.ps1 -Files Ember.exe -PfxPath C:\keys\agseyl.pfx -RequireTrustedCertificate
+#   .\Sign-Files.ps1 -Files Ember.exe -CertThumbprint 0123ABCD... -RequireTrustedCertificate
 #
 # The certificate password is read from the EMBER_PFX_PASSWORD environment variable, or asked for. It is never written
-# anywhere, and the .pfx file must stay outside the repository (the .gitignore excludes *.pfx).
+# anywhere, and the .pfx file must stay outside the repository (the .gitignore excludes *.pfx). The default publisher
+# must be Agseyl; public releases should pass -RequireTrustedCertificate.
 param(
     [Parameter(Mandatory = $true)][string[]]$Files,
     [string]$PfxPath,
     [string]$CertThumbprint,
+    [string]$ExpectedPublisher = 'agseyl',
+    [switch]$RequireTrustedCertificate,
     # A timestamp keeps the signature valid after the certificate expires. Pass '' to sign without one (offline).
     [string]$TimestampServer = 'http://timestamp.digicert.com'
 )
@@ -46,6 +49,25 @@ if ($cert.NotAfter -lt (Get-Date)) { throw "The certificate expired on $($cert.N
 if (-not ($cert.EnhancedKeyUsageList | Where-Object { $_.ObjectId -eq '1.3.6.1.5.5.7.3.3' })) {
     throw 'That certificate is not meant for code signing.'
 }
+$publisher = $cert.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+if ($ExpectedPublisher -and -not [string]::Equals($publisher, $ExpectedPublisher, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "The certificate publisher is '$publisher'; expected '$ExpectedPublisher'."
+}
+if ($RequireTrustedCertificate) {
+    $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+    try {
+        $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::Online
+        $chain.ChainPolicy.RevocationFlag = [System.Security.Cryptography.X509Certificates.X509RevocationFlag]::ExcludeRoot
+        $chain.ChainPolicy.UrlRetrievalTimeout = [TimeSpan]::FromSeconds(15)
+        $chain.ChainPolicy.ApplicationPolicy.Add([System.Security.Cryptography.Oid]::new('1.3.6.1.5.5.7.3.3'))
+        if (-not $chain.Build($cert)) {
+            $chainErrors = $chain.ChainStatus | ForEach-Object { $_.Status.ToString() } | Select-Object -Unique
+            throw "The certificate does not chain to a trusted code-signing authority: $($chainErrors -join ', ')."
+        }
+    } finally {
+        $chain.Dispose()
+    }
+}
 foreach ($file in $Files) {
     # jpackage writes its programs read-only; signing has to rewrite the file
     $item = Get-Item $file
@@ -57,6 +79,9 @@ foreach ($file in $Files) {
     $signature = Get-AuthenticodeSignature -FilePath $file
     if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $cert.Thumbprint) {
         throw "Signing failed for ${file}: $($result.StatusMessage)"
+    }
+    if ($RequireTrustedCertificate -and $signature.Status -ne 'Valid') {
+        throw "The signature on ${file} is not trusted by Windows: $($signature.StatusMessage)"
     }
     Write-Host ("signed {0} ({1})" -f (Split-Path $file -Leaf), $signature.Status)
 }
