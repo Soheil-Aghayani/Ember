@@ -48,12 +48,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val isTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) || BuildConfig.TV_PREVIEW
         setContent {
             val language by engine.language.collectAsState()
             val words = stringsFor(language)
             EmberVpnTheme(layoutDirection = if (words === PersianStrings) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                 CompositionLocalProvider(LocalStrings provides words) {
-                    EmberRoot(engine, onConnect = ::connect, onDisconnect = { XrayVpnService.stop(this) })
+                    EmberRoot(engine, onConnect = ::connect, onDisconnect = { XrayVpnService.stop(this) }, isTv = isTv)
                 }
             }
         }

@@ -36,6 +36,7 @@ tasks.named("preBuild").configure { dependsOn(fetchHevSocks5Tunnel) }
 // Xray. The emulator's ARM translation cannot run Xray (a Go program), so this is the only way to try the whole VPN there.
 // It never goes into a release build.
 val forEmulator = project.hasProperty("emulator")
+val tvPreview = project.hasProperty("tvPreview")
 val emulatorLibsDir = layout.buildDirectory.dir("emulator-libs").get().asFile
 val fetchXrayEmulator = tasks.register("fetchXrayEmulator") {
     val target = File(emulatorLibsDir, "x86_64/libxray.so")
@@ -135,7 +136,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "TV_PREVIEW", tvPreview.toString())
+            if (tvPreview) applicationIdSuffix = ".tvpreview"
+        }
         release {
+            buildConfigField("boolean", "TV_PREVIEW", "false")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 

@@ -24,6 +24,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import com.soheil.ember.ui.components.Card
+import com.soheil.ember.ui.components.tvFocusOutline
+import com.soheil.ember.ui.components.tvEntryFocus
+import com.soheil.ember.ui.components.tvDpadActivate
+import com.soheil.ember.ui.components.tvReturnToNavigation
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,7 +57,13 @@ private class InstalledApp(val packageName: String, val label: String)
 
 /** Failover, which apps use the VPN, and keeping it alive in the background. */
 @Composable
-fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    engine: AndroidEngine,
+    modifier: Modifier = Modifier,
+    isTv: Boolean = false,
+    tvNavigationFocusRequester: FocusRequester? = null,
+    tvEntryFocusRequester: FocusRequester? = null,
+) {
     val context = LocalContext.current
     val s = LocalStrings.current
     val language by engine.language.collectAsState()
@@ -81,11 +92,13 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(8.dp))
                     LazyColumn(Modifier.heightIn(max = 360.dp)) {
                         items(choices, key = { it.packageName }) { app ->
+                            val addApp = {
+                                engine.setAppPackages(packages + app.packageName)
+                                picking = false
+                            }
                             Text(
-                                app.label, Modifier.fillMaxWidth().clickable {
-                                    engine.setAppPackages(packages + app.packageName)
-                                    picking = false
-                                }.padding(vertical = 12.dp),
+                                app.label, Modifier.fillMaxWidth().tvFocusOutline(isTv)
+                                    .tvDpadActivate(isTv, addApp).clickable(onClick = addApp).padding(vertical = 12.dp),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
@@ -93,7 +106,7 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { picking = false }) { Text(s.cancel) } },
+            dismissButton = { TextButton(onClick = { picking = false }, modifier = Modifier.tvDpadActivate(isTv) { picking = false }) { Text(s.cancel) } },
         )
     }
 
@@ -104,8 +117,13 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
         Card(Modifier.fillMaxWidth()) {
             Column {
                 for ((code, name) in listOf("system" to s.languageSystem, "en" to "English", "fa" to "فارسی")) {
+                    val changeLanguage = { engine.setLanguage(code) }
                     Row(
-                        Modifier.fillMaxWidth().selectable(selected = language == code, role = Role.RadioButton) { engine.setLanguage(code) }
+                        Modifier.fillMaxWidth().tvEntryFocus(
+                            isTv && code == "system", tvEntryFocusRequester, tvNavigationFocusRequester,
+                        ).tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                            .tvDpadActivate(isTv, changeLanguage).tvFocusOutline(isTv)
+                            .selectable(selected = language == code, role = Role.RadioButton, onClick = changeLanguage)
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -127,7 +145,13 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Switch(checked = failover, onCheckedChange = { engine.setAutoFailover(it) })
+                val toggleFailover = { engine.setAutoFailover(!failover) }
+                Switch(
+                    checked = failover,
+                    onCheckedChange = { engine.setAutoFailover(it) },
+                    modifier = Modifier.tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                        .tvDpadActivate(isTv, toggleFailover).tvFocusOutline(isTv),
+                )
             }
         }
 
@@ -140,8 +164,12 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                     Triple(AppMode.ONLY, s.appsOnly, s.appsOnlyHelp),
                 )
                 for ((value, title, help) in options) {
+                    val setMode = { engine.setAppMode(value) }
                     Row(
-                        Modifier.fillMaxWidth().selectable(selected = mode == value, role = Role.RadioButton) { engine.setAppMode(value) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                        Modifier.fillMaxWidth().tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                            .tvDpadActivate(isTv, setMode).tvFocusOutline(isTv)
+                            .selectable(selected = mode == value, role = Role.RadioButton, onClick = setMode)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = mode == value, onClick = null)
@@ -157,7 +185,12 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
         Text(s.appsApply, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(s.appsInList, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FilledIconButton(onClick = { picking = true }) { Icon(Icons.Filled.Add, contentDescription = s.addApp) }
+            val startAppPicker = { picking = true }
+            FilledIconButton(
+                onClick = startAppPicker,
+                modifier = Modifier.tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                    .tvDpadActivate(isTv, startAppPicker).tvFocusOutline(isTv),
+            ) { Icon(Icons.Filled.Add, contentDescription = s.addApp) }
         }
         Card(Modifier.fillMaxWidth()) {
             if (packages.isEmpty()) {
@@ -165,46 +198,64 @@ fun SettingsScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
             } else {
                 Column {
                     for (packageName in packages.sortedBy { label(it).lowercase() }) {
+                        val removeApp = { engine.setAppPackages(packages - packageName) }
                         Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(label(packageName), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                            IconButton(onClick = { engine.setAppPackages(packages - packageName) }) { Icon(Icons.Filled.Delete, contentDescription = s.remove) }
+                            IconButton(
+                                onClick = removeApp,
+                                modifier = Modifier.tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                                    .tvDpadActivate(isTv, removeApp).tvFocusOutline(isTv),
+                            ) {
+                                Icon(Icons.Filled.Delete, contentDescription = s.remove)
+                            }
                         }
                     }
                 }
             }
         }
 
-        Card(
-            Modifier.fillMaxWidth().clickable {
-                if (!requestQuickSettingsTile(context)) {
-                    Toast.makeText(context, s.addTileManual, Toast.LENGTH_LONG).show()
+        if (!isTv) {
+            Card(
+                Modifier.fillMaxWidth().tvFocusOutline(isTv).clickable {
+                    if (!requestQuickSettingsTile(context)) {
+                        Toast.makeText(context, s.addTileManual, Toast.LENGTH_LONG).show()
+                    }
+                },
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(s.addTileTitle, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        s.addTileHelp,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-            },
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(s.addTileTitle, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    s.addTileHelp,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+
+            Card(
+                Modifier.fillMaxWidth().tvFocusOutline(isTv).clickable {
+                    if (!requestHomeScreenWidget(context)) Toast.makeText(context, s.addWidgetManual, Toast.LENGTH_LONG).show()
+                },
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(s.addWidgetTitle, style = MaterialTheme.typography.bodyLarge)
+                    Text(s.addWidgetHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        val openBatterySettings = {
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             }
+            Unit
         }
-
         Card(
-            Modifier.fillMaxWidth().clickable {
-                if (!requestHomeScreenWidget(context)) Toast.makeText(context, s.addWidgetManual, Toast.LENGTH_LONG).show()
-            },
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(s.addWidgetTitle, style = MaterialTheme.typography.bodyLarge)
-                Text(s.addWidgetHelp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Card(
-            Modifier.fillMaxWidth().clickable {
-                runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            },
+            Modifier.fillMaxWidth().tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                .tvDpadActivate(isTv, openBatterySettings).tvFocusOutline(isTv)
+                .clickable(onClick = openBatterySettings),
         ) {
             Column(Modifier.padding(16.dp)) {
                 Text(s.keepBgTitle, style = MaterialTheme.typography.bodyLarge)

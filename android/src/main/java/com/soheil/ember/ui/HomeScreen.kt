@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,12 +23,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,12 +45,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import com.soheil.ember.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.soheil.ember.ui.components.tvFocusOutline
+import com.soheil.ember.ui.components.tvEntryFocus
+import com.soheil.ember.ui.components.tvDpadActivate
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.engine.AndroidEngine
 import com.soheil.ember.engine.VpnState
@@ -63,6 +72,9 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onOpenServers: () -> Unit,
     modifier: Modifier = Modifier,
+    isTv: Boolean = false,
+    tvHomeNavigationFocusRequester: FocusRequester? = null,
+    tvEntryFocusRequester: FocusRequester? = null,
 ) {
     val s = LocalStrings.current
     val phase by VpnState.phase.collectAsState()
@@ -86,57 +98,122 @@ fun HomeScreen(
         } else elapsed = 0
     }
 
-    Column(modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Orb(phase) {
-            when {
-                phase != ConnectionState.DISCONNECTED -> onDisconnect()
-                node == null -> onOpenServers()
-                else -> onConnect()
-            }
+    val status = when (phase) {
+        ConnectionState.CONNECTED -> s.connected
+        ConnectionState.CONNECTING -> s.connecting
+        ConnectionState.DISCONNECTED -> s.disconnected
+    }
+    val detail = when (phase) {
+        ConnectionState.CONNECTED -> String.format(Locale.US, "%02d:%02d:%02d", elapsed / 3600, elapsed % 3600 / 60, elapsed % 60)
+        ConnectionState.CONNECTING -> progress
+        ConnectionState.DISCONNECTED -> null
+    }
+    val serverTitle = when {
+        node == null -> s.chooseServer
+        selectedId == AUTO_NODE && phase == ConnectionState.DISCONNECTED -> s.fastestWithServer(node.title)
+        else -> node.title
+    }
+    val result = node?.let { results[it.id] }
+    val serverDetail = result?.mbps?.let { String.format(Locale.US, "⁦%.1f Mbps⁩", it) } ?: result?.pingMs?.let { "⁦$it ms⁩" }
+    val action = when (phase) {
+        ConnectionState.DISCONNECTED -> s.connect
+        ConnectionState.CONNECTING -> s.cancel
+        ConnectionState.CONNECTED -> s.disconnect
+    }
+    val onOrbClick = {
+        when {
+            phase != ConnectionState.DISCONNECTED -> onDisconnect()
+            node == null -> onOpenServers()
+            else -> onConnect()
         }
-        Spacer(Modifier.height(24.dp))
-        Text(
-            when (phase) {
-                ConnectionState.CONNECTED -> s.connected
-                ConnectionState.CONNECTING -> s.connecting
-                ConnectionState.DISCONNECTED -> s.disconnected
-            },
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        val detail = when (phase) {
-            ConnectionState.CONNECTED -> String.format(Locale.US, "%02d:%02d:%02d", elapsed / 3600, elapsed % 3600 / 60, elapsed % 60)
-            ConnectionState.CONNECTING -> progress
-            ConnectionState.DISCONNECTED -> null
-        }
-        detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        error?.takeIf { phase == ConnectionState.DISCONNECTED }?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-        }
-        Spacer(Modifier.height(32.dp))
+    }
+
+    if (isTv) {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(glassFill())
-                .border(1.dp, glassEdge(), RoundedCornerShape(16.dp))
-                .clickable(enabled = phase == ConnectionState.DISCONNECTED, onClick = onOpenServers)
-                .padding(16.dp),
+            modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 40.dp),
+            horizontalArrangement = Arrangement.spacedBy(48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            node?.flagCode?.let {
-                FlagIcon(it, 24.dp)
-                Spacer(Modifier.width(12.dp))
+            Column(
+                Modifier.weight(0.9f), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(s.home, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                GlassOrb(
+                    phase, action,
+                    Modifier.widthIn(max = 320.dp).aspectRatio(1f)
+                        .tvEntryFocus(isTv, tvEntryFocusRequester, tvHomeNavigationFocusRequester)
+                        .tvDpadActivate(isTv, onOrbClick)
+                        .tvFocusOutline(true, CircleShape),
+                    if (dark) Color.White else Color(0xFF7A5BC0),
+                    onOrbClick,
+                ) {
+                    Icon(painterResource(R.drawable.ic_solar_power), contentDescription = null, tint = Color.White.copy(alpha = 0.92f), modifier = Modifier.size(56.dp))
+                }
+                Text(status, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                detail?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Text(
-                when {
-                    node == null -> s.chooseServer
-                    selectedId == AUTO_NODE && phase == ConnectionState.DISCONNECTED -> s.fastestWithServer(node.title)
-                    else -> node.title
-                },
-                Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1,
-            )
-            val result = node?.let { results[it.id] }
-            (result?.mbps?.let { String.format(Locale.US, "⁦%.1f Mbps⁩", it) } ?: result?.pingMs?.let { "⁦$it ms⁩" })?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(
+                Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Text(s.chooseServer, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val shape = RoundedCornerShape(20.dp)
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 124.dp).clip(shape).background(glassFill())
+                        .border(1.dp, glassEdge(), shape)
+                        .tvDpadActivate(isTv && phase == ConnectionState.DISCONNECTED, onOpenServers)
+                        .tvFocusOutline(phase == ConnectionState.DISCONNECTED, shape)
+                        .clickable(enabled = phase == ConnectionState.DISCONNECTED, onClick = onOpenServers)
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    node?.flagCode?.let {
+                        FlagIcon(it, 44.dp)
+                        Spacer(Modifier.width(20.dp))
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(serverTitle, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                        serverDetail?.let { Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+                error?.takeIf { phase == ConnectionState.DISCONNECTED }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+                }
+                Button(
+                    onClick = onOpenServers,
+                    enabled = phase == ConnectionState.DISCONNECTED,
+                    modifier = Modifier.fillMaxWidth().height(68.dp)
+                        .tvDpadActivate(isTv && phase == ConnectionState.DISCONNECTED, onOpenServers)
+                        .tvFocusOutline(isTv, RoundedCornerShape(18.dp)),
+                ) { Text(s.servers, style = MaterialTheme.typography.titleLarge) }
+            }
+        }
+    } else {
+        Column(modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Orb(phase, onOrbClick)
+            Spacer(Modifier.height(24.dp))
+            Text(status, style = MaterialTheme.typography.headlineMedium)
+            detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            error?.takeIf { phase == ConnectionState.DISCONNECTED }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(32.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    .background(glassFill())
+                    .border(1.dp, glassEdge(), RoundedCornerShape(16.dp))
+                    .clickable(enabled = phase == ConnectionState.DISCONNECTED, onClick = onOpenServers)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                node?.flagCode?.let {
+                    FlagIcon(it, 24.dp)
+                    Spacer(Modifier.width(12.dp))
+                }
+                Text(serverTitle, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                serverDetail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }

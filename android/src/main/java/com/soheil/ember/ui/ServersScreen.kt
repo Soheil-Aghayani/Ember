@@ -60,6 +60,10 @@ import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.engine.AndroidEngine
 import com.soheil.ember.engine.VpnState
 import com.soheil.ember.ui.components.FlagIcon
+import com.soheil.ember.ui.components.tvFocusOutline
+import com.soheil.ember.ui.components.tvEntryFocus
+import com.soheil.ember.ui.components.tvDpadActivate
+import androidx.compose.ui.focus.FocusRequester
 import ember.subs.Subscription
 import ember.subs.shareLink
 import ember.subs.sortNodes
@@ -67,7 +71,15 @@ import java.util.Locale
 
 /** Subscriptions and servers: add them (link, clipboard, QR code, file, WARP), test them, and pick the one Connect uses. */
 @Composable
-fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () -> Unit, modifier: Modifier = Modifier) {
+fun ServersScreen(
+    engine: AndroidEngine,
+    say: (String) -> Unit,
+    onConnect: () -> Unit,
+    modifier: Modifier = Modifier,
+    isTv: Boolean = false,
+    tvNavigationFocusRequester: FocusRequester? = null,
+    tvEntryFocusRequester: FocusRequester? = null,
+) {
     val context = LocalContext.current
     val s = LocalStrings.current
     val clipboard = LocalClipboardManager.current
@@ -110,8 +122,15 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                     maxLines = 4, modifier = Modifier.fillMaxWidth(),
                 )
             },
-            confirmButton = { Button(enabled = link.isNotBlank(), onClick = { askLink = false; add(link, "") }) { Text(s.add) } },
-            dismissButton = { TextButton(onClick = { askLink = false }) { Text(s.cancel) } },
+            confirmButton = {
+                Button(
+                    enabled = link.isNotBlank(), onClick = { askLink = false; add(link, "") },
+                    modifier = Modifier.tvDpadActivate(isTv && link.isNotBlank()) { askLink = false; add(link, "") }.tvFocusOutline(isTv),
+                ) { Text(s.add) }
+            },
+            dismissButton = {
+                TextButton(onClick = { askLink = false }, modifier = Modifier.tvDpadActivate(isTv) { askLink = false }.tvFocusOutline(isTv)) { Text(s.cancel) }
+            },
         )
     }
 
@@ -121,6 +140,12 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
         var input by remember { mutableStateOf("") }
         var picked by remember { mutableStateOf<String?>(null) }
         val url = normalizeSiteUrl(input)
+        fun checkSite() {
+            val checkedUrl = url ?: return
+            askSite = false
+            val host = picked ?: runCatching { java.net.URI(checkedUrl).host.removePrefix("www.") }.getOrDefault(checkedUrl)
+            engine.checkSite(subscriptions.flatMap { it.nodes }, host, checkedUrl)
+        }
         AlertDialog(
             onDismissRequest = { askSite = false },
             title = { Text(s.siteTitle) },
@@ -144,12 +169,15 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                 }
             },
             confirmButton = {
-                Button(enabled = url != null, onClick = {
-                    askSite = false
-                    engine.checkSite(subscriptions.flatMap { it.nodes }, picked ?: runCatching { java.net.URI(url!!).host.removePrefix("www.") }.getOrDefault(url!!), url!!)
-                }) { Text(s.check) }
+                Button(
+                    enabled = url != null,
+                    onClick = { checkSite() },
+                    modifier = Modifier.tvDpadActivate(isTv && url != null) { checkSite() }.tvFocusOutline(isTv),
+                ) { Text(s.check) }
             },
-            dismissButton = { TextButton(onClick = { askSite = false }) { Text(s.cancel) } },
+            dismissButton = {
+                TextButton(onClick = { askSite = false }, modifier = Modifier.tvDpadActivate(isTv) { askSite = false }.tvFocusOutline(isTv)) { Text(s.cancel) }
+            },
         )
     }
 
@@ -159,19 +187,32 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                 Text(s.servers, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
                 if (testing != null) {
                     CircularProgressIndicator(Modifier.width(20.dp).height(20.dp), strokeWidth = 2.dp)
-                    TextButton(onClick = { engine.cancelTest() }) { Text(s.stop) }
-                } else {
                     TextButton(
-                        enabled = phase == ConnectionState.DISCONNECTED && subscriptions.isNotEmpty(),
-                        onClick = { engine.testNodes(subscriptions.flatMap { it.nodes }) },
+                        onClick = { engine.cancelTest() },
+                        modifier = Modifier.tvDpadActivate(isTv) { engine.cancelTest() }.tvFocusOutline(isTv),
+                    ) { Text(s.stop) }
+                } else {
+                    val canTest = phase == ConnectionState.DISCONNECTED && subscriptions.isNotEmpty()
+                    val testServers = { engine.testNodes(subscriptions.flatMap { it.nodes }) }
+                    TextButton(
+                        enabled = canTest,
+                        onClick = testServers,
+                        modifier = Modifier.tvDpadActivate(isTv && canTest, testServers).tvFocusOutline(isTv),
                     ) { Text(s.testSpeed) }
                 }
+                val canCheckSite = phase == ConnectionState.DISCONNECTED && testing == null && subscriptions.isNotEmpty()
                 IconButton(
-                    enabled = phase == ConnectionState.DISCONNECTED && testing == null && subscriptions.isNotEmpty(),
+                    enabled = canCheckSite,
                     onClick = { askSite = true },
+                    modifier = Modifier.tvDpadActivate(isTv && canCheckSite) { askSite = true }.tvFocusOutline(isTv),
                 ) { Icon(painterResource(R.drawable.ic_solar_magnifier), contentDescription = s.checkSite) }
                 Box {
-                    FilledIconButton(onClick = { menu = true }) { Icon(Icons.Filled.Add, contentDescription = s.addServers) }
+                    FilledIconButton(
+                        onClick = { menu = true },
+                        modifier = Modifier.tvEntryFocus(isTv, tvEntryFocusRequester, tvNavigationFocusRequester)
+                            .tvDpadActivate(isTv) { menu = true }
+                            .tvFocusOutline(isTv),
+                    ) { Icon(Icons.Filled.Add, contentDescription = s.addServers) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text(s.addLink) }, onClick = { menu = false; askLink = true })
                         DropdownMenuItem(text = { Text(s.fromClipboard) }, onClick = {
@@ -179,11 +220,13 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                             val text = clipboard.getText()?.text.orEmpty().trim()
                             if (text.isEmpty()) say(s.clipboardEmpty) else add(text, "")
                         })
-                        DropdownMenuItem(text = { Text(s.scanQr) }, onClick = {
-                            menu = false
-                            scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false)
-                                .setPrompt(s.qrPrompt))
-                        })
+                        if (!isTv) {
+                            DropdownMenuItem(text = { Text(s.scanQr) }, onClick = {
+                                menu = false
+                                scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false)
+                                    .setPrompt(s.qrPrompt))
+                            })
+                        }
                         DropdownMenuItem(text = { Text(s.warpThroughServer) }, onClick = {
                             menu = false
                             val carrier = engine.selectedNode()?.takeIf { it.protocol !in setOf("openvpn", "wireguard", "warp") }
@@ -215,13 +258,21 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                         val best = sortNodes(
                             subscriptions.flatMap { it.nodes }.filter { n -> check.results[n.id]?.ok == true }, results, favorites,
                         ).firstOrNull()
-                        TextButton(enabled = best != null && testing == null && phase == ConnectionState.DISCONNECTED, onClick = {
+                        val connectBest = {
                             best?.let {
                                 engine.chooseServer(it.id)
                                 onConnect()
                             }
-                        }) { Text(s.connect) }
-                        IconButton(onClick = { engine.clearSiteCheck() }) { Icon(Icons.Filled.Close, contentDescription = s.clear) }
+                        }
+                        TextButton(enabled = best != null && testing == null && phase == ConnectionState.DISCONNECTED, onClick = {
+                            connectBest()
+                        }, modifier = Modifier.tvDpadActivate(isTv && best != null && testing == null && phase == ConnectionState.DISCONNECTED) {
+                            connectBest()
+                        }.tvFocusOutline(isTv)) { Text(s.connect) }
+                        IconButton(
+                            onClick = { engine.clearSiteCheck() },
+                            modifier = Modifier.tvDpadActivate(isTv) { engine.clearSiteCheck() }.tvFocusOutline(isTv),
+                        ) { Icon(Icons.Filled.Close, contentDescription = s.clear) }
                     }
                 }
             }
@@ -250,16 +301,24 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                             )
                         }
                         if (subscription.url.isNotBlank()) {
-                            IconButton(onClick = {
+                            val refreshSubscription = {
                                 engine.work({ engine.subscriptions.refresh(subscription.id) }) { r ->
                                     r.onSuccess { say(s.updated) }.onFailure { say(it.message ?: s.couldNotUpdate) }
                                 }
-                            }) { Icon(Icons.Filled.Refresh, contentDescription = s.update) }
+                            }
+                            IconButton(
+                                onClick = refreshSubscription,
+                                modifier = Modifier.tvDpadActivate(isTv, refreshSubscription).tvFocusOutline(isTv),
+                            ) { Icon(Icons.Filled.Refresh, contentDescription = s.update) }
                         }
-                        IconButton(onClick = {
+                        val removeSubscription = {
                             if (subscription.nodes.any { it.id == selectedId }) engine.chooseServer(ember.subs.AUTO_NODE)
                             engine.subscriptions.remove(subscription.id)
-                        }) { Icon(Icons.Filled.Delete, contentDescription = s.remove) }
+                        }
+                        IconButton(
+                            onClick = removeSubscription,
+                            modifier = Modifier.tvDpadActivate(isTv, removeSubscription).tvFocusOutline(isTv),
+                        ) { Icon(Icons.Filled.Delete, contentDescription = s.remove) }
                     }
                     val ordered = sortNodes(servers, results, favorites)
                     // after a website check the servers that reached it come first, then the ones not asked, then the refused ones
@@ -267,8 +326,11 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                     for (node in shown) {
                         val result = results[node.id]
                         val selected = node.id == selectedId
+                        val chooseServer = { engine.chooseServer(node.id) }
                         Row(
-                            Modifier.fillMaxWidth().clickable { engine.chooseServer(node.id) }.padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                            Modifier.fillMaxWidth().tvDpadActivate(isTv, chooseServer).tvFocusOutline(isTv)
+                                .clickable(onClick = chooseServer)
+                                .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             node.flagCode?.let {
@@ -295,9 +357,19 @@ fun ServersScreen(engine: AndroidEngine, say: (String) -> Unit, onConnect: () ->
                                 )
                             }
                             if (selected && node.shareLink != null) {
-                                IconButton(onClick = { qrNode = node }) { Icon(painterResource(R.drawable.ic_solar_qr), contentDescription = s.showQr) }
+                                val showQr = { qrNode = node }
+                                IconButton(
+                                    onClick = showQr,
+                                    modifier = Modifier.tvDpadActivate(isTv, showQr).tvFocusOutline(isTv),
+                                ) {
+                                    Icon(painterResource(R.drawable.ic_solar_qr), contentDescription = s.showQr)
+                                }
                             }
-                            IconButton(onClick = { engine.toggleFavorite(node) }) {
+                            val toggleFavorite = { engine.toggleFavorite(node) }
+                            IconButton(
+                                onClick = toggleFavorite,
+                                modifier = Modifier.tvDpadActivate(isTv, toggleFavorite).tvFocusOutline(isTv),
+                            ) {
                                 Icon(
                                     Icons.Filled.Star, contentDescription = s.favourite,
                                     tint = if (node.id in favorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),

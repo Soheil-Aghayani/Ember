@@ -16,6 +16,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.soheil.ember.ui.components.Card
+import com.soheil.ember.ui.components.tvFocusOutline
+import com.soheil.ember.ui.components.tvEntryFocus
+import com.soheil.ember.ui.components.tvDpadActivate
+import com.soheil.ember.ui.components.tvReturnToNavigation
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,11 +45,18 @@ import java.util.Locale
 
 /** Version, components and how to reach the developer. */
 @Composable
-fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
+fun AboutScreen(
+    engine: AndroidEngine,
+    modifier: Modifier = Modifier,
+    isTv: Boolean = false,
+    tvNavigationFocusRequester: FocusRequester? = null,
+    tvEntryFocusRequester: FocusRequester? = null,
+) {
     val context = LocalContext.current
     val s = LocalStrings.current
     val clipboard = LocalClipboardManager.current
     var showLogs by remember { mutableStateOf(false) }
+    val closeLogs = { showLogs = false }
     if (showLogs) {
         val entries by AppLogger.entries.collectAsState()
         val text = remember(entries) {
@@ -53,13 +65,21 @@ fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
                 "\n\nXray: " + engine.xrayOutput()
         }
         AlertDialog(
-            onDismissRequest = { showLogs = false },
+            onDismissRequest = closeLogs,
             title = { Text(s.logs) },
             text = { Text(text, Modifier.verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
-            confirmButton = { TextButton(onClick = { clipboard.setText(AnnotatedString(text)) }) { Text(s.copy) } },
-            dismissButton = { TextButton(onClick = { showLogs = false }) { Text(s.close) } },
+            confirmButton = {
+                val copyLogs = { clipboard.setText(AnnotatedString(text)) }
+                TextButton(onClick = copyLogs, modifier = Modifier.tvDpadActivate(isTv, copyLogs).tvFocusOutline(isTv)) { Text(s.copy) }
+            },
+            dismissButton = { TextButton(onClick = closeLogs, modifier = Modifier.tvDpadActivate(isTv, closeLogs).tvFocusOutline(isTv)) { Text(s.close) } },
         )
     }
+    val openContact = {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/env_soh"))) }
+        Unit
+    }
+    val openLogs = { showLogs = true }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text(s.about, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
@@ -72,9 +92,8 @@ fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(12.dp))
         Card(
-            Modifier.fillMaxWidth().clickable {
-                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/env_soh"))) }
-            },
+            Modifier.fillMaxWidth().tvEntryFocus(isTv, tvEntryFocusRequester, tvNavigationFocusRequester)
+                .tvDpadActivate(isTv, openContact).tvFocusOutline(isTv).clickable(onClick = openContact),
         ) {
             androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Icon(painterResource(R.drawable.ic_telegram), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -86,7 +105,10 @@ fun AboutScreen(engine: AndroidEngine, modifier: Modifier = Modifier) {
             }
         }
         Spacer(Modifier.height(12.dp))
-        Card(Modifier.fillMaxWidth().clickable { showLogs = true }) {
+        Card(
+            Modifier.fillMaxWidth().tvReturnToNavigation(isTv, tvNavigationFocusRequester)
+                .tvDpadActivate(isTv, openLogs).tvFocusOutline(isTv).clickable(onClick = openLogs),
+        ) {
             Text(s.logs, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
         }
         Spacer(Modifier.height(12.dp))

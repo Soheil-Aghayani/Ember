@@ -31,7 +31,7 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 |---|---|---|
 | Windows PC | Current preview: native Rust app 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; this preview is packaged side-by-side with the earlier Kotlin app. |
 | Android phone | Release APK prepared: 2.7.2 | Android 8.0 or newer; arm64. VPN and QR behavior still need a physical phone check. |
-| Android TV | APK prepared; device validation pending | Same arm64 APK includes the TV launcher. Verify remote navigation and VPN behavior on the Sony BRAVIA BF1 before calling TV support verified. |
+| Android TV | TV layout and D-pad navigation implemented; generic emulator check passed | Same Android package and arm64 runtime; physical Sony BRAVIA BF1 validation remains pending. |
 
 | Windows | |
 |---|---|
@@ -53,8 +53,8 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 Release candidates and checksums are prepared in the shared Ember app catalogue at `https://app.agseyl.ir/`; this catalogue is intended to host multiple apps.
 
 - **Windows:** the Rust 2.0.1 preview installer (Windows 10/11, 64-bit). It remains side-by-side with the older Kotlin app; whole-device networking needs owner verification.
-- **Android phone and TV:** signed arm64 APK (Android 8.0 or newer). The same APK has both phone and Leanback launchers; physical TV behavior remains unverified.
-- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. TV support is still awaiting validation on the BRAVIA BF1.
+- **Android phone and TV:** the currently prepared signed arm64 APK is version 2.7.2 (Android 8.0 or newer). The TV layout changes in source need a new signed build before release.
+- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. D-pad behavior was checked on a generic emulator; Sony BRAVIA BF1 launcher, remote, and VPN behavior still need validation.
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
 
