@@ -126,7 +126,10 @@ export component HomePage inherits Rectangle {
         if caption != "" : Rectangle { height: 12px; }
         if caption != "" : Label { text: root.caption; muted: true; font-size: Type.body-small; horizontal-alignment: center; wrap: word-wrap; }
         if error != "" : Rectangle { height: 16px; }
-        if error != "" : Label { text: root.error; muted: true; font-size: Type.body-small; overflow: elide; }
+        if error != "" : Label {
+            text: root.error; muted: true; font-size: Type.body-small;
+            width: parent.width; wrap: word-wrap; horizontal-alignment: center;
+        }
         if blocked-notice != "" : Rectangle { height: 16px; }
         if blocked-notice != "" : Card {
             height: nb-title.preferred-height + nb-body.preferred-height + (can-restore ? 48px : 0px) + 40px;

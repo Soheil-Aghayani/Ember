@@ -13,6 +13,7 @@ slint::include_modules!();
 use ember_engine::{ConnState, Engine, HTTP_PORT, LOCAL_BIND, SOCKS_PORT};
 use slint::{ComponentHandle, Image, Model, ModelRc, SharedString, VecModel};
 use std::{
+    net::TcpListener,
     path::PathBuf,
     rc::Rc,
     sync::{
@@ -92,14 +93,25 @@ pub(crate) fn flag(code: &str) -> Option<Image> {
     [beside_exe, next_to_exe, Some(in_source)].into_iter().flatten().find(|p| p.exists()).and_then(|p| Image::load_from_path(&p).ok())
 }
 
-/// `--ports <socks> <http>`: other local proxy ports, so the Rust app can run beside the Kotlin app (which holds 10808).
+/// `--ports <socks> <http>` sets explicit local proxy ports; otherwise, use the usual ports or pick free ones if occupied.
 fn ports(args: &[String]) -> (u16, u16) {
-    let Some(i) = args.iter().position(|a| a == "--ports") else { return (SOCKS_PORT, HTTP_PORT) };
-    let number = |k: usize| args.get(i + k).and_then(|v| v.parse::<u16>().ok());
-    match (number(1), number(2)) {
-        (Some(socks), Some(http)) if socks != http => (socks, http),
-        _ => (SOCKS_PORT, HTTP_PORT),
+    if let Some(i) = args.iter().position(|a| a == "--ports") {
+        let number = |k: usize| args.get(i + k).and_then(|v| v.parse::<u16>().ok());
+        return match (number(1), number(2)) {
+            (Some(socks), Some(http)) if socks != http => (socks, http),
+            _ => (SOCKS_PORT, HTTP_PORT),
+        };
     }
+
+    let defaults_available = [SOCKS_PORT, HTTP_PORT].into_iter().all(|port| TcpListener::bind((LOCAL_BIND, port)).is_ok());
+    if defaults_available {
+        return (SOCKS_PORT, HTTP_PORT);
+    }
+
+    ember_subs::runner::free_ports(2)
+        .ok()
+        .map(|ports| (ports[0], ports[1]))
+        .unwrap_or((SOCKS_PORT, HTTP_PORT))
 }
 
 fn duration(seconds: u64) -> String {
