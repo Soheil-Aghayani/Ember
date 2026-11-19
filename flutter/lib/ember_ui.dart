@@ -42,10 +42,9 @@ class EmberBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          dark ? 'assets/art/bg-dark.png' : 'assets/art/bg-mint.png',
-          fit: BoxFit.cover,
-        ),
+        dark
+            ? Image.asset('assets/art/bg-dark.png', fit: BoxFit.cover)
+            : SvgPicture.asset('assets/art/bg-mint.svg', fit: BoxFit.cover),
         if (dark) const ColoredBox(color: Color(0x66000000)),
       ],
     );
