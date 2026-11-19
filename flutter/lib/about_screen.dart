@@ -4,9 +4,14 @@ import 'package:flutter/services.dart';
 import 'ember_ui.dart';
 
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key, required this.ui});
+  const AboutScreen({
+    super.key,
+    required this.ui,
+    required this.onOpenWhatsNew,
+  });
 
   final EmberUi ui;
+  final VoidCallback onOpenWhatsNew;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +30,12 @@ class AboutScreen extends StatelessWidget {
               _aboutRow(context, copy.get('tunnel'), 'hev-socks5-tunnel'),
             ],
           ),
+        ),
+        const SizedBox(height: 10),
+        EmberActionTile(
+          icon: 'star_fall',
+          title: copy.get('whatsNew'),
+          onPressed: onOpenWhatsNew,
         ),
         const SizedBox(height: 10),
         EmberActionTile(

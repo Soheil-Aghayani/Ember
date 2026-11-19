@@ -19,6 +19,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/ember-logo.png
+    - assets/art/
+    - assets/flags/
     - assets/icons/solar/
     - assets/fonts/Inter-LICENSE.txt
   fonts:

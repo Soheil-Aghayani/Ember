@@ -32,7 +32,7 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 |---|---|---|
 | Windows PC | Current preview: native Rust app 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; this preview is packaged side-by-side with the earlier Kotlin app. |
 | Android phone | Flutter UI port builds locally; runtime validation pending | Android 8.0 or newer; arm64. The Kotlin VPN engine remains native. The Flutter debug build has not been checked on a physical phone. |
-| Android TV | Flutter TV preview APK builds locally; runtime validation pending | Same Android app with a debug-only TV preview package. D-pad behavior on Flutter and physical Sony BRAVIA BF1 validation remain pending. |
+| Android TV | Flutter TV preview launched on an API 34 Android TV emulator; D-pad navigation checked | The emulator check covered Home, Servers, Settings, Logs, What's new and About. Physical Sony BRAVIA BF1 launcher, remote and VPN behavior remain unverified. |
 
 | Windows | |
 |---|---|

@@ -9,8 +9,10 @@ import 'ember_api.dart';
 import 'ember_strings.dart';
 import 'ember_ui.dart';
 import 'home_screen.dart';
+import 'logs_screen.dart';
 import 'servers_screen.dart';
 import 'settings_screen.dart';
+import 'whats_new_screen.dart';
 
 void main() => runApp(const EmberApp());
 
@@ -137,21 +139,21 @@ class _EmberAppState extends State<EmberApp> {
 
   ThemeData _theme(Brightness brightness) {
     const light = ColorScheme.light(
-      primary: Color(0xFF9C3107),
+      primary: EmberColors.mintPrimary,
       onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFFBE6DA),
-      onPrimaryContainer: Color(0xFF5A1C00),
-      secondary: Color(0xFF6A3BD1),
+      primaryContainer: Color(0xFFD7EEE5),
+      onPrimaryContainer: Color(0xFF0A4E3D),
+      secondary: EmberColors.mintOrb,
       onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: Color(0xFFECE5FA),
-      onSecondaryContainer: Color(0xFF2A1566),
+      secondaryContainer: EmberColors.mintSurfaceVariant,
+      onSecondaryContainer: Color(0xFF0A6B52),
       tertiary: Color(0xFF1E7A3C),
       error: Color(0xFFBA1A1A),
       surface: Color(0xFFFFFFFF),
-      onSurface: Color(0xFF1F1B16),
-      onSurfaceVariant: Color(0xFF534C44),
-      outline: Color(0xFF8A8277),
-      outlineVariant: Color(0xFFE4DDD1),
+      onSurface: Color(0xFF231712),
+      onSurfaceVariant: Color(0xFF51443C),
+      outline: Color(0xFF7E978A),
+      outlineVariant: EmberColors.mintOutline,
     );
     const dark = ColorScheme.dark(
       primary: Color(0xFFFF8D5C),
@@ -178,7 +180,7 @@ class _EmberAppState extends State<EmberApp> {
       fontFamily: 'Inter',
       scaffoldBackgroundColor: brightness == Brightness.dark
           ? const Color(0xFF1A1714)
-          : const Color(0xFFFAF7F2),
+          : EmberColors.mintBackground,
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           fontSize: 32,
@@ -215,7 +217,9 @@ class _EmberAppState extends State<EmberApp> {
         ),
       ),
       cardTheme: CardThemeData(
-        color: scheme.surface,
+        color: brightness == Brightness.dark
+            ? scheme.surface
+            : scheme.surface.withValues(alpha: .78),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -223,8 +227,12 @@ class _EmberAppState extends State<EmberApp> {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surface.withValues(alpha: .96),
-        indicatorColor: scheme.secondaryContainer,
+        backgroundColor: brightness == Brightness.dark
+            ? scheme.surface.withValues(alpha: .96)
+            : scheme.surface.withValues(alpha: .84),
+        indicatorColor: brightness == Brightness.dark
+            ? scheme.secondaryContainer
+            : scheme.primaryContainer,
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: Colors.transparent,
@@ -258,7 +266,7 @@ class _LaunchScreen extends StatelessWidget {
   );
 }
 
-enum _Page { home, servers, settings, about }
+enum _Page { home, servers, settings, logs, whatsNew, about }
 
 class _EmberShell extends StatefulWidget {
   const _EmberShell({required this.ui});
@@ -272,16 +280,34 @@ class _EmberShell extends StatefulWidget {
 class _EmberShellState extends State<_EmberShell> {
   _Page _page = _Page.home;
 
-  static const _pages = _Page.values;
-  static const _icons = ['power', 'global', 'settings', 'info_circle'];
-  static const _labels = ['home', 'servers', 'settings', 'about'];
+  static const _tvPages = [
+    _Page.home,
+    _Page.servers,
+    _Page.settings,
+    _Page.logs,
+    _Page.whatsNew,
+    _Page.about,
+  ];
+  static const _phonePages = [
+    _Page.home,
+    _Page.servers,
+    _Page.settings,
+    _Page.about,
+  ];
+  static const _phoneIcons = ['home', 'server_2', 'settings', 'info_circle'];
+  static const _phoneLabels = ['home', 'servers', 'settings', 'about'];
 
   @override
   Widget build(BuildContext context) {
     final ui = widget.ui;
     final copy = ui.strings;
     final rtl = copy.persian;
-    final selected = _pages.indexOf(_page);
+    final selected = _Page.values.indexOf(_page);
+    final tvSelected = _tvPages.indexOf(_page);
+    final phoneSelected = _phonePages.indexOf(_page);
+    final phoneNavigationIndex = phoneSelected < 0
+        ? _phonePages.indexOf(_Page.about)
+        : phoneSelected;
     final content = IndexedStack(
       index: selected,
       children: [
@@ -300,9 +326,14 @@ class _EmberShellState extends State<_EmberShell> {
           enabled: selected == 2,
           child: SettingsScreen(ui: ui),
         ),
+        LogsScreen(ui: ui),
+        WhatsNewScreen(ui: ui),
         TickerMode(
-          enabled: selected == 3,
-          child: AboutScreen(ui: ui),
+          enabled: selected == 5,
+          child: AboutScreen(
+            ui: ui,
+            onOpenWhatsNew: () => _select(_Page.whatsNew),
+          ),
         ),
       ],
     );
@@ -310,45 +341,50 @@ class _EmberShellState extends State<_EmberShell> {
     return Directionality(
       textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        body: SafeArea(
-          child: ui.state.isTv
-              ? Row(
-                  textDirection: TextDirection.ltr,
-                  children: [
-                    _TvRail(
-                      selectedIndex: selected,
-                      label: (key) => copy.get(key),
-                      onSelect: (index) => _select(_pages[index]),
-                    ),
-                    VerticalDivider(
-                      width: 1,
-                      thickness: 1,
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: content,
-                      ),
-                    ),
-                  ],
-                )
-              : content,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: EmberBackdrop()),
+            SafeArea(
+              child: ui.state.isTv
+                  ? Row(
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        _TvRail(
+                          selectedIndex: tvSelected,
+                          label: (key) => copy.get(key),
+                          onSelect: (index) => _select(_tvPages[index]),
+                        ),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: Colors.white.withValues(alpha: .7),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: content,
+                          ),
+                        ),
+                      ],
+                    )
+                  : content,
+            ),
+          ],
         ),
         bottomNavigationBar: ui.state.isTv
             ? null
             : NavigationBar(
-                selectedIndex: selected,
-                onDestinationSelected: (index) => _select(_pages[index]),
-                destinations: List.generate(_pages.length, (index) {
+                selectedIndex: phoneNavigationIndex,
+                onDestinationSelected: (index) => _select(_phonePages[index]),
+                destinations: List.generate(_phonePages.length, (index) {
                   return NavigationDestination(
-                    icon: SolarIcon(_icons[index], size: 23),
+                    icon: SolarIcon(_phoneIcons[index], size: 23),
                     selectedIcon: SolarIcon(
-                      _icons[index],
+                      _phoneIcons[index],
                       size: 23,
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    label: copy.get(_labels[index]),
+                    label: copy.get(_phoneLabels[index]),
                   );
                 }),
               ),
@@ -370,8 +406,22 @@ class _TvRail extends StatelessWidget {
   final String Function(String key) label;
   final ValueChanged<int> onSelect;
 
-  static const _icons = ['power', 'global', 'settings', 'info_circle'];
-  static const _labels = ['home', 'servers', 'settings', 'about'];
+  static const _icons = [
+    'home',
+    'server_2',
+    'settings',
+    'file_text',
+    'star_fall',
+    'info_circle',
+  ];
+  static const _labels = [
+    'home',
+    'servers',
+    'settings',
+    'logs',
+    'whatsNew',
+    'about',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -396,55 +446,55 @@ class _TvRail extends StatelessWidget {
                 ],
               ),
             ),
-            for (var index = 0; index < _icons.length; index++)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                child: Material(
-                  color: selectedIndex == index
-                      ? colors.secondaryContainer
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => onSelect(index),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      child: Row(
-                        children: [
-                          SolarIcon(
-                            _icons[index],
-                            color: selectedIndex == index
-                                ? colors.onSecondaryContainer
-                                : colors.onSurface,
-                          ),
-                          const SizedBox(width: 14),
-                          Text(
-                            label(_labels[index]),
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(
-                                  color: selectedIndex == index
-                                      ? colors.onSecondaryContainer
-                                      : colors.onSurface,
-                                  fontWeight: selectedIndex == index
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            for (var index = 0; index < 4; index++)
+              _item(context, index, colors),
+            const Spacer(),
+            for (var index = 4; index < _icons.length; index++)
+              _item(context, index, colors),
           ],
         ),
       ),
     );
   }
+
+  Widget _item(BuildContext context, int index, ColorScheme colors) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: Material(
+      color: selectedIndex == index
+          ? colors.primaryContainer.withValues(alpha: .88)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        focusColor: colors.primary.withValues(alpha: .1),
+        autofocus: index == selectedIndex,
+        onTap: () => onSelect(index),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              SolarIcon(
+                _icons[index],
+                color: selectedIndex == index
+                    ? colors.primary
+                    : colors.onSurface,
+              ),
+              const SizedBox(width: 14),
+              Text(
+                label(_labels[index]),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: selectedIndex == index
+                      ? colors.primary
+                      : colors.onSurface,
+                  fontWeight: selectedIndex == index
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

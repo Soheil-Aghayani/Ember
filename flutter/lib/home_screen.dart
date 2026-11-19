@@ -128,70 +128,52 @@ class _HomeScreenState extends State<HomeScreen>
     String status,
     String? detail,
   ) {
-    final copy = widget.ui.strings;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 36, 28),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 9,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                EmberPageHeader(copy.get('home')),
-                const SizedBox(height: 8),
-                _orb(context, state, 310),
-                const SizedBox(height: 8),
-                Text(status, style: Theme.of(context).textTheme.headlineLarge),
-                if (detail != null) ...[
-                  const SizedBox(height: 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final orbSize = math.min(310.0, constraints.maxHeight * .58);
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _orb(context, state, orbSize),
+                  const SizedBox(height: 4),
                   Text(
-                    detail,
+                    status,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
-                ],
-                if (state.error != null && state.disconnected) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    state.error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                  if (detail != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      detail,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
+                  ],
+                  if (state.error != null && state.disconnected) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      state.error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 30),
+                  _serverCard(context, state, node, compact: true),
                 ],
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 32),
-          Expanded(
-            flex: 11,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  copy.get('chooseServer'),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _serverCard(context, state, node),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: widget.onOpenServers,
-                  icon: const SolarIcon('global', color: Colors.white),
-                  label: Text(copy.get('servers')),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -210,7 +192,9 @@ class _HomeScreenState extends State<HomeScreen>
               child: CustomPaint(
                 painter: _OrbitPainter(
                   animation: _orbit,
-                  orbitColor: Theme.of(context).colorScheme.tertiary,
+                  orbitColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : EmberColors.mintOrb,
                   connected: connected,
                 ),
               ),
@@ -224,6 +208,8 @@ class _HomeScreenState extends State<HomeScreen>
                   : widget.ui.strings.get('connect'),
               child: InkWell(
                 customBorder: const CircleBorder(),
+                focusColor: Theme.of(context).colorScheme.primary
+                    .withValues(alpha: .12),
                 onTap: () {
                   if (!state.disconnected) {
                     widget.ui.run(() => widget.ui.api.disconnect());
@@ -240,26 +226,36 @@ class _HomeScreenState extends State<HomeScreen>
                   height: size * .68,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: const Alignment(-.25, -.35),
-                      radius: 1.15,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                       colors: connected
                           ? const [
-                              Color(0xFF8BBDA5),
-                              Color(0xFF4F7890),
-                              Color(0xFF343956),
+                              Color(0xFF0B4F6C),
+                              Color(0xFF0F7A7A),
+                              Color(0xFF1FB08A),
+                              Color(0xFF4FD6A0),
+                              Color(0xFF9AF0B8),
+                              Color(0xFFE0FFC8),
                             ]
                           : connecting
                           ? const [
-                              Color(0xFFB4B9D3),
-                              Color(0xFF766E9D),
-                              Color(0xFF5C567B),
+                              Color(0xFFB1BECD),
+                              Color(0xFF9AAEBE),
+                              Color(0xFF849DAE),
+                              Color(0xFF7D969F),
+                              Color(0xFF9BB6AB),
+                              Color(0xFFD4DCC8),
                             ]
                           : const [
-                              Color(0xFFAA9AE2),
-                              Color(0xFF7467A3),
-                              Color(0xFF554D75),
+                              Color(0xFFB4BCD6),
+                              Color(0xFF929BBC),
+                              Color(0xFF767FA4),
+                              Color(0xFF6A7298),
+                              Color(0xFF8C82A6),
+                              Color(0xFFD0A294),
                             ],
+                      stops: const [0, .22, .42, .60, .78, 1],
                     ),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: .35),
@@ -267,31 +263,57 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     boxShadow: [
                       BoxShadow(
+                        color: Colors.black.withValues(alpha: .14),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
                         color:
                             (connected
-                                    ? const Color(0xFF4C9675)
-                                    : const Color(0xFF7162A5))
-                                .withValues(alpha: .22),
-                        blurRadius: 24,
+                                    ? EmberColors.mintOrb
+                                    : const Color(0xFF8C82A6))
+                                .withValues(alpha: .19),
+                        blurRadius: 28,
                         spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: connecting
-                        ? const SizedBox(
-                            width: 38,
-                            height: 38,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              center: const Alignment(-.28, -.38),
+                              radius: 1.05,
+                              colors: [
+                                Colors.white.withValues(alpha: .36),
+                                Colors.white.withValues(alpha: .12),
+                                Colors.transparent,
+                              ],
+                              stops: const [0, .38, 1],
                             ),
-                          )
-                        : SolarIcon(
-                            'power',
-                            size: size * .22,
-                            color: Colors.white.withValues(alpha: .96),
                           ),
+                        ),
+                      ),
+                      Center(
+                        child: connecting
+                            ? const SizedBox(
+                                width: 38,
+                                height: 38,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : SolarIcon(
+                                'power',
+                                size: size * .17,
+                                color: Colors.white.withValues(alpha: .96),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -302,49 +324,82 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _serverCard(BuildContext context, EmberState state, EmberNode? node) {
+  Widget _serverCard(
+    BuildContext context,
+    EmberState state,
+    EmberNode? node, {
+    bool compact = false,
+  }) {
     final copy = widget.ui.strings;
+    final speed = node == null ? null : state.results[node.id]?.mbps;
     return InkWell(
       onTap: state.disconnected ? widget.onOpenServers : null,
       borderRadius: BorderRadius.circular(18),
+      focusColor: Theme.of(context).colorScheme.primary.withValues(alpha: .08),
       child: EmberCard(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 20 : 16,
+          vertical: compact ? 14 : 18,
+        ),
         child: Row(
           children: [
-            EmberFlagBadge(node?.flagCode, size: 34),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    node?.title ?? copy.get('chooseServer'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  if (node != null)
-                    Text(
-                      node.protocol.toUpperCase(),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (node != null && state.results[node.id]?.mbps != null)
-              Text(
-                '${state.results[node.id]!.mbps!.toStringAsFixed(1)} Mbps',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+            EmberFlagBadge(node?.flagCode, size: compact ? 32 : 34),
+            SizedBox(width: compact ? 14 : 12),
+            if (compact) ...[
+              Expanded(
+                child: Text(
+                  node?.title ?? copy.get('chooseServer'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
-            const SizedBox(width: 6),
-            SolarIcon(
-              'alt_arrow_right',
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+              if (speed != null)
+                Text(
+                  '${speed.toStringAsFixed(1)} Mbps',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              const SizedBox(width: 10),
+              SolarIcon(
+                'alt_arrow_down',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ] else ...[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      node?.title ?? copy.get('chooseServer'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    if (node != null)
+                      Text(
+                        node.protocol.toUpperCase(),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (speed != null)
+                Text(
+                  '${speed.toStringAsFixed(1)} Mbps',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              const SizedBox(width: 6),
+              SolarIcon(
+                'alt_arrow_right',
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
           ],
         ),
       ),

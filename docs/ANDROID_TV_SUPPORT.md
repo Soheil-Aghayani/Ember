@@ -22,16 +22,16 @@ This profile comes from the owner's TV information image. Unique device identifi
 ## Remote-first behavior
 
 - Flutter Home uses a wide layout with a connect orb, selected-server card, and focus styles for remote-operable controls.
-- Flutter TV navigation uses a left rail; the phone layout uses touch navigation. Servers, Settings, About, and Logs are implemented in the Flutter module.
+- Flutter TV navigation uses a left rail; the phone layout uses touch navigation. Home, Servers, Settings, Logs, What's new, and About are implemented in the Flutter module.
 - The TV server menu hides camera scanning. Users can type or paste subscription links, open a server file, and share a selected server's QR code with a phone.
 - The native Kotlin VPN engine and platform services are shared by phone and TV; Flutter owns presentation and navigation.
 
 ## Status and acceptance checks
 
-The Flutter-backed normal Android debug APK and a separate debug-only TV preview APK both assembled on 2026-11-19. The preview uses the `.tvpreview` application ID suffix and sets the TV layout flag. No Flutter app was installed or launched on an emulator or physical device during this port. The earlier generic emulator D-pad checks covered the Compose interface and do not establish Flutter behavior. Physical BRAVIA BF1 validation remains pending.
+On 2026-11-19, the debug-only `.tvpreview` APK was installed and launched on an Android TV API 34 x86_64 emulator. The Mint home screen rendered; D-pad navigation reached Home, Servers, Settings, Logs, What's new, and About; the disconnected orb opened Servers when no server was selected. The app stayed running without Flutter runtime or layout errors. No server was configured, so VPN connection behavior was not tested. Physical BRAVIA BF1 validation remains pending.
 
 - [x] Assemble the normal debug APK and debug-only TV preview APK.
-- [ ] Check D-pad focus and Select navigation across Home, Servers, Settings and About on an Android TV emulator.
+- [x] Check D-pad focus and Select navigation across Home, Servers, Settings, Logs, What's new, and About on an Android TV emulator.
 - [ ] Open and dismiss the Add link and Logs dialogs with a remote.
 - [ ] Check the touch layout and QR camera flow on an Android phone.
 - [ ] Confirm Ember appears in the TV launcher with its banner and opens the TV layout.

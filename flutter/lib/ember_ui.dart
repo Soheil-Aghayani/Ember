@@ -4,6 +4,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'ember_api.dart';
 import 'ember_strings.dart';
 
+abstract final class EmberColors {
+  static const mintPrimary = Color(0xFF0A6B52);
+  static const mintBackground = Color(0xFFF1FAF5);
+  static const mintSurfaceVariant = Color(0xFFE3F0E8);
+  static const mintOutline = Color(0xFFCBE2D6);
+  static const mintOrb = Color(0xFF2F8F78);
+}
+
 typedef EmberRunner = Future<T?> Function<T>(
   Future<T> Function() action, {
   String? success,
@@ -23,6 +31,25 @@ class EmberUi {
   final EmberStrings strings;
   final EmberRunner run;
   final ValueChanged<String> tell;
+}
+
+class EmberBackdrop extends StatelessWidget {
+  const EmberBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          dark ? 'assets/art/bg-dark.png' : 'assets/art/bg-mint.png',
+          fit: BoxFit.cover,
+        ),
+        if (dark) const ColoredBox(color: Color(0x66000000)),
+      ],
+    );
+  }
 }
 
 class SolarIcon extends StatelessWidget {
@@ -57,12 +84,17 @@ class EmberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: dark ? colors.surface : colors.surface.withValues(alpha: .78),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .75)),
+        border: Border.all(
+          color: dark
+              ? colors.outlineVariant.withValues(alpha: .75)
+              : Colors.white.withValues(alpha: .72),
+        ),
       ),
       child: child,
     );
@@ -101,19 +133,23 @@ class EmberFlagBadge extends StatelessWidget {
     if (label == null || label.length != 2) {
       return SizedBox.square(dimension: size);
     }
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.secondaryContainer,
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.onSecondaryContainer,
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: size,
+        child: SvgPicture.asset(
+          'assets/flags/${label.toLowerCase()}.svg',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(
+            alignment: Alignment.center,
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
         ),
       ),
     );

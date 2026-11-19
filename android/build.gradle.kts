@@ -92,6 +92,11 @@ android {
     namespace = "com.soheil.ember"
     compileSdk = 36
 
+    androidResources {
+        // Keep Flutter's large debug kernel intact during Android asset extraction.
+        noCompress += "bin"
+    }
+
     ndkVersion = "26.1.10909125"
 
     defaultConfig {

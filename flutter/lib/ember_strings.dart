@@ -15,6 +15,7 @@ class EmberStrings {
     'home': 'Home',
     'servers': 'Servers',
     'settings': 'Settings',
+    'whatsNew': "What's new",
     'about': 'About',
     'connected': 'Connected',
     'connecting': 'Connecting…',
@@ -100,6 +101,13 @@ class EmberStrings {
     'serversAdded': 'Added {count} servers',
     'updated': 'Updated',
     'noLogs': 'No log entries yet.',
+    'logsUnavailable': 'Logs could not be loaded.',
+    'whatsNewIntro': 'What changed in each version of Ember.',
+    'currentVersion': 'You have this version',
+    'whatsNewFlutter':
+        'Ember now uses Flutter for its Android phone and TV interface.',
+    'whatsNewMint': 'The Mint background, glass power orb and server selector follow Ember’s familiar design.',
+    'whatsNewEngine': 'Your Android VPN engine still manages permissions, servers and connections.',
     'languageChanged': 'Language updated',
   };
 
@@ -107,6 +115,7 @@ class EmberStrings {
     'home': 'خانه',
     'servers': 'سرورها',
     'settings': 'تنظیمات',
+    'whatsNew': 'تازه‌ها',
     'about': 'درباره',
     'connected': 'متصل',
     'connecting': 'در حال اتصال…',
@@ -190,6 +199,13 @@ class EmberStrings {
     'serversAdded': '{count} سرور اضافه شد',
     'updated': 'به‌روز شد',
     'noLogs': 'هنوز گزارشی ثبت نشده است.',
+    'logsUnavailable': 'گزارش‌ها بارگذاری نشدند.',
+    'whatsNewIntro': 'تغییرات نسخه‌های مختلف Ember.',
+    'currentVersion': 'این نسخه در حال اجراست',
+    'whatsNewFlutter':
+        'رابط اندروید Ember برای گوشی و تلویزیون با Flutter ساخته شده است.',
+    'whatsNewMint': 'پس‌زمینهٔ نعناعی، گوی شیشه‌ای و انتخاب‌گر سرور، ظاهر آشنای Ember را حفظ می‌کنند.',
+    'whatsNewEngine': 'موتور بومی VPN اندروید همچنان مجوزها، سرورها و اتصال را مدیریت می‌کند.',
     'languageChanged': 'زبان به‌روز شد',
   };
 }
