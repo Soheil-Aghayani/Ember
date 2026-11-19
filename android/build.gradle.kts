@@ -1,9 +1,9 @@
-import java.net.URL
+import java.net.URI
 import java.security.MessageDigest
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -37,6 +37,7 @@ tasks.named("preBuild").configure { dependsOn(fetchHevSocks5Tunnel) }
 // It never goes into a release build.
 val forEmulator = project.hasProperty("emulator")
 val tvPreview = project.hasProperty("tvPreview")
+val useFlutterUi = !project.hasProperty("composeUi")
 val emulatorLibsDir = layout.buildDirectory.dir("emulator-libs").get().asFile
 val fetchXrayEmulator = tasks.register("fetchXrayEmulator") {
     val target = File(emulatorLibsDir, "x86_64/libxray.so")
@@ -44,7 +45,7 @@ val fetchXrayEmulator = tasks.register("fetchXrayEmulator") {
     onlyIf { forEmulator && !target.exists() }
     doLast {
         val zip = layout.buildDirectory.file("xray-android/Xray-linux-64.zip").get().asFile.apply { parentFile.mkdirs() }
-        URL("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip").openStream()
+        URI("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip").toURL().openStream()
             .use { input -> zip.outputStream().use { input.copyTo(it) } }
         val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
         check(actual == "e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214") { "Checksum mismatch for the Xray download: $actual" }
@@ -64,7 +65,7 @@ val fetchXrayAndroid = tasks.register("fetchXrayAndroid") {
     onlyIf { !target.exists() }
     doLast {
         val zip = layout.buildDirectory.file("xray-android/Xray-android-arm64-v8a.zip").get().asFile.apply { parentFile.mkdirs() }
-        URL("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-arm64-v8a.zip").openStream()
+        URI("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-arm64-v8a.zip").toURL().openStream()
             .use { input -> zip.outputStream().use { input.copyTo(it) } }
         val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
         check(actual == "ee7878bb47ce28ff5b068e2d173ba1a9fab20ca1aec94191644919ec08ba5f1d") { "Checksum mismatch for the Xray download: $actual" }
@@ -89,12 +90,13 @@ val hasReleaseSigning = releaseKeystoreFile.exists() &&
 
 android {
     namespace = "com.soheil.ember"
-    compileSdk = 35
+    compileSdk = 36
 
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.soheil.ember"
+        manifestPlaceholders["launcherActivity"] = if (useFlutterUi) ".MainActivity" else ".ComposeMainActivity"
         minSdk = 26
         targetSdk = 35
         versionCode = 172
@@ -132,7 +134,7 @@ android {
     }
 
     sourceSets {
-        if (forEmulator) getByName("debug").jniLibs.srcDir(emulatorLibsDir)
+        if (forEmulator) getByName("debug").jniLibs.directories.add(emulatorLibsDir.absolutePath)
     }
 
     buildTypes {
@@ -156,12 +158,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
-        )
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+            )
+        }
     }
 
     buildFeatures {
@@ -191,6 +195,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":flutter"))
+
     // the older Firefox-account code in core is not used here; its network libraries would only add size
     implementation(project(":core")) { exclude(group = "io.netty") }
 

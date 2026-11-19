@@ -10,6 +10,13 @@
 .cxx
 local.properties
 android/build/
+flutter/.android/
+flutter/.ios/
+flutter/.dart_tool/
+flutter/build/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
 *.apk
 *.aab
 *.keystore

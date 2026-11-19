@@ -7,8 +7,8 @@ This page is the maintained index for the repository. It labels code by responsi
 | Target | Status | Current implementation | Evidence required before calling it supported |
 |---|---|---|---|
 | Windows PC | Current preview: native Rust app 2.0.1 | `ember-rs/` plus `helper/` and its staged resources. The earlier Kotlin app remains in `desktop/`. | Build the app and installer; the owner validates Windows UI and any real network behavior. Never run the tunnel helper or installer as an agent. |
-| Android phone | Current: 2.7.2 | `android/` plus shared subscription logic in `core/`; arm64 release build. | Build and install on an emulator or phone; separately verify camera/QR behavior on a device with a camera. |
-| Sony Smart TV | TV layout and D-pad navigation implemented; physical-device validation pending | Same `android/` package with an optional Leanback launcher, remote-first Home, Servers, Settings and About screens, and shared VPN service. Target: Sony BRAVIA BF1, Android TV OS 12. | D-pad navigation and dialog actions passed on a generic TV preview emulator; verify launcher visibility, physical remote, and VPN behavior on the actual BRAVIA BF1. |
+| Android phone | Flutter UI port builds locally as version 2.7.2 debug; runtime validation pending | `flutter/` UI + `android/` native bridge, engine, and VPN service, with subscription logic in `core/`. Local debug APK is arm64. | Install and launch on a phone; verify navigation, server import/QR, permissions, VPN connect/disconnect, and traffic. |
+| Sony Smart TV | Flutter TV preview APK builds; Flutter runtime and physical-device validation pending | Shared Flutter UI adapts for Leanback; Kotlin owns the VPN service. Target: Sony BRAVIA BF1, Android TV OS 12. | Previous D-pad checks covered Compose only. Verify Flutter focus/dialog behavior on an emulator, then launcher visibility, physical remote, and VPN behavior on the BRAVIA BF1. |
 
 Sony uses both Android-based TVs and other TV operating systems. The identified target is Sony BRAVIA BF1 with Android TV OS 12. A successful APK build does not prove TV runtime support; the owner still needs to verify remote input and VPN behavior on the physical TV. See [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) for the device profile and acceptance checklist. References: [Sony's model/OS identification guide](https://www.sony.com/electronics/support/audio-video/articles/00200248), [Android TV navigation](https://developer.android.com/design/ui/tv/guides/foundations/navigation-on-tv), and [Android TV controller requirements](https://developer.android.com/training/tv/get-started/controllers).
 
@@ -16,7 +16,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 
 | Category | Location | Owns | Boundary |
 |---|---|---|---|
-| Android client | `android/` | Phone UI, Android lifecycle, permissions, VPN service, app resources, and phone/TV packaging. | Android APIs stay here. TV screens branch on Leanback and must remain D-pad operable. |
+| Android client | `flutter/`, `android/` | Flutter phone/TV screens and Android lifecycle, permissions, VPN service, app resources, and packaging. `android/MainActivity.kt` owns Flutter method/event channels; the VPN engine remains native. | Keep Flutter UI in `flutter/` and Android APIs in `android/`. TV screens branch on Leanback and must remain D-pad operable. |
 | Windows clients | `ember-rs/`, `desktop/` | Current Rust/Slint preview and earlier Kotlin/Compose app, including Windows resources and installer packaging. | Do not execute the installer or network-changing helper. |
 | Shared code | `core/` | Logging, connection check, tunnel config; and the older Android client's Firefox account flows, Mozilla proxy pass, HTTP/2 tunnel and local proxies. | JVM only; no Android or Compose dependencies. |
 | Windows native support | `helper/`, `desktop/appResources/windows-x64/` | Native helper sources and packaged Windows tunnel resources. | Do not edit or execute the elevated PowerShell tunnel helper unless the task explicitly requires source changes; never run network-altering code. |
@@ -28,8 +28,9 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 
 - Shared protocol, session-transfer crypto, and account logic belong in `core/` only when they need no platform APIs.
 - Login and session-transfer screens belong in each platform UI (`android/` or `desktop/`); keep shared behavior in `core/` instead of duplicating it.
-- Android camera scanning, permissions, TV declarations, and Android lifecycle code belong in `android/`.
-- Android TV launcher, focus treatment, remote-first screens, and the Sony device profile belong in `android/` and `docs/ANDROID_TV_SUPPORT.md`.
+- Android phone/TV screens, navigation, and responsive layout belong in `flutter/`.
+- Android camera scanning, permissions, TV declarations, Flutter channels, and lifecycle code belong in `android/`.
+- Android TV launcher declarations belong in `android/`; focus treatment and remote-first screens belong in `flutter/`; Sony device details belong in `docs/ANDROID_TV_SUPPORT.md`.
 - Current Windows tray, installer, UI settings, and native integration belong in `ember-rs/` or `helper/`; the earlier Kotlin desktop app remains in `desktop/`.
 - Brand-wide colors, spacing, typography, and icons belong in `design/` and its platform mirrors.
 
@@ -55,6 +56,7 @@ The Windows app has no sign-in: it runs on subscription links (`desktop/src/main
 - [`desktop/README.md`](../desktop/README.md), [`desktop/TUNNEL.md`](../desktop/TUNNEL.md), [`desktop/SIGNING.md`](../desktop/SIGNING.md) — Windows-specific behavior and packaging.
 - [`helper/README.md`](../helper/README.md) — native helper details.
 - [`ANDROID_TV_SUPPORT.md`](ANDROID_TV_SUPPORT.md) — Sony BRAVIA BF1 target profile, TV behavior, and validation status.
+- [`../flutter/README.md`](../flutter/README.md) — Flutter module architecture, build commands, and native bridge boundary.
 - [`WINDOWS_APP_SPLIT_TUNNELING.md`](WINDOWS_APP_SPLIT_TUNNELING.md) — feasibility, the Xray tunnel option, and safety requirements for Windows per-app routing.
 - [`design/README.md`](../design/README.md) — design assets and attributions.
 - [`history/2026-10-29-ember-sign-in.md`](history/2026-10-29-ember-sign-in.md) — archived sign-in task brief and completion record.

@@ -1,6 +1,6 @@
 # Ember design
 
-`tokens.json` is the single source of truth for both apps. `android/` and `desktop/` read from it; do not hard-code colours, sizes or fonts in either app.
+`tokens.json` is the visual source of truth. Android and desktop keep platform mirrors; Flutter centralizes its semantic theme and shared components in `flutter/lib/ember_ui.dart`.
 
 ## Direction
 Claude's warmth (cream paper, ink text, generous whitespace) with Firefox's orange and violet as accents, laid out to Apple's Human Interface Guidelines: clear hierarchy, large titles, grouped lists, 44pt+ targets, subtle motion.
@@ -16,8 +16,9 @@ Claude's warmth (cream paper, ink text, generous whitespace) with Firefox's oran
 
 ## Third-party assets
 - Country flags in `desktop/src/main/resources/flags/` are from the circle-flags set (MIT licence, github.com/HatScripts/circle-flags).
-- Icons come from the Solar icon set by 480 Design (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Ember uses converted copies in `android/src/main/res/drawable/ic_solar_*` and `desktop/src/main/resources/icons/`.
+- Icons come from the Solar icon set by 480 Design (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Ember uses converted copies in `android/src/main/res/drawable/ic_solar_*` and `desktop/src/main/resources/icons/`, and SVG copies in `flutter/assets/icons/solar/`.
 - Inter font: SIL Open Font License 1.1 (see `design/Inter-LICENSE.txt`).
+- The Flutter module bundles Inter fonts and its license in `flutter/assets/fonts/`, and the Ember logo from `design/brand/` in `flutter/assets/brand/`.
 - Vazirmatn (Persian font, used by the Rust app in right-to-left languages; `ember-rs/ember-ui/ui/assets/fonts/`): SIL Open Font License 1.1, by Saber Rastikerdar.
 - Windows `.ico` files are generated from `brand/ember-logo.png`, Ember's original logo.
 - `sing-box` 1.14.4 is bundled by the Windows app for per-app routing (GPL-3.0-or-later). Its corresponding source is available at [the v1.14.4 source release](https://github.com/SagerNet/sing-box/releases/tag/v1.14.4).

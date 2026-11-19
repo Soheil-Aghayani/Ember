@@ -9,6 +9,7 @@
 ![Windows](https://img.shields.io/badge/Windows-212121?style=for-the-badge&logo=windows&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-212121?style=for-the-badge&logo=rust&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-212121?style=for-the-badge&logo=kotlin&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-212121?style=for-the-badge&logo=flutter&logoColor=white)
 ![License](https://img.shields.io/badge/License_MIT-212121?style=for-the-badge)
 
 </div>
@@ -30,8 +31,8 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 | Device | Status | Notes |
 |---|---|---|
 | Windows PC | Current preview: native Rust app 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; this preview is packaged side-by-side with the earlier Kotlin app. |
-| Android phone | Release APK prepared: 2.7.2 | Android 8.0 or newer; arm64. VPN and QR behavior still need a physical phone check. |
-| Android TV | TV layout and D-pad navigation implemented; generic emulator check passed | Same Android package and arm64 runtime; physical Sony BRAVIA BF1 validation remains pending. |
+| Android phone | Flutter UI port builds locally; runtime validation pending | Android 8.0 or newer; arm64. The Kotlin VPN engine remains native. The Flutter debug build has not been checked on a physical phone. |
+| Android TV | Flutter TV preview APK builds locally; runtime validation pending | Same Android app with a debug-only TV preview package. D-pad behavior on Flutter and physical Sony BRAVIA BF1 validation remain pending. |
 
 | Windows | |
 |---|---|
@@ -50,11 +51,11 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 ## Download
 
-Release candidates and checksums are prepared in the shared Ember app catalogue at `https://app.agseyl.ir/`; this catalogue is intended to host multiple apps.
+The shared app catalogue at `https://app.agseyl.ir/` is intended to host multiple apps. The Flutter port has only been built locally as debug APKs; it is not a signed or published release.
 
 - **Windows:** the Rust 2.0.1 preview installer (Windows 10/11, 64-bit). It remains side-by-side with the older Kotlin app; whole-device networking needs owner verification.
-- **Android phone and TV:** the currently prepared signed arm64 APK is version 2.7.2 (Android 8.0 or newer). The TV layout changes in source need a new signed build before release.
-- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. D-pad behavior was checked on a generic emulator; Sony BRAVIA BF1 launcher, remote, and VPN behavior still need validation.
+- **Android phone and TV:** the catalogue still contains the previous prepared APK, version 2.7.2. A Flutter-backed debug build was compiled locally with the same version code; it needs phone and TV validation, a signed release build, and release review before it can replace the catalogue APK.
+- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. The prior generic emulator checks covered the Compose UI; they do not validate the Flutter UI. Sony BRAVIA BF1 launcher, remote, and VPN behavior remain unverified.
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
 
@@ -73,7 +74,8 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 | Folder | Contents |
 |---|---|
-| `android/` | Android phone and TV app: Kotlin, Jetpack Compose, VPN service, platform-aware screens, resources, and Android build configuration |
+| `android/` | Android phone and TV host: Kotlin Activity bridge, VPN service, platform APIs, resources, and Android build configuration |
+| `flutter/` | Flutter phone/TV UI, native-channel client, app assets, and add-to-app module |
 | `desktop/` | Earlier Windows desktop app: Kotlin/Compose UI, resources, and installer packaging |
 | `ember-rs/` | Current Windows Rust/Slint preview app and installer packaging |
 | `core/` | Platform-neutral JVM logic. The Windows app uses only its logging and connection-check helpers; the rest belongs to the older Android version |
@@ -86,7 +88,7 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 
 Generated `.gradle/`, `.kotlin/`, and module `build/` folders are build output/cache areas, not source. Read [`docs/PROJECT_MAP.md`](docs/PROJECT_MAP.md) for ownership boundaries and the Sony TV compatibility gate.
 
-Design: warm neutrals with orange and violet accents, Inter typeface, Solar icons, round country flags. Source of truth: [`design/tokens.json`](design/tokens.json).
+Design: warm neutrals with orange and violet accents, Inter typeface, Solar icons, round country flags. Source of truth: [`design/tokens.json`](design/tokens.json); Flutter screen styles are centralized in `flutter/lib/ember_ui.dart`.
 
 <br>
 
@@ -107,13 +109,20 @@ powershell -File installer\stage.ps1 -Resources 'C:\Program Files\Ember\app\reso
   "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\Output" installer\ember-rs.iss
 ```
 
-Android needs Android SDK 35 with NDK `26.1.10909125`. A signed arm64 release APK can be built with:
+The Android host now uses Flutter 3.50 with Dart 3.14, Android SDK 36, Gradle 9.5.0, AGP 9.3.1, CMake 3.22.1, and NDK `26.1.10909125`. The Flutter engine also requests NDK `28.2.13676358`. The Gradle wrapper pins version 9.5.0 and verifies the official distribution checksum.
 
-```bash
-tools/build-apk.ps1
+Fetch Flutter dependencies and build the phone APK:
+
+```powershell
+Set-Location flutter
+flutter pub get
+Set-Location ..
+.\gradlew.bat :android:assembleDebug
 ```
 
-The Android debug APK is written to `android/build/outputs/apk/debug/android-debug.apk`. Android unit tests are currently absent; Gradle's `:android:testDebugUnitTest` task therefore has no sources.
+Build the debug-only TV layout with `.\gradlew.bat :android:assembleDebug -PtvPreview`; it uses the `.tvpreview` package suffix. Both builds write `android/build/outputs/apk/debug/android-debug.apk`, so save the first APK before building the other variant. These are local debug packages, not release artifacts.
+
+The signed release script (`tools/build-apk.ps1`) was not run for the Flutter port. Review and update its toolchain before preparing a signed Android release.
 
 The helper's unit tests run with `cargo test --manifest-path helper/Cargo.toml`.
 
