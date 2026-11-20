@@ -246,8 +246,8 @@ export component SettingsPage inherits Rectangle {
                         }
                         Divider { }
                         ChoiceRow {
-                            title: Tr.appearance; selected: root.d.theme; current-label: root.d.theme == "Light" ? Tr.light : (root.d.theme == "Dark" ? Tr.dark : (root.d.theme == "Mint" ? Tr.mint : Tr.system)); picked(v) => { root.theme-chosen(v); }
-                            options: [{ value: "Light", label: Tr.light }, { value: "Dark", label: Tr.dark }, { value: "Mint", label: Tr.mint }, { value: "System", label: Tr.system }];
+                            title: Tr.appearance; selected: root.d.theme; current-label: root.d.theme == "Light" ? Tr.light : (root.d.theme == "Dark" ? Tr.dark : (root.d.theme == "Mint" ? Tr.mint : (root.d.theme == "KitKat" ? Tr.kitkat : Tr.system))); picked(v) => { root.theme-chosen(v); }
+                            options: [{ value: "Light", label: Tr.light }, { value: "Dark", label: Tr.dark }, { value: "Mint", label: Tr.mint }, { value: "KitKat", label: Tr.kitkat }, { value: "System", label: Tr.system }];
                         }
                         Divider { }
                         NavRow { title: Tr.startup-tray; clicked => { root.section = 1; } }

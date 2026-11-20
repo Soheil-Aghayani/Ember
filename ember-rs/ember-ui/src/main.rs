@@ -54,24 +54,25 @@ struct SpriteCache {
     diameter: u32,
     scale: f32,
     mint: bool,
+    kitkat: bool,
     off: bool,
     on: bool,
 }
 
 impl SpriteCache {
-    fn ensure(&mut self, app: &App, diameter: u32, scale: f32, lit: f32, mint: bool) {
+    fn ensure(&mut self, app: &App, diameter: u32, scale: f32, lit: f32, mint: bool, kitkat: bool) {
         let m = app.global::<Motion>();
-        let fresh = diameter != self.diameter || scale != self.scale || mint != self.mint;
+        let fresh = diameter != self.diameter || scale != self.scale || mint != self.mint || kitkat != self.kitkat;
         if fresh {
-            *self = SpriteCache { diameter, scale, mint, off: false, on: false };
+            *self = SpriteCache { diameter, scale, mint, kitkat, off: false, on: false };
         }
         if lit < 0.999 && !self.off {
             self.off = true;
-            m.set_sphere_off(sphere::sprite(diameter, 0.0, mint));
+            m.set_sphere_off(sphere::sprite(diameter, 0.0, mint, kitkat));
         }
         if lit > 0.001 && !self.on {
             self.on = true;
-            m.set_sphere_on(sphere::sprite(diameter, 1.0, mint));
+            m.set_sphere_on(sphere::sprite(diameter, 1.0, mint, kitkat));
         }
         if fresh {
             m.set_sprite_size((diameter + 2 * sphere::PAD) as f32 / scale);
@@ -309,6 +310,7 @@ fn apply_language(app: &App, language: &str) {
     tr.set_light(s.light.into());
     tr.set_dark(s.dark.into());
     tr.set_mint(s.mint.into());
+    tr.set_kitkat(s.kitkat.into());
     tr.set_system(s.system.into());
     tr.set_startup_tray(s.startup_and_tray.into());
     tr.set_protection(s.protection.into());
@@ -465,12 +467,13 @@ fn push_static_pages(app: &App, data_dir: &std::path::Path) {
     app.set_releases(about::releases(lang::code(), env!("CARGO_PKG_VERSION")));
 }
 
-/// The look for an Appearance value ("Light", "Dark", "Mint" or "System"): 0 Strawberry chocolate, 1 Dark chocolate, 2 Mint chocolate.
+/// The look for an Appearance value: 0 Strawberry, 1 Dark, 2 Mint, 3 KitKat.
 fn flavour(theme: &str, forced: Option<i32>) -> i32 {
     forced.unwrap_or_else(|| match theme {
         "Light" => 0,
         "Dark" => 1,
         "Mint" => 2,
+        "KitKat" => 3,
         _ => i32::from(ember_win::theme::apps_use_dark()),
     })
 }
@@ -1189,8 +1192,8 @@ fn main() {
     }
 
     let app = App::new().unwrap();
-    // --light / --dark force the look (for screenshots); otherwise the Appearance setting decides
-    let forced_theme = if has("--light") { Some(0) } else if has("--dark") { Some(1) } else if has("--mint") { Some(2) } else { None };
+    // --light / --dark / --mint / --kitkat force the look; otherwise the Appearance setting decides
+    let forced_theme = if has("--light") { Some(0) } else if has("--dark") { Some(1) } else if has("--mint") { Some(2) } else if has("--kitkat") { Some(3) } else { None };
     app.global::<Palette>().set_flavour(flavour(&engine.settings().theme(), forced_theme));
     let language = if has("--fa") { "fa".to_string() } else { engine.settings().language() };
     lang::set(&language);
@@ -1493,7 +1496,7 @@ fn main() {
             // the sphere itself is made again for its current pixel size (176 logical, scaled by the spring and the pointer)
             let scale = app.window().scale_factor();
             let diameter = ((176.0 * scale * motion.pop * motion.feel).round() as u32).max(16);
-            motion.sprites.ensure(&app, diameter, scale, motion.lit, app.global::<Palette>().get_mint());
+            motion.sprites.ensure(&app, diameter, scale, motion.lit, app.global::<Palette>().get_mint(), app.global::<Palette>().get_kitkat());
             let m = app.global::<Motion>();
             m.set_feel(motion.feel);
             m.set_list_t(motion.list_t);

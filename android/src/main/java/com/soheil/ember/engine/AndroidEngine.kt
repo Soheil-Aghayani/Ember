@@ -91,6 +91,16 @@ class AndroidEngine(private val context: Context) {
         _language.value = code
     }
 
+    private val _appearance = MutableStateFlow(prefs.getString("appearance", "system") ?: "system")
+
+    /** "system", "light", "dark", "mint" or "kitkat". */
+    val appearance: StateFlow<String> = _appearance
+
+    fun setAppearance(flavour: String) {
+        prefs.edit().putString("appearance", flavour).apply()
+        _appearance.value = flavour
+    }
+
     /** The words for the language in use; the service and this engine write their messages with it. */
     val strings: Strings get() = stringsFor(_language.value)
 

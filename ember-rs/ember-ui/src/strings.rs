@@ -192,6 +192,7 @@ pub struct Strings {
     pub sounds: &'static str,
     pub sounds_help: &'static str,
     pub mint: &'static str,
+    pub kitkat: &'static str,
 }
 
 pub const EN: Strings = Strings {
@@ -383,6 +384,7 @@ pub const EN: Strings = Strings {
     sounds: "Play a soft sound when connecting and disconnecting",
     sounds_help: "A short chime, quiet by design.",
     mint: "Mint",
+    kitkat: "KitKat",
 };
 
 pub const FA: Strings = Strings {
@@ -574,6 +576,7 @@ pub const FA: Strings = Strings {
     sounds: "پخش صدای ملایم هنگام اتصال و قطع",
     sounds_help: "یک زنگ کوتاه و آرام.",
     mint: "نعنا",
+    kitkat: "کیت‌کت",
 };
 
 pub fn for_language(code: &str) -> &'static Strings {

@@ -131,6 +131,7 @@ class MainActivity : FlutterFragmentActivity() {
         engine.testProgress.map { Unit },
         engine.notice.map { Unit },
         engine.language.map { Unit },
+        engine.appearance.map { Unit },
         engine.autoFailover.map { Unit },
         engine.appMode.map { Unit },
         engine.appPackages.map { Unit },
@@ -159,6 +160,7 @@ class MainActivity : FlutterFragmentActivity() {
             "notice" to engine.notice.value,
             "settings" to mapOf(
                 "language" to engine.language.value,
+                "appearance" to engine.appearance.value,
                 "autoFailover" to engine.autoFailover.value,
                 "appMode" to engine.appMode.value,
                 "appPackages" to engine.appPackages.value.toList(),
@@ -287,6 +289,14 @@ class MainActivity : FlutterFragmentActivity() {
                 if (code !in setOf("system", "en", "fa")) result.error("invalid_language", "Choose a supported language.", null)
                 else {
                     engine.setLanguage(code)
+                    result.success(null)
+                }
+            }
+            "setAppearance" -> {
+                val flavour = call.requiredString("flavour", result) ?: return
+                if (flavour !in setOf("system", "light", "dark", "mint", "kitkat")) result.error("invalid_appearance", "Choose a supported appearance.", null)
+                else {
+                    engine.setAppearance(flavour)
                     result.success(null)
                 }
             }

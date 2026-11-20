@@ -11,6 +11,11 @@ const OFF: [(f32, [f32; 3]); 6] = [
     (0.42, [0x76 as f32, 0x7F as f32, 0xA4 as f32]), (0.60, [0x6A as f32, 0x72 as f32, 0x98 as f32]),
     (0.78, [0x8C as f32, 0x82 as f32, 0xA6 as f32]), (1.0, [0xD0 as f32, 0xA2 as f32, 0x94 as f32]),
 ];
+const OFF_KITKAT: [(f32, [f32; 3]); 6] = [
+    (0.0, [0xD7 as f32, 0xA9 as f32, 0xA0 as f32]), (0.22, [0xC7 as f32, 0x78 as f32, 0x70 as f32]),
+    (0.42, [0xAB as f32, 0x4B as f32, 0x4C as f32]), (0.60, [0x8B as f32, 0x30 as f32, 0x36 as f32]),
+    (0.78, [0x9B as f32, 0x48 as f32, 0x40 as f32]), (1.0, [0xE4 as f32, 0xB5 as f32, 0x90 as f32]),
+];
 const ON: [(f32, [f32; 3]); 6] = [
     (0.0, [0x4E as f32, 0x1C as f32, 0xD6 as f32]), (0.22, [0x82 as f32, 0x22 as f32, 0xD6 as f32]),
     (0.42, [0xCE as f32, 0x24 as f32, 0x96 as f32]), (0.60, [0xF0 as f32, 0x34 as f32, 0x46 as f32]),
@@ -22,6 +27,11 @@ const ON_MINT: [(f32, [f32; 3]); 6] = [
     (0.0, [0x0B as f32, 0x4F as f32, 0x6C as f32]), (0.22, [0x0F as f32, 0x7A as f32, 0x7A as f32]),
     (0.42, [0x1F as f32, 0xB0 as f32, 0x8A as f32]), (0.60, [0x4F as f32, 0xD6 as f32, 0xA0 as f32]),
     (0.78, [0x9A as f32, 0xF0 as f32, 0xB8 as f32]), (1.0, [0xE0 as f32, 0xFF as f32, 0xC8 as f32]),
+];
+const ON_KITKAT: [(f32, [f32; 3]); 6] = [
+    (0.0, [0x4F as f32, 0x17 as f32, 0x20 as f32]), (0.22, [0x8C as f32, 0x1C as f32, 0x2A as f32]),
+    (0.42, [0xC1 as f32, 0x26 as f32, 0x38 as f32]), (0.60, [0xE1 as f32, 0x48 as f32, 0x3B as f32]),
+    (0.78, [0xF4 as f32, 0x7B as f32, 0x40 as f32]), (1.0, [0xFF as f32, 0xC9 as f32, 0x8A as f32]),
 ];
 
 fn ramp(stops: &[(f32, [f32; 3]); 6], t: f32) -> [f32; 3] {
@@ -45,7 +55,7 @@ fn dither(x: u32, y: u32) -> f32 {
 }
 
 /// `size` is the sphere's diameter; the buffer is `pad` pixels larger on every side so the renderer's rounding never clips it.
-fn pixels(size: u32, pad: u32, lit: f32, mint: bool) -> Vec<u8> {
+fn pixels(size: u32, pad: u32, lit: f32, mint: bool, kitkat: bool) -> Vec<u8> {
     let r = size as f32 / 2.0;
     let total = size + 2 * pad;
     let centre = total as f32 / 2.0;
@@ -57,7 +67,7 @@ fn pixels(size: u32, pad: u32, lit: f32, mint: bool) -> Vec<u8> {
             let d = (x * x + y * y).sqrt();
             let edge = ((1.0 - d) * r + 0.5).clamp(0.0, 1.0);
             if edge <= 0.0 { continue; }
-            let stops = if lit <= 0.5 { &OFF } else if mint { &ON_MINT } else { &ON };
+            let stops = if lit <= 0.5 { if kitkat { &OFF_KITKAT } else { &OFF } } else if mint { &ON_MINT } else if kitkat { &ON_KITKAT } else { &ON };
             let mut c = ramp(stops, (y + 1.0) / 2.0);
             // soft highlight, upper left
             let hd = ((x + 0.35).powi(2) + (y + 0.45).powi(2)).sqrt() / 0.62;
@@ -86,9 +96,9 @@ pub const PAD: u32 = 4;
 
 /// One sprite (`lit` 0 is the off sphere, 1 the on sphere): a sphere `diameter` pixels across inside a buffer `PAD`
 /// pixels larger on every side. It is drawn 1:1, so it is made again for every size the sphere takes while it pops.
-pub fn sprite(diameter: u32, lit: f32, mint: bool) -> Image {
+pub fn sprite(diameter: u32, lit: f32, mint: bool, kitkat: bool) -> Image {
     let total = diameter + 2 * PAD;
     let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(total, total);
-    buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, PAD, lit, mint));
+    buffer.make_mut_bytes().copy_from_slice(&pixels(diameter, PAD, lit, mint, kitkat));
     Image::from_rgba8(buffer)
 }
