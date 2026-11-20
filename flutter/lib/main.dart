@@ -95,19 +95,13 @@ class _EmberAppState extends State<EmberApp> {
 
   @override
   Widget build(BuildContext context) {
-    final appearance = _state?.appearance ?? 'system';
-    final kitkat = appearance == 'kitkat';
-    final mint = appearance == 'mint' || appearance == 'system';
+    final brightness = MediaQuery.platformBrightnessOf(context);
     return MaterialApp(
       title: 'Ember',
       debugShowCheckedModeBanner: false,
-      theme: _theme(Brightness.light, mint: mint, kitkat: kitkat),
-      darkTheme: _theme(Brightness.dark, mint: false, kitkat: false),
-      themeMode: switch (appearance) {
-        'light' || 'mint' || 'kitkat' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      },
+      theme: _theme(Brightness.light),
+      darkTheme: _theme(Brightness.dark),
+      themeMode: ThemeMode.system,
       scaffoldMessengerKey: _messengerKey,
       home: _state == null
           ? const _LaunchScreen()
@@ -121,7 +115,6 @@ class _EmberAppState extends State<EmberApp> {
               ),
             ),
       builder: (context, child) {
-        final brightness = Theme.of(context).brightness;
         SystemChrome.setSystemUIOverlayStyle(
           SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
@@ -144,29 +137,8 @@ class _EmberAppState extends State<EmberApp> {
       (state.language == 'system' &&
           ui.PlatformDispatcher.instance.locale.languageCode == 'fa');
 
-  ThemeData _theme(
-    Brightness brightness, {
-    required bool mint,
-    required bool kitkat,
-  }) {
-    const strawberryLight = ColorScheme.light(
-      primary: Color(0xFF9C3107),
-      onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFFBE6DA),
-      onPrimaryContainer: Color(0xFF641B00),
-      secondary: Color(0xFF6A3BD1),
-      onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: Color(0xFFECE5FA),
-      onSecondaryContainer: Color(0xFF32136D),
-      tertiary: Color(0xFF1E7A3C),
-      error: Color(0xFFBA1A1A),
-      surface: Color(0xFFFFFFFF),
-      onSurface: Color(0xFF1F1B16),
-      onSurfaceVariant: Color(0xFF534C44),
-      outline: Color(0xFF80776A),
-      outlineVariant: Color(0xFFE4DDD1),
-    );
-    const mintLight = ColorScheme.light(
+  ThemeData _theme(Brightness brightness) {
+    const light = ColorScheme.light(
       primary: EmberColors.mintPrimary,
       onPrimary: Color(0xFFFFFFFF),
       primaryContainer: Color(0xFFD7EEE5),
@@ -182,23 +154,6 @@ class _EmberAppState extends State<EmberApp> {
       onSurfaceVariant: Color(0xFF51443C),
       outline: Color(0xFF7E978A),
       outlineVariant: EmberColors.mintOutline,
-    );
-    const kitkatLight = ColorScheme.light(
-      primary: EmberColors.kitkatPrimary,
-      onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFF8D9D8),
-      onPrimaryContainer: Color(0xFF65101C),
-      secondary: Color(0xFF6C382C),
-      onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: EmberColors.kitkatSurfaceVariant,
-      onSecondaryContainer: Color(0xFF4B2119),
-      tertiary: Color(0xFF1E7A3C),
-      error: Color(0xFFBA1A1A),
-      surface: EmberColors.kitkatSurface,
-      onSurface: Color(0xFF2D1715),
-      onSurfaceVariant: Color(0xFF61443C),
-      outline: Color(0xFF8A6559),
-      outlineVariant: EmberColors.kitkatOutline,
     );
     const dark = ColorScheme.dark(
       primary: Color(0xFFFF8D5C),
@@ -217,13 +172,7 @@ class _EmberAppState extends State<EmberApp> {
       outline: Color(0xFF80786C),
       outlineVariant: Color(0xFF3A342D),
     );
-    final scheme = brightness == Brightness.dark
-        ? dark
-        : kitkat
-        ? kitkatLight
-        : mint
-        ? mintLight
-        : strawberryLight;
+    final scheme = brightness == Brightness.dark ? dark : light;
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -231,22 +180,7 @@ class _EmberAppState extends State<EmberApp> {
       fontFamily: 'Inter',
       scaffoldBackgroundColor: brightness == Brightness.dark
           ? const Color(0xFF1A1714)
-          : kitkat
-          ? EmberColors.kitkatBackground
-          : mint
-          ? EmberColors.mintBackground
-          : const Color(0xFFFAF7F2),
-      extensions: [
-        EmberThemeVariant(
-          flavour: brightness == Brightness.dark
-              ? 'dark'
-              : kitkat
-              ? 'kitkat'
-              : mint
-              ? 'mint'
-              : 'strawberry',
-        ),
-      ],
+          : EmberColors.mintBackground,
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           fontSize: 32,

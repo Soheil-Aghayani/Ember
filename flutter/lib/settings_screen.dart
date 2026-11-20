@@ -34,28 +34,6 @@ class SettingsScreen extends StatelessWidget {
           child: _languageOptions(context),
         ),
         const SizedBox(height: 14),
-        _sectionTitle(context, copy.get('settingsAppearance')),
-        EmberCard(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: RadioGroup<String>(
-            groupValue: state.appearance,
-            onChanged: (value) {
-              if (value != null) {
-                ui.run(() => ui.api.setAppearance(value));
-              }
-            },
-            child: Column(
-              children: [
-                _appearanceOption('system', copy.get('system')),
-                _appearanceOption('light', copy.get('appearanceStrawberry')),
-                _appearanceOption('dark', copy.get('appearanceDarkChoco')),
-                _appearanceOption('mint', copy.get('appearanceMint')),
-                _appearanceOption('kitkat', copy.get('appearanceKitkat')),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
         EmberCard(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: SwitchListTile(
@@ -198,13 +176,6 @@ class SettingsScreen extends StatelessWidget {
     title: Text(label),
     controlAffinity: ListTileControlAffinity.leading,
   );
-
-  Widget _appearanceOption(String flavour, String label) =>
-      RadioListTile<String>(
-        value: flavour,
-        title: Text(label),
-        controlAffinity: ListTileControlAffinity.leading,
-      );
 
   Widget _sectionTitle(BuildContext context, String title) => Padding(
     padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),

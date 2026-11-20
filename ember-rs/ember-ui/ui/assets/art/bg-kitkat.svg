@@ -1,40 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
   <defs>
-    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFF8F1" />
-      <stop offset="0.52" stop-color="#FFF4EC" />
-      <stop offset="1" stop-color="#F7E8DF" />
+    <linearGradient id="vanilla" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF0D1" />
+      <stop offset="0.52" stop-color="#FFF8EA" />
+      <stop offset="1" stop-color="#F8EFD9" />
     </linearGradient>
-    <radialGradient id="berry-glow" cx="94%" cy="14%" r="66%">
-      <stop offset="0" stop-color="#F3A3A1" stop-opacity="0.30" />
-      <stop offset="1" stop-color="#F3A3A1" stop-opacity="0" />
+    <linearGradient id="cherry" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F44E70" />
+      <stop offset="1" stop-color="#C9233D" />
+    </linearGradient>
+    <linearGradient id="caramel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE27A" />
+      <stop offset="1" stop-color="#FFAE38" />
+    </linearGradient>
+    <linearGradient id="aqua" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#92E1CC" />
+      <stop offset="1" stop-color="#36AA9E" />
+    </linearGradient>
+    <radialGradient id="clear-center" cx="48%" cy="46%" r="64%">
+      <stop offset="0" stop-color="#FFFDF7" stop-opacity="0.76" />
+      <stop offset="0.56" stop-color="#FFFDF7" stop-opacity="0.38" />
+      <stop offset="1" stop-color="#FFFDF7" stop-opacity="0" />
     </radialGradient>
-    <radialGradient id="caramel-glow" cx="4%" cy="96%" r="70%">
-      <stop offset="0" stop-color="#E8B474" stop-opacity="0.22" />
-      <stop offset="1" stop-color="#E8B474" stop-opacity="0" />
-    </radialGradient>
-    <radialGradient id="center-clear" cx="48%" cy="42%" r="70%">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.62" />
-      <stop offset="0.58" stop-color="#FFFFFF" stop-opacity="0.18" />
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
-    </radialGradient>
-    <pattern id="wafer-stripes" width="84" height="84" patternUnits="userSpaceOnUse" patternTransform="rotate(32)">
-      <rect width="84" height="84" fill="none" />
-      <rect width="14" height="84" fill="#B32634" fill-opacity="0.09" />
-      <rect x="42" width="9" height="84" fill="#6C382C" fill-opacity="0.07" />
-    </pattern>
-    <radialGradient id="edge-mask" cx="50%" cy="48%" r="73%">
-      <stop offset="0.42" stop-color="#000000" stop-opacity="0" />
-      <stop offset="0.78" stop-color="#000000" stop-opacity="0.12" />
-      <stop offset="1" stop-color="#000000" stop-opacity="0.58" />
-    </radialGradient>
-    <mask id="edge-fade">
-      <rect width="1600" height="1200" fill="url(#edge-mask)" />
-    </mask>
   </defs>
-  <rect width="1600" height="1200" fill="url(#base)" />
-  <rect width="1600" height="1200" fill="url(#berry-glow)" />
-  <rect width="1600" height="1200" fill="url(#caramel-glow)" />
-  <rect width="1600" height="1200" fill="url(#wafer-stripes)" mask="url(#edge-fade)" />
-  <rect width="1600" height="1200" fill="url(#center-clear)" />
+
+  <rect width="1600" height="1200" fill="url(#vanilla)" />
+
+  <!-- Oversized color fields stay at the edges so the controls remain easy to read. -->
+  <path d="M1030 -70 C1215 40 1365 34 1605 0 L1605 312 C1460 346 1320 288 1210 218 C1102 150 1044 88 1030 -70Z" fill="#F45B78" fill-opacity="0.23" />
+  <path d="M1205 -50 C1334 70 1450 91 1610 64" fill="none" stroke="url(#caramel)" stroke-width="76" stroke-linecap="round" stroke-opacity="0.88" />
+  <path d="M1020 70 C1195 196 1336 221 1548 196" fill="none" stroke="#FFF8EA" stroke-width="22" stroke-linecap="round" stroke-opacity="0.84" />
+
+  <path d="M1036 1200 C1148 1055 1198 942 1324 903 C1450 864 1533 928 1600 856 L1600 1200Z" fill="#FFC84B" fill-opacity="0.40" />
+  <path d="M1230 1200 C1340 1073 1438 1048 1600 1080" fill="none" stroke="url(#cherry)" stroke-width="82" stroke-linecap="round" stroke-opacity="0.44" />
+  <path d="M1130 1190 C1267 1058 1402 1021 1592 1034" fill="none" stroke="#FFFDF7" stroke-width="24" stroke-linecap="round" stroke-opacity="0.82" />
+  <path d="M150 1120 C270 1032 385 1010 518 1045" fill="none" stroke="url(#aqua)" stroke-width="48" stroke-linecap="round" stroke-opacity="0.24" />
+
+  <!-- Small wrapped sweets: simple, abstract shapes rather than product artwork. -->
+  <g transform="translate(1395 365) rotate(22)" opacity="0.76">
+    <path d="M-82 -21 L-126 -48 L-120 1 L-82 18Z" fill="#F45B78" />
+    <path d="M82 -21 L126 -48 L120 1 L82 18Z" fill="#FFB33E" />
+    <rect x="-90" y="-28" width="180" height="56" rx="28" fill="url(#cherry)" />
+    <path d="M-45 -25 C-26 -3 -26 5 -45 25" fill="none" stroke="#FFF8EA" stroke-width="8" stroke-linecap="round" stroke-opacity="0.82" />
+    <path d="M7 -26 C26 -4 26 4 7 26" fill="none" stroke="#FFDA73" stroke-width="8" stroke-linecap="round" stroke-opacity="0.92" />
+  </g>
+  <g transform="translate(1385 890) rotate(-20) scale(0.78)" opacity="0.72">
+    <path d="M-82 -21 L-126 -48 L-120 1 L-82 18Z" fill="#43B5A6" />
+    <path d="M82 -21 L126 -48 L120 1 L82 18Z" fill="#F45B78" />
+    <rect x="-90" y="-28" width="180" height="56" rx="28" fill="url(#aqua)" />
+    <path d="M-35 -25 C-17 -3 -17 5 -35 25" fill="none" stroke="#FFFDF7" stroke-width="9" stroke-linecap="round" stroke-opacity="0.88" />
+    <path d="M20 -26 C38 -4 38 4 20 26" fill="none" stroke="#FFE27A" stroke-width="9" stroke-linecap="round" />
+  </g>
+
+  <!-- A few crisp candy dots give the composition a playful, printed-wrapper rhythm. -->
+  <circle cx="1220" cy="378" r="17" fill="#FFB33E" fill-opacity="0.78" />
+  <circle cx="1502" cy="499" r="11" fill="#43B5A6" fill-opacity="0.74" />
+  <circle cx="1282" cy="524" r="8" fill="#F45B78" fill-opacity="0.78" />
+  <circle cx="1515" cy="782" r="19" fill="#F45B78" fill-opacity="0.66" />
+  <circle cx="1190" cy="962" r="12" fill="#43B5A6" fill-opacity="0.72" />
+  <circle cx="1074" cy="1053" r="8" fill="#FFB33E" fill-opacity="0.86" />
+  <circle cx="310" cy="1012" r="10" fill="#F45B78" fill-opacity="0.42" />
+  <circle cx="386" cy="1070" r="6" fill="#FFB33E" fill-opacity="0.68" />
+
+  <rect width="1600" height="1200" fill="url(#clear-center)" />
 </svg>

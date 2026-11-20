@@ -123,7 +123,6 @@ class EmberState {
     required this.phase,
     required this.selectedId,
     required this.language,
-    required this.appearance,
     required this.autoFailover,
     required this.appMode,
     required this.appPackages,
@@ -146,7 +145,6 @@ class EmberState {
   final String phase;
   final String selectedId;
   final String language;
-  final String appearance;
   final bool autoFailover;
   final String appMode;
   final Set<String> appPackages;
@@ -180,7 +178,6 @@ class EmberState {
       phase: vpn['phase'] as String? ?? 'disconnected',
       selectedId: data['selectedId'] as String? ?? 'auto',
       language: settings['language'] as String? ?? 'system',
-      appearance: settings['appearance'] as String? ?? 'system',
       autoFailover: settings['autoFailover'] as bool? ?? true,
       appMode: settings['appMode'] as String? ?? 'off',
       appPackages: (settings['appPackages'] as List? ?? const [])
@@ -262,8 +259,6 @@ class EmberApi {
   Future<void> clearNotice() => _methods.invokeMethod<void>('clearNotice');
   Future<void> setLanguage(String code) =>
       _methods.invokeMethod<void>('setLanguage', {'code': code});
-  Future<void> setAppearance(String flavour) =>
-      _methods.invokeMethod<void>('setAppearance', {'flavour': flavour});
   Future<void> setAutoFailover(bool enabled) =>
       _methods.invokeMethod<void>('setAutoFailover', {'enabled': enabled});
   Future<void> setAppMode(String mode) =>

@@ -180,65 +180,6 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _orb(BuildContext context, EmberState state, double size) {
     final connected = state.connected;
     final connecting = state.connecting;
-    final kitkat = EmberThemeVariant.of(context) == 'kitkat';
-    final orbColors = kitkat
-        ? connected
-              ? const <Color>[
-                  Color(0xFF4F1720),
-                  Color(0xFF8C1C2A),
-                  Color(0xFFC12638),
-                  Color(0xFFE1483B),
-                  Color(0xFFF47B40),
-                  Color(0xFFFFC98A),
-                ]
-              : connecting
-              ? const <Color>[
-                  Color(0xFFE6CDC6),
-                  Color(0xFFD7B6AD),
-                  Color(0xFFC8A197),
-                  Color(0xFFB89087),
-                  Color(0xFFD0B1A1),
-                  Color(0xFFEDE0D2),
-                ]
-              : const <Color>[
-                  Color(0xFFD7A9A0),
-                  Color(0xFFC77870),
-                  Color(0xFFAB4B4C),
-                  Color(0xFF8B3036),
-                  Color(0xFF9B4840),
-                  Color(0xFFE4B590),
-                ]
-        : connected
-        ? const <Color>[
-            Color(0xFF0B4F6C),
-            Color(0xFF0F7A7A),
-            Color(0xFF1FB08A),
-            Color(0xFF4FD6A0),
-            Color(0xFF9AF0B8),
-            Color(0xFFE0FFC8),
-          ]
-        : connecting
-        ? const <Color>[
-            Color(0xFFB1BECD),
-            Color(0xFF9AAEBE),
-            Color(0xFF849DAE),
-            Color(0xFF7D969F),
-            Color(0xFF9BB6AB),
-            Color(0xFFD4DCC8),
-          ]
-        : const <Color>[
-            Color(0xFFB4BCD6),
-            Color(0xFF929BBC),
-            Color(0xFF767FA4),
-            Color(0xFF6A7298),
-            Color(0xFF8C82A6),
-            Color(0xFFD0A294),
-          ];
-    final glowColor = kitkat
-        ? EmberColors.kitkatOrb
-        : connected
-        ? EmberColors.mintOrb
-        : const Color(0xFF8C82A6);
     return RepaintBoundary(
       child: SizedBox(
         width: size,
@@ -253,8 +194,6 @@ class _HomeScreenState extends State<HomeScreen>
                   animation: _orbit,
                   orbitColor: Theme.of(context).brightness == Brightness.dark
                       ? Colors.white
-                      : kitkat
-                      ? EmberColors.kitkatOrb
                       : EmberColors.mintOrb,
                   connected: connected,
                 ),
@@ -290,7 +229,32 @@ class _HomeScreenState extends State<HomeScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: orbColors,
+                      colors: connected
+                          ? const [
+                              Color(0xFF0B4F6C),
+                              Color(0xFF0F7A7A),
+                              Color(0xFF1FB08A),
+                              Color(0xFF4FD6A0),
+                              Color(0xFF9AF0B8),
+                              Color(0xFFE0FFC8),
+                            ]
+                          : connecting
+                          ? const [
+                              Color(0xFFB1BECD),
+                              Color(0xFF9AAEBE),
+                              Color(0xFF849DAE),
+                              Color(0xFF7D969F),
+                              Color(0xFF9BB6AB),
+                              Color(0xFFD4DCC8),
+                            ]
+                          : const [
+                              Color(0xFFB4BCD6),
+                              Color(0xFF929BBC),
+                              Color(0xFF767FA4),
+                              Color(0xFF6A7298),
+                              Color(0xFF8C82A6),
+                              Color(0xFFD0A294),
+                            ],
                       stops: const [0, .22, .42, .60, .78, 1],
                     ),
                     border: Border.all(
@@ -304,7 +268,11 @@ class _HomeScreenState extends State<HomeScreen>
                         offset: const Offset(0, 8),
                       ),
                       BoxShadow(
-                        color: glowColor.withValues(alpha: .19),
+                        color:
+                            (connected
+                                    ? EmberColors.mintOrb
+                                    : const Color(0xFF8C82A6))
+                                .withValues(alpha: .19),
                         blurRadius: 28,
                         spreadRadius: 1,
                       ),

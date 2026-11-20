@@ -12,9 +12,9 @@ const OFF: [(f32, [f32; 3]); 6] = [
     (0.78, [0x8C as f32, 0x82 as f32, 0xA6 as f32]), (1.0, [0xD0 as f32, 0xA2 as f32, 0x94 as f32]),
 ];
 const OFF_KITKAT: [(f32, [f32; 3]); 6] = [
-    (0.0, [0xD7 as f32, 0xA9 as f32, 0xA0 as f32]), (0.22, [0xC7 as f32, 0x78 as f32, 0x70 as f32]),
-    (0.42, [0xAB as f32, 0x4B as f32, 0x4C as f32]), (0.60, [0x8B as f32, 0x30 as f32, 0x36 as f32]),
-    (0.78, [0x9B as f32, 0x48 as f32, 0x40 as f32]), (1.0, [0xE4 as f32, 0xB5 as f32, 0x90 as f32]),
+    (0.0, [0xFF as f32, 0xD0 as f32, 0xA8 as f32]), (0.22, [0xFF as f32, 0x9B as f32, 0x88 as f32]),
+    (0.42, [0xEE as f32, 0x5C as f32, 0x79 as f32]), (0.60, [0xCF as f32, 0x31 as f32, 0x58 as f32]),
+    (0.78, [0xE7 as f32, 0x4D as f32, 0x4F as f32]), (1.0, [0xFF as f32, 0xD0 as f32, 0x60 as f32]),
 ];
 const ON: [(f32, [f32; 3]); 6] = [
     (0.0, [0x4E as f32, 0x1C as f32, 0xD6 as f32]), (0.22, [0x82 as f32, 0x22 as f32, 0xD6 as f32]),
@@ -29,9 +29,9 @@ const ON_MINT: [(f32, [f32; 3]); 6] = [
     (0.78, [0x9A as f32, 0xF0 as f32, 0xB8 as f32]), (1.0, [0xE0 as f32, 0xFF as f32, 0xC8 as f32]),
 ];
 const ON_KITKAT: [(f32, [f32; 3]); 6] = [
-    (0.0, [0x4F as f32, 0x17 as f32, 0x20 as f32]), (0.22, [0x8C as f32, 0x1C as f32, 0x2A as f32]),
-    (0.42, [0xC1 as f32, 0x26 as f32, 0x38 as f32]), (0.60, [0xE1 as f32, 0x48 as f32, 0x3B as f32]),
-    (0.78, [0xF4 as f32, 0x7B as f32, 0x40 as f32]), (1.0, [0xFF as f32, 0xC9 as f32, 0x8A as f32]),
+    (0.0, [0x55 as f32, 0x20 as f32, 0x37 as f32]), (0.22, [0x9F as f32, 0x1F as f32, 0x45 as f32]),
+    (0.42, [0xD8 as f32, 0x2D as f32, 0x52 as f32]), (0.60, [0xF2 as f32, 0x4F as f32, 0x55 as f32]),
+    (0.78, [0xFF as f32, 0x88 as f32, 0x47 as f32]), (1.0, [0xFF as f32, 0xE0 as f32, 0x71 as f32]),
 ];
 
 fn ramp(stops: &[(f32, [f32; 3]); 6], t: f32) -> [f32; 3] {

@@ -10,29 +10,6 @@ abstract final class EmberColors {
   static const mintSurfaceVariant = Color(0xFFE3F0E8);
   static const mintOutline = Color(0xFFCBE2D6);
   static const mintOrb = Color(0xFF2F8F78);
-  static const kitkatPrimary = Color(0xFFB32634);
-  static const kitkatBackground = Color(0xFFFFF6EE);
-  static const kitkatSurface = Color(0xFFFFFCF8);
-  static const kitkatSurfaceVariant = Color(0xFFF3DCD5);
-  static const kitkatOutline = Color(0xFFE6CBC0);
-  static const kitkatOrb = Color(0xFFA51F2B);
-}
-
-class EmberThemeVariant extends ThemeExtension<EmberThemeVariant> {
-  const EmberThemeVariant({required this.flavour});
-
-  final String flavour;
-
-  static String of(BuildContext context) =>
-      Theme.of(context).extension<EmberThemeVariant>()?.flavour ?? 'mint';
-
-  @override
-  EmberThemeVariant copyWith({String? flavour}) =>
-      EmberThemeVariant(flavour: flavour ?? this.flavour);
-
-  @override
-  EmberThemeVariant lerp(ThemeExtension<EmberThemeVariant>? other, double t) =>
-      other is EmberThemeVariant && t >= .5 ? other : this;
 }
 
 typedef EmberRunner = Future<T?> Function<T>(
@@ -62,16 +39,12 @@ class EmberBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final kitkat = EmberThemeVariant.of(context) == 'kitkat';
     return Stack(
       fit: StackFit.expand,
       children: [
         dark
             ? Image.asset('assets/art/bg-dark.png', fit: BoxFit.cover)
-            : SvgPicture.asset(
-                kitkat ? 'assets/art/bg-kitkat.svg' : 'assets/art/bg-mint.svg',
-                fit: BoxFit.cover,
-              ),
+            : SvgPicture.asset('assets/art/bg-mint.svg', fit: BoxFit.cover),
         if (dark) const ColoredBox(color: Color(0x66000000)),
       ],
     );
