@@ -62,7 +62,6 @@ export component Orb inherits Rectangle {
     in property <float> angle;
     in property <float> loader;     // 0..1, the running arc while connecting
     in property <float> ripple: 1;  // 0..1 expanding ring after connecting; 1 = none
-    in property <float> comic: 1;   // one brief KitKat burst after connecting; 1 = none
     in property <float> pop: 1;
     in property <float> feel: 1;     // hover lifts, press pushes in (a spring on the Rust side)
     in property <color> ink: #ffffff;
@@ -82,34 +81,6 @@ export component Orb inherits Rectangle {
     // back halves of both rings, then the sphere, then the front halves
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: -0.42; a: s * 0.47; b: s * 0.13; direction: 1; dot1: 0; dot2: 3.4; cx: root.cx; cy: root.cy; ink: root.ink; }
     RingLayer { x: 0; y: 0; width: root.width; height: root.height; lit: root.lit; angle: root.angle; front: false; tilt: 0.14; a: s * 0.46; b: s * 0.10; direction: -0.7; dot1: 1.7; dot2: 4.9; cx: root.cx; cy: root.cy; ink: root.ink; }
-
-    // A short comic-book burst belongs to KitKat's punchy candy palette; it stays behind the glass orb.
-    for ray[i] in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : Path {
-        x: 0; y: 0; width: root.width; height: root.height;
-        visible: Palette.kitkat && comic < 1;
-        viewbox-x: 0; viewbox-y: 0; viewbox-width: self.width / 1px; viewbox-height: self.height / 1px;
-        fill: transparent;
-        property <float> theta: i * 0.5235987756 + 0.18;
-        property <float> fade: 1 - comic;
-        property <float> r0: (s * (0.28 + 0.04 * comic)) / 1px;
-        property <float> r1: (s * (0.46 + 0.02 * comic + 0.004 * Math.sin(i * 1.7 * 1rad))) / 1px;
-        stroke: Palette.orb-ink.with-alpha(0.86 * fade);
-        stroke-width: 6px;
-        stroke-line-cap: round;
-        MoveTo { x: cx / 1px + parent.r0 * Math.cos(parent.theta * 1rad); y: cy / 1px + parent.r0 * Math.sin(parent.theta * 1rad); }
-        LineTo { x: cx / 1px + parent.r1 * Math.cos(parent.theta * 1rad); y: cy / 1px + parent.r1 * Math.sin(parent.theta * 1rad); }
-    }
-    for dot[i] in [0, 1, 2, 3, 4, 5, 6, 7] : Rectangle {
-        visible: Palette.kitkat && comic < 1;
-        property <float> theta: i * 0.7853981634 + 0.39;
-        property <float> fade: 1 - comic;
-        property <length> orbit: s * (0.42 + 0.06 * comic);
-        property <length> d: (4.5 + 2.0 * (1 - comic)) * 1px;
-        x: cx + orbit * Math.cos(theta * 1rad) - d / 2;
-        y: cy + orbit * Math.sin(theta * 1rad) - d / 2;
-        width: d; height: d; border-radius: d / 2;
-        background: Palette.orb-ink.with-alpha(0.72 * fade);
-    }
 
     // the sprites are drawn 1:1 at the size Rust made them for, so the edge is never resampled
     Image { source: off-sprite; visible: lit < 0.999; x: cx - self.width / 2; y: cy - self.height / 2; width: sprite-size; height: sprite-size; }

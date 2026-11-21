@@ -34,7 +34,6 @@ struct OrbMotion {
     loader: f32,
     angle: f32,
     ripple: f32,
-    comic: f32,
     pop: f32,
     pop_v: f32,
     feel: f32,
@@ -1346,10 +1345,8 @@ fn main() {
         app.on_orb_touch(move |s| touch_cell.set(s));
     }
     let (demo_connecting, demo_connected, demo_settled) = (has("--demo-orb-connecting"), has("--demo-orb-connected"), has("--demo-orb-settled"));
-    let demo_comic = has("--demo-comic-burst"); // UI-only looping preview; it never starts a connection
     let mut motion =
-        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, comic: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
-    let mut demo_comic_time = 0.0f32;
+        OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
     
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
@@ -1461,7 +1458,6 @@ fn main() {
                 motion.ripple = 0.0;
                 motion.pop = 0.93;
                 motion.pop_v = 0.0;
-                motion.comic = if app.global::<Palette>().get_kitkat() { 0.0 } else { 1.0 };
             }
             motion.previous = state;
             // A page change gets a short fade; list rows stay settled so navigation feels immediate.
@@ -1489,12 +1485,6 @@ fn main() {
             if motion.ripple < 1.0 {
                 motion.ripple = (motion.ripple + dt / 1.4).min(1.0);
             }
-            if demo_comic {
-                demo_comic_time = (demo_comic_time + dt) % 1.4;
-                motion.comic = demo_comic_time.min(1.0);
-            } else if motion.comic < 1.0 {
-                motion.comic = (motion.comic + dt / 1.0).min(1.0);
-            }
             // the sphere settles back to full size like a spring (a small overshoot), not a plain ease
             let mut left = dt;
             while left > 0.0 {
@@ -1516,7 +1506,6 @@ fn main() {
             m.set_lit(motion.lit);
             m.set_loader(motion.loader);
             m.set_ripple(motion.ripple);
-            m.set_comic(motion.comic);
             m.set_pop(motion.pop);
             m.set_page_in(1.0 - (1.0 - motion.page_in).powi(3));
     });
