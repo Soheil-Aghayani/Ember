@@ -134,7 +134,13 @@ export component App inherits Window {
 
     Image {
         source: Palette.dark ? @image-url("assets/art/bg-dark.png") : (Palette.kitkat ? @image-url("assets/art/bg-kitkat.svg") : (Palette.mint ? @image-url("assets/art/bg-mint.svg") : @image-url("assets/art/bg-light.png")));
-        width: parent.width; height: parent.height; image-fit: cover;
+        property <length> drift-x: Palette.kitkat ? 12px * Math.sin(Motion.background-phase * 1rad) : 0px;
+        property <length> drift-y: Palette.kitkat ? 10px * Math.cos(Motion.background-phase * 1rad) : 0px;
+        x: Palette.kitkat ? -16px + drift-x : 0px;
+        y: Palette.kitkat ? -16px + drift-y : 0px;
+        width: parent.width + (Palette.kitkat ? 32px : 0px);
+        height: parent.height + (Palette.kitkat ? 32px : 0px);
+        image-fit: cover;
     }
     if Palette.dark : Rectangle { background: #0000004d; }
     Rectangle { x: 0px; y: 0px; width: 220px; height: parent.height; background: Palette.sidebar; }
@@ -177,8 +183,15 @@ export component App inherits Window {
             Rectangle {
                 width: min(640px, parent.width);
                 x: (parent.width - self.width) / 2;
+                property <float> page-scale: Motion.page-scale;
+                property <length> page-top: page == 0 ? 0px : 32px;
+                property <length> page-content-x: 32px + (self.width - 64px) * (1 - page-scale) / 2;
+                property <length> page-content-y: page-top + Motion.page-shift-y + (self.height - page-top) * (1 - page-scale) / 2;
+                property <length> page-content-width: (self.width - 64px) * page-scale;
+                property <length> page-content-height: (self.height - page-top) * page-scale;
                 if page == 0 : HomePage {
-                    x: 32px; y: 0px; width: parent.width - 64px; height: parent.height; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     state: root.state; status: root.status; secondary: root.secondary;
                     server-title: root.server-title; server-flag: root.server-flag; server-has-flag: root.server-has-flag;
                     server-detail: root.server-detail; can-pick: root.can-pick; auto-selected: root.auto-selected; servers: root.servers;
@@ -191,7 +204,8 @@ export component App inherits Window {
                     open-servers => { root.page = 1; }
                 }
                 if page == 1 : ServersPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     subs: root.subs; testing: root.testing; can-test: root.can-pick; test-progress: root.test-progress;
                     notice: root.page-notice; notice-error: root.page-notice-error;
                     dialog-busy: root.dialog-busy; dialog-error: root.dialog-error; dialog-done: root.dialog-done; dialog-request: root.dialog-request; pasted-text: root.pasted-text; paste-serial: root.paste-serial;
@@ -215,7 +229,8 @@ export component App inherits Window {
                     paste-request => { root.paste-request(); }
                 }
                 if page == 3 : LogsPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     lines: root.log-lines; has-entries: root.log-has-entries; filter <=> root.log-filter;
                     filter-changed(f) => { root.log-filter-changed(f); }
                     copy => { root.copy-logs(); }
@@ -223,7 +238,8 @@ export component App inherits Window {
                     copy-report => { root.copy-report(); }
                 }
                 if page == 2 : SettingsPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     d: root.settings-data; list-error: root.list-error;
                     app-mode-chosen(m) => { root.app-mode-chosen(m); }
                     list-add(kind, text) => { root.list-add(kind, text); }
@@ -238,11 +254,13 @@ export component App inherits Window {
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }
                 }
                 if page == 4 : WhatsNewPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     releases: root.releases;
                 }
                 if page == 5 : AboutPage {
-                    x: 32px; y: 32px; width: parent.width - 64px; height: parent.height - 32px; opacity: Motion.page-in;
+                    x: parent.page-content-x; y: parent.page-content-y;
+                    width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;
                     info: root.about-info; licenses: root.about-licenses;
                     open-contact => { root.open-contact(); }
                 }

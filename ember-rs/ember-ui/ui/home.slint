@@ -61,6 +61,10 @@ export component HomePage inherits Rectangle {
             if state == 2 : Image { source: Icons.check; colorize: Palette.tertiary; width: 28px; height: 28px; }
             Label { text: root.status; font-size: Type.headline-medium; font-weight: 600; }
         }
+        if Palette.kitkat : Label {
+            text: state == 2 ? Tr.kitkat-connected : (state == 1 ? Tr.kitkat-connecting : Tr.kitkat-disconnected);
+            color: Palette.on-variant; font-size: Type.body-small; horizontal-alignment: center; height: 20px;
+        }
         if secondary != "" : Rectangle { height: 8px; }
         if secondary != "" : Label { text: root.secondary; muted: true; horizontal-alignment: center; height: 20px; }
         Rectangle { height: 32px; }

@@ -30,7 +30,7 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 | Device | Status | Notes |
 |---|---|---|
-| Windows PC | Current preview: native Rust app 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; this preview is packaged side-by-side with the earlier Kotlin app. |
+| Windows PC | Current local review build: native Rust app 2.0.2; latest prepared installer: 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; the preview is packaged side-by-side with the earlier Kotlin app. |
 | Android phone | Flutter UI port builds locally; runtime validation pending | Android 8.0 or newer; arm64. The Kotlin VPN engine remains native. The Flutter debug build has not been checked on a physical phone. |
 | Android TV | Flutter TV preview launched on an API 34 Android TV emulator; D-pad navigation checked | The emulator check covered Home, Servers, Settings, Logs, What's new and About. Physical Sony BRAVIA BF1 launcher, remote and VPN behavior remain unverified. |
 
@@ -53,7 +53,7 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 The shared app catalogue at `https://app.agseyl.ir/` is intended to host multiple apps. The Flutter port has only been built locally as debug APKs; it is not a signed or published release.
 
-- **Windows:** the Rust 2.0.1 preview installer (Windows 10/11, 64-bit). It remains side-by-side with the older Kotlin app; whole-device networking needs owner verification.
+- **Windows:** the Rust 2.0.1 preview installer remains the latest prepared installer. A local 2.0.2 review build is available, but it is not packaged or published as a release.
 - **Android phone and TV:** the catalogue still contains the previous prepared APK, version 2.7.2. A Flutter-backed debug build was compiled locally with the same version code; it needs phone and TV validation, a signed release build, and release review before it can replace the catalogue APK.
 - The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. The prior generic emulator checks covered the Compose UI; they do not validate the Flutter UI. Sony BRAVIA BF1 launcher, remote, and VPN behavior remain unverified.
 

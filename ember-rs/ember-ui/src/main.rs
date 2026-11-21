@@ -265,6 +265,9 @@ fn apply_language(app: &App, language: &str) {
     tr.set_settings(s.settings.into());
     tr.set_logs(s.logs.into());
     tr.set_whats_new(s.whats_new.into());
+    tr.set_kitkat_connected(s.kitkat_connected.into());
+    tr.set_kitkat_connecting(s.kitkat_connecting.into());
+    tr.set_kitkat_disconnected(s.kitkat_disconnected.into());
     tr.set_about(s.about.into());
     tr.set_test_speed(s.test_speed.into());
     tr.set_stop_test(s.stop_test.into());
@@ -1348,6 +1351,7 @@ fn main() {
     let mut motion =
         OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
+    let mut background_phase = 0.0f32;
     
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
     let dialog_at: u32 = if has("--dialog") { 40 } else { 0 }; // debug: open the add dialog after about a second
@@ -1356,6 +1360,10 @@ fn main() {
         let app = weak.unwrap();
         let engine = &engine_for_timer;
         tick += 1;
+        if app.window().is_visible() && app.global::<Palette>().get_kitkat() {
+            background_phase = (background_phase + 0.012) % std::f32::consts::TAU;
+            app.global::<Motion>().set_background_phase(background_phase);
+        }
         // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
         if forced_theme.is_none() && tick.is_multiple_of(60) && engine.settings().theme() == "System" {
             let now = flavour("System", None);
@@ -1466,7 +1474,7 @@ fn main() {
                 motion.last_page = page;
                 motion.page_in = 0.0;
             }
-            motion.page_in = (motion.page_in + dt / 0.14).min(1.0);
+            motion.page_in = (motion.page_in + dt / 0.24).min(1.0);
             motion.list_t = (motion.list_t + dt).min(2.0);
             if let Some(id) = servers_ui.opened.borrow_mut().take() {
                 motion.row_card = id;

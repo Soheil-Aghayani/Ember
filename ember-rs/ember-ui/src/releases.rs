@@ -10,6 +10,17 @@ pub struct Release {
 
 pub const RELEASES: &[Release] = &[
     Release {
+        version: "2.0.2",
+        en: &[
+            "KitKat brings a gently drifting chocolate backdrop and playful connection lines, including “Getting your break ready…” and “Take a break.”",
+            "Switching pages now has a short, smooth rise-and-scale morph.",
+        ],
+        fa: &[
+            "تم کیت‌کت پس‌زمینهٔ شکلاتیِ آرام‌متحرک و پیام‌های صمیمی برای اتصال دارد: «داریم اتصال را برای استراحت آماده می‌کنیم…» و «وقت استراحت است.»",
+            "تعویض صفحه‌ها با بزرگ‌شدن و بالا آمدن کوتاه و نرمی همراه است.",
+        ],
+    },
+    Release {
         version: "2.0.1",
         en: &["Add a server from a QR-code picture (PNG, JPEG, WebP or BMP). The picture is decoded locally."],
         fa: &["اکنون می‌توانید سرور را از تصویر کد QR (PNG، JPEG، WebP یا BMP) اضافه کنید؛ تصویر فقط روی دستگاه شما خوانده می‌شود."],
