@@ -16,26 +16,31 @@ export global Palette {
     out property <bool> kitkat: flavour == 3;
     // right-to-left languages (Persian): the whole window is mirrored, then text and pictures are flipped back
     in property <bool> rtl: false;
-    out property <color> primary: dark ? #ff8d5c : (kitkat ? #c9233d : (mint ? #0a6b52 : #9c3107));
+    out property <color> primary: dark ? #ff8d5c : (kitkat ? #ba0018 : (mint ? #0a6b52 : #9c3107));
     out property <color> on-primary: dark ? #1a1714 : #ffffff;
-    out property <color> inverse-surface: dark ? #f3eee6 : (kitkat ? #321d24 : (mint ? #2b211c : #2f2a24));
-    out property <color> inverse-on: dark ? #2b2620 : (kitkat ? #fff8e9 : (mint ? #f1faf5 : #f5efe6));
+    out property <color> inverse-surface: dark ? #f3eee6 : (kitkat ? #351c1b : (mint ? #2b211c : #2f2a24));
+    out property <color> inverse-on: dark ? #2b2620 : (kitkat ? #fff7ee : (mint ? #f1faf5 : #f5efe6));
     out property <color> toast-ok: dark ? #14301d : (mint ? #d3f0df : #ddf1e2);
     out property <color> toast-bad: dark ? #5c1a14 : #ffdad6;
-    out property <color> on-surface: dark ? #f3eee6 : (kitkat ? #321d24 : (mint ? #231712 : #1f1b16));
-    out property <color> on-variant: dark ? #cdc5ba : (kitkat ? #70515a : (mint ? #51443c : #534c44));
+    out property <color> on-surface: dark ? #f3eee6 : (kitkat ? #351c1b : (mint ? #231712 : #1f1b16));
+    out property <color> on-variant: dark ? #cdc5ba : (kitkat ? #68504a : (mint ? #51443c : #534c44));
     out property <color> tertiary: dark ? #5fd17f : #1e7a3c;
     out property <color> error: dark ? #ffb4ab : #ba1a1a;
-    out property <color> background: dark ? #1a1714 : (kitkat ? #fff4de : (mint ? #f1faf5 : #faf7f2));
-    out property <color> surface-variant: dark ? #3a342d : (kitkat ? #f5e6cc : (mint ? #e3f0e8 : #f1ece3));
-    out property <color> outline-variant: dark ? #3a342d : (kitkat ? #e8cfab : (mint ? #cbe2d6 : #e4ddd1));
+    out property <color> background: dark ? #1a1714 : (kitkat ? #fff7ee : (mint ? #f1faf5 : #faf7f2));
+    out property <color> surface-variant: dark ? #3a342d : (kitkat ? #f4e7da : (mint ? #e3f0e8 : #f1ece3));
+    out property <color> outline-variant: dark ? #3a342d : (kitkat ? #e9d3c3 : (mint ? #cbe2d6 : #e4ddd1));
     // The glass panels: the Kotlin fill is a vertical gradient, but the software renderer cannot round the corners of a
     // gradient, so this is the average of its two ends.
-    out property <color> glass: dark ? #1f1829.with-alpha(0.60) : #ffffff.with-alpha(kitkat ? 0.92 : 0.72);
-    out property <color> glass-edge: dark ? #ffffff.with-alpha(0.16) : #ffffff.with-alpha(0.65);
-    out property <color> divider: dark ? #ffffff.with-alpha(0.10) : (kitkat ? #e8cfab.with-alpha(0.90) : #ffffff.with-alpha(0.65));
-    out property <color> orb-ink: dark ? #ffffff : (kitkat ? #c9233d : (mint ? #2f8f78 : #7a5bc0));
-    out property <color> ripple: kitkat ? #f24f67 : (mint ? #3fd6a0 : #ff8a3d);
+    out property <color> glass: dark ? #1f1829.with-alpha(0.60) : (kitkat ? #fffdf9.with-alpha(0.94) : #ffffff.with-alpha(0.72));
+    out property <color> glass-edge: dark ? #ffffff.with-alpha(0.16) : (kitkat ? #e9d3c3.with-alpha(0.82) : #ffffff.with-alpha(0.65));
+    out property <color> divider: dark ? #ffffff.with-alpha(0.10) : (kitkat ? #ffffff.with-alpha(0.30) : #ffffff.with-alpha(0.65));
+    out property <color> orb-ink: dark ? #ffffff : (kitkat ? #ba0018 : (mint ? #2f8f78 : #7a5bc0));
+    out property <color> ripple: kitkat ? #ffb632 : (mint ? #3fd6a0 : #ff8a3d);
+    out property <color> sidebar: kitkat ? #ba0018 : transparent;
+    out property <color> sidebar-ink: kitkat ? #ffffff : on-surface;
+    out property <color> sidebar-active-ink: kitkat ? #ffffff : primary;
+    out property <color> sidebar-hover: kitkat ? #ffffff.with-alpha(0.12) : primary.with-alpha(0.09);
+    out property <color> sidebar-active-background: kitkat ? #ffffff.with-alpha(0.20) : primary.with-alpha(0.16);
 }
 
 export global Type {

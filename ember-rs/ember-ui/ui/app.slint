@@ -15,12 +15,12 @@ component NavItem inherits Rectangle {
     callback clicked();
     height: 42px;
     border-radius: 10px;
-    background: touch.has-hover ? Palette.primary.with-alpha(0.09) : transparent;
+    background: touch.has-hover ? Palette.sidebar-hover : transparent;
     animate background { duration: 100ms; easing: ease-out; }
     HRow {
         pad-start: 12px; spacing: 12px;
-        Image { source: icon; colorize: active ? Palette.primary : Palette.on-surface; width: 20px; height: 20px; }
-        Label { text: root.text; font-size: Type.title-small; font-weight: 500; color: active ? Palette.primary : Palette.on-surface; }
+        Image { source: icon; colorize: active ? Palette.sidebar-active-ink : Palette.sidebar-ink; width: 20px; height: 20px; }
+        Label { text: root.text; font-size: Type.title-small; font-weight: 500; color: active ? Palette.sidebar-active-ink : Palette.sidebar-ink; }
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
@@ -137,17 +137,18 @@ export component App inherits Window {
         width: parent.width; height: parent.height; image-fit: cover;
     }
     if Palette.dark : Rectangle { background: #0000004d; }
+    Rectangle { x: 0px; y: 0px; width: 220px; height: parent.height; background: Palette.sidebar; }
 
     Rectangle {
         x: 16px; y: 80px + min(page, 3) * 46px; width: 188px; height: 42px;
-        border-radius: 10px; background: Palette.primary.with-alpha(0.16);
+        border-radius: 10px; background: Palette.sidebar-active-background;
         opacity: page < 4 ? 1 : 0;
         animate y { duration: 180ms; easing: ease-out; }
         animate opacity { duration: 100ms; easing: ease-out; }
     }
     Rectangle {
         x: 16px; y: page == 4 ? parent.height - 104px : parent.height - 58px; width: 188px; height: 42px;
-        border-radius: 10px; background: Palette.primary.with-alpha(0.16);
+        border-radius: 10px; background: Palette.sidebar-active-background;
         opacity: page >= 4 ? 1 : 0;
         animate y { duration: 160ms; easing: ease-out; }
         animate opacity { duration: 100ms; easing: ease-out; }
@@ -160,7 +161,7 @@ export component App inherits Window {
             HRow {
                 pad-start: 8px; padding-bottom: 24px; spacing: 10px; height: 60px;
                 Image { source: @image-url("assets/ember_logo_128.png"); width: 36px; height: 36px; }
-                Label { text: "Ember"; font-size: Type.headline-small; font-weight: 600; }
+                Label { text: "Ember"; font-size: Type.headline-small; font-weight: 600; color: Palette.sidebar-ink; }
             }
             NavItem { icon: Icons.home; text: Tr.home; active: page == 0; clicked => { page = 0; } }
             NavItem { icon: Icons.subscriptions; text: Tr.servers; active: page == 1; clicked => { page = 1; } }
