@@ -1361,7 +1361,7 @@ fn main() {
         let engine = &engine_for_timer;
         tick += 1;
         if app.window().is_visible() && app.global::<Palette>().get_kitkat() {
-            background_phase = (background_phase + 0.012) % std::f32::consts::TAU;
+            background_phase = (background_phase + 0.006) % std::f32::consts::TAU;
             app.global::<Motion>().set_background_phase(background_phase);
         }
         // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
@@ -1474,7 +1474,7 @@ fn main() {
                 motion.last_page = page;
                 motion.page_in = 0.0;
             }
-            motion.page_in = (motion.page_in + dt / 0.24).min(1.0);
+            motion.page_in = (motion.page_in + dt / 0.20).min(1.0);
             motion.list_t = (motion.list_t + dt).min(2.0);
             if let Some(id) = servers_ui.opened.borrow_mut().take() {
                 motion.row_card = id;

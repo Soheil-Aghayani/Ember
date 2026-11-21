@@ -134,12 +134,12 @@ export component App inherits Window {
 
     Image {
         source: Palette.dark ? @image-url("assets/art/bg-dark.png") : (Palette.kitkat ? @image-url("assets/art/bg-kitkat.svg") : (Palette.mint ? @image-url("assets/art/bg-mint.svg") : @image-url("assets/art/bg-light.png")));
-        property <length> drift-x: Palette.kitkat ? 12px * Math.sin(Motion.background-phase * 1rad) : 0px;
-        property <length> drift-y: Palette.kitkat ? 10px * Math.cos(Motion.background-phase * 1rad) : 0px;
-        x: Palette.kitkat ? -16px + drift-x : 0px;
-        y: Palette.kitkat ? -16px + drift-y : 0px;
-        width: parent.width + (Palette.kitkat ? 32px : 0px);
-        height: parent.height + (Palette.kitkat ? 32px : 0px);
+        property <length> drift-x: Palette.kitkat ? 6px * Math.sin(Motion.background-phase * 1rad) : 0px;
+        property <length> drift-y: Palette.kitkat ? 5px * Math.cos(Motion.background-phase * 1rad) : 0px;
+        x: Palette.kitkat ? -8px + drift-x : 0px;
+        y: Palette.kitkat ? -8px + drift-y : 0px;
+        width: parent.width + (Palette.kitkat ? 16px : 0px);
+        height: parent.height + (Palette.kitkat ? 16px : 0px);
         image-fit: cover;
     }
     if Palette.dark : Rectangle { background: #0000004d; }
@@ -183,12 +183,11 @@ export component App inherits Window {
             Rectangle {
                 width: min(640px, parent.width);
                 x: (parent.width - self.width) / 2;
-                property <float> page-scale: Motion.page-scale;
                 property <length> page-top: page == 0 ? 0px : 32px;
-                property <length> page-content-x: 32px + (self.width - 64px) * (1 - page-scale) / 2;
-                property <length> page-content-y: page-top + Motion.page-shift-y + (self.height - page-top) * (1 - page-scale) / 2;
-                property <length> page-content-width: (self.width - 64px) * page-scale;
-                property <length> page-content-height: (self.height - page-top) * page-scale;
+                property <length> page-content-x: 32px;
+                property <length> page-content-y: page-top + Motion.page-shift-y;
+                property <length> page-content-width: self.width - 64px;
+                property <length> page-content-height: self.height - page-top;
                 if page == 0 : HomePage {
                     x: parent.page-content-x; y: parent.page-content-y;
                     width: parent.page-content-width; height: parent.page-content-height; opacity: Motion.page-in;

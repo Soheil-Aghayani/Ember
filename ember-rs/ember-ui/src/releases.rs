@@ -13,11 +13,11 @@ pub const RELEASES: &[Release] = &[
         version: "2.0.2",
         en: &[
             "KitKat brings a gently drifting chocolate backdrop and playful connection lines, including “Getting your break ready…” and “Take a break.”",
-            "Switching pages now has a short, smooth rise-and-scale morph.",
+            "Switching pages now has a short, steady fade-and-rise transition.",
         ],
         fa: &[
             "تم کیت‌کت پس‌زمینهٔ شکلاتیِ آرام‌متحرک و پیام‌های صمیمی برای اتصال دارد: «داریم اتصال را برای استراحت آماده می‌کنیم…» و «وقت استراحت است.»",
-            "تعویض صفحه‌ها با بزرگ‌شدن و بالا آمدن کوتاه و نرمی همراه است.",
+            "تعویض صفحه‌ها با محوشدن و بالا آمدن کوتاه و نرمی همراه است.",
         ],
     },
     Release {

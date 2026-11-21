@@ -105,8 +105,7 @@ export global Motion {
     in property <float> list-t: 2;    // seconds since the page changed; lists stagger their rows by it
     in property <float> page-in: 1;   // 0 right after a page change, eased up to 1
     in property <float> background-phase: 0;
-    out property <float> page-scale: 0.97 + 0.03 * page-in;
-    out property <length> page-shift-y: (1 - page-in) * 14px;
+    out property <length> page-shift-y: (1 - page-in) * 8px;
     in property <image> sphere-off;
     in property <image> sphere-on;
     in property <length> sprite-size: 184px;   // the sprite including its transparent border
