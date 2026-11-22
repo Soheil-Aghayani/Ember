@@ -132,7 +132,8 @@ export component HomePage inherits Rectangle {
         if error != "" : Rectangle { height: 16px; }
         if error != "" : Label {
             text: root.error; muted: true; font-size: Type.body-small;
-            width: parent.width; wrap: word-wrap; horizontal-alignment: center;
+            width: parent.width; height: self.preferred-height;
+            wrap: word-wrap; horizontal-alignment: center; vertical-alignment: top;
         }
         if blocked-notice != "" : Rectangle { height: 16px; }
         if blocked-notice != "" : Card {
