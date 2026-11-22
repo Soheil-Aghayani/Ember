@@ -134,12 +134,7 @@ export component App inherits Window {
 
     Image {
         source: Palette.dark ? @image-url("assets/art/bg-dark.png") : (Palette.kitkat ? @image-url("assets/art/bg-kitkat.svg") : (Palette.mint ? @image-url("assets/art/bg-mint.svg") : @image-url("assets/art/bg-light.png")));
-        property <length> drift-x: Palette.kitkat ? 6px * Math.sin(Motion.background-phase * 1rad) : 0px;
-        property <length> drift-y: Palette.kitkat ? 5px * Math.cos(Motion.background-phase * 1rad) : 0px;
-        x: Palette.kitkat ? -8px + drift-x : 0px;
-        y: Palette.kitkat ? -8px + drift-y : 0px;
-        width: parent.width + (Palette.kitkat ? 16px : 0px);
-        height: parent.height + (Palette.kitkat ? 16px : 0px);
+        x: 0px; y: 0px; width: parent.width; height: parent.height;
         image-fit: cover;
     }
     if Palette.dark : Rectangle { background: #0000004d; }

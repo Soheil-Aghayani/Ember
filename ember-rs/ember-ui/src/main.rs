@@ -1351,7 +1351,6 @@ fn main() {
     let mut motion =
         OrbMotion { lit: 0.0, speed: 0.12, loader: 0.0, angle: 0.0, ripple: 1.0, pop: 1.0, pop_v: 0.0, feel: 1.0, list_t: 2.0, row_t: 2.0, row_card: String::new(), sprites: SpriteCache::default(), page_in: 1.0, last_page: 0, last: Instant::now(), previous: ConnState::Disconnected };
     let mut tick = 0u32;
-    let mut background_phase = 0.0f32;
     
     let menu_at: u32 = if has("--menu") { 60 } else { 0 }; // debug: open the server menu after about two seconds
     let dialog_at: u32 = if has("--dialog") { 40 } else { 0 }; // debug: open the add dialog after about a second
@@ -1360,10 +1359,6 @@ fn main() {
         let app = weak.unwrap();
         let engine = &engine_for_timer;
         tick += 1;
-        if app.window().is_visible() && app.global::<Palette>().get_kitkat() {
-            background_phase = (background_phase + 0.006) % std::f32::consts::TAU;
-            app.global::<Motion>().set_background_phase(background_phase);
-        }
         // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
         if forced_theme.is_none() && tick.is_multiple_of(60) && engine.settings().theme() == "System" {
             let now = flavour("System", None);

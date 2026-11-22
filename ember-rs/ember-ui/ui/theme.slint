@@ -104,7 +104,6 @@ export global Motion {
     in property <float> row-t: 2;     // seconds since it opened
     in property <float> list-t: 2;    // seconds since the page changed; lists stagger their rows by it
     in property <float> page-in: 1;   // 0 right after a page change, eased up to 1
-    in property <float> background-phase: 0;
     out property <length> page-shift-y: (1 - page-in) * 8px;
     in property <image> sphere-off;
     in property <image> sphere-on;
