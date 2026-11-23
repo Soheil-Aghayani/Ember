@@ -1,48 +1,98 @@
-# Builds the signed Android release APK and copies it to your Programs folder.
+# Builds and verifies a signed Android release APK using the Flutter port's root Gradle wrapper.
+# The Android keystore and its DPAPI-protected password file stay outside the repository.
 #
 #   .\tools\build-apk.ps1 -KeystoreDir D:\Programming\Ember-releases\signing
-#
-# The key comes from tools\New-AndroidKeystore.ps1. Needs the Android SDK named in local.properties. Local only.
+
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$KeystoreDir,
     [string]$OutDir = (Join-Path $env:USERPROFILE 'Downloads\Programs')
 )
+
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$gradle = 'D:\Programming\tools\gradle\gradle-8.10.2\bin\gradle.bat'
-if (-not $env:JAVA_HOME) { $env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot' }
-$env:Path += ";$env:USERPROFILE\.cargo\bin"
+$flutterRoot = Join-Path $root 'flutter'
+$gradle = Join-Path $root 'gradlew.bat'
+$originalJavaHome = $env:JAVA_HOME
+$javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot' }
+if (-not (Test-Path -LiteralPath (Join-Path $javaHome 'bin\java.exe') -PathType Leaf)) { throw "JDK 21 was not found at $javaHome; set JAVA_HOME to a JDK 21 installation." }
+$originalAndroidHome = $env:ANDROID_HOME
+$originalAndroidSdkRoot = $env:ANDROID_SDK_ROOT
+$sdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } elseif ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { 'D:\Programming\tools\android-sdk' }
+if (-not (Test-Path -LiteralPath $sdkRoot -PathType Container)) { throw "Android SDK was not found at $sdkRoot." }
+
+$flutterCommand = Get-Command flutter -ErrorAction SilentlyContinue
+$flutter = if ($flutterCommand) { $flutterCommand.Source } else { 'D:\Programming\tools\flutter\bin\flutter.bat' }
+if (-not (Test-Path -LiteralPath $flutter -PathType Leaf)) { throw "Flutter was not found at $flutter." }
+if (-not (Test-Path -LiteralPath $gradle -PathType Leaf)) { throw "Gradle wrapper was not found at $gradle." }
 
 $store = Join-Path $KeystoreDir 'ember-android.jks'
 $saved = Join-Path $KeystoreDir 'ember-android.pwd'
-if (-not (Test-Path $store) -or -not (Test-Path $saved)) { throw "No Android key in $KeystoreDir; run tools\New-AndroidKeystore.ps1 first." }
-$password = [System.Net.NetworkCredential]::new('', (Get-Content $saved | ConvertTo-SecureString)).Password
-$env:SIGNING_KEYSTORE = $store
-$env:SIGNING_KEY_ALIAS = 'ember'
-$env:SIGNING_KEY_PASSWORD = $password
-$env:SIGNING_STORE_PASSWORD = $password
-try {
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    & $gradle -p $root :android:assembleRelease --console=plain -q
-    $code = $LASTEXITCODE
-    $ErrorActionPreference = $previous
-    if ($code -ne 0) { throw 'The Android build failed.' }
-} finally {
-    Remove-Item Env:\SIGNING_KEY_PASSWORD, Env:\SIGNING_STORE_PASSWORD, Env:\SIGNING_KEYSTORE, Env:\SIGNING_KEY_ALIAS -ErrorAction SilentlyContinue
+if (-not (Test-Path -LiteralPath $store -PathType Leaf) -or -not (Test-Path -LiteralPath $saved -PathType Leaf)) {
+    throw "No Android key in $KeystoreDir; run tools\New-AndroidKeystore.ps1 first."
 }
 
-$apk = Get-ChildItem "$root\android\build\outputs\apk\release" -Filter '*.apk' | Select-Object -First 1
-if (-not $apk) { throw 'No release APK was produced (is the signing key found by the build?).' }
-$version = (Select-String -Path "$root\android\build.gradle.kts" -Pattern 'versionName = "([^"]+)"').Matches[0].Groups[1].Value
-$apksigner = Get-ChildItem (Join-Path (Split-Path $root -Qualifier) 'Programming\tools\android-sdk\build-tools') -Recurse -Filter apksigner.bat | Sort-Object FullName | Select-Object -Last 1
-if ($apksigner) {
-    $previous = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & $apksigner.FullName verify --print-certs $apk.FullName | Select-Object -First 3
-    $ErrorActionPreference = $previous
+$versionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $root 'android\build.gradle.kts') -Raw), '(?m)^\s*versionName\s*=\s*"([^"]+)"')
+if (-not $versionMatch.Success) { throw 'Could not read Android versionName from android/build.gradle.kts.' }
+$version = $versionMatch.Groups[1].Value
+$password = [System.Net.NetworkCredential]::new('', (Get-Content -LiteralPath $saved | ConvertTo-SecureString)).Password
+$signingNames = 'SIGNING_KEYSTORE', 'SIGNING_KEY_ALIAS', 'SIGNING_KEY_PASSWORD', 'SIGNING_STORE_PASSWORD'
+$originalSigningValues = @{}
+foreach ($name in $signingNames) { $originalSigningValues[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+
+try {
+    if (-not $env:JAVA_HOME) { $env:JAVA_HOME = $javaHome }
+    if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = $sdkRoot }
+    if (-not $env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT = $sdkRoot }
+    Push-Location -LiteralPath $flutterRoot
+    try {
+        & $flutter pub get
+        if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
+    } finally {
+        Pop-Location
+    }
+
+    $env:SIGNING_KEYSTORE = $store
+    $env:SIGNING_KEY_ALIAS = 'ember'
+    $env:SIGNING_KEY_PASSWORD = $password
+    $env:SIGNING_STORE_PASSWORD = $password
+    Push-Location -LiteralPath $root
+    try {
+        & $gradle :android:assembleRelease --console=plain -q
+        if ($LASTEXITCODE -ne 0) { throw 'The Android release build failed.' }
+    } finally {
+        Pop-Location
+    }
+
+    $apk = Join-Path $root 'android\build\outputs\apk\release\android-release.apk'
+    if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) { throw "Signed Android APK was not produced: $apk" }
+
+    $buildToolsRoot = Join-Path $sdkRoot 'build-tools'
+    $buildTools = Get-ChildItem -LiteralPath $buildToolsRoot -Directory -ErrorAction SilentlyContinue |
+        Sort-Object { try { [version]$_.Name } catch { [version]'0.0' } } -Descending |
+        Select-Object -First 1
+    if (-not $buildTools) { throw "Android Build Tools were not found in $buildToolsRoot." }
+    $apksigner = Join-Path $buildTools.FullName 'apksigner.bat'
+    if (-not (Test-Path -LiteralPath $apksigner -PathType Leaf)) { throw "apksigner was not found in $($buildTools.FullName)." }
+    & $apksigner verify --print-certs $apk
+    if ($LASTEXITCODE -ne 0) { throw 'Android APK signature verification failed.' }
+
+    New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+    $final = Join-Path $OutDir "Ember-$version.apk"
+    Copy-Item -LiteralPath $apk -Destination $final -Force
+    Write-Host "Signed Android APK ready: $final"
+    Get-FileHash -LiteralPath $final -Algorithm SHA256 | ForEach-Object { "SHA-256 $($_.Hash)" }
+} finally {
+    foreach ($name in $signingNames) {
+        $value = $originalSigningValues[$name]
+        if ($null -eq $value) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
+        else { Set-Item "Env:$name" $value }
+    }
+    if ($originalJavaHome) { $env:JAVA_HOME = $originalJavaHome }
+    else { Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue }
+    if ($originalAndroidHome) { $env:ANDROID_HOME = $originalAndroidHome }
+    else { Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue }
+    if ($originalAndroidSdkRoot) { $env:ANDROID_SDK_ROOT = $originalAndroidSdkRoot }
+    else { Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue }
+    $password = $null
 }
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$final = Join-Path $OutDir "Ember-$version.apk"
-Copy-Item $apk.FullName $final -Force
-Write-Host "== Done: $final"
-Get-FileHash $final -Algorithm SHA256 | ForEach-Object { "SHA-256 $($_.Hash)" }

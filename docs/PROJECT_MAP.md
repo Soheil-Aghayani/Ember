@@ -21,7 +21,7 @@ Sony uses both Android-based TVs and other TV operating systems. The identified 
 | Shared code | `core/` | Logging, connection check, tunnel config; and the older Android client's Firefox account flows, Mozilla proxy pass, HTTP/2 tunnel and local proxies. | JVM only; no Android or Compose dependencies. |
 | Windows native support | `helper/`, `desktop/appResources/windows-x64/` | Native helper sources and packaged Windows tunnel resources. | Do not edit or execute the elevated PowerShell tunnel helper unless the task explicitly requires source changes; never run network-altering code. |
 | Design system | `design/` | Brand, tokens, UI assets, and asset attribution. | `design/tokens.json` is the visual source of truth. |
-| Repository tooling | `tools/`, root Gradle files, `.github/` | Asset utilities, build orchestration, and repository metadata. | Keep generated outputs out of source changes; do not run GitHub Actions. |
+| Repository tooling | `tools/`, root Gradle files, `.github/` | Asset utilities, local multi-target candidate packaging, build orchestration, and repository metadata. | Keep generated outputs out of source changes; do not run GitHub Actions. |
 | Documentation | `README.md`, `AGENTS.md`, `docs/`, module READMEs | User-facing overview, agent constraints, architecture map, and module-specific instructions. | Keep platform status consistent in all three top-level guides. |
 
 ## Where changes belong

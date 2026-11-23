@@ -3,9 +3,12 @@
     android:initialLayout="@layout/widget_connect"
     android:minWidth="110dp"
     android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
     android:previewLayout="@layout/widget_connect"
-    android:resizeMode="none"
+    android:description="@string/quick_connect_widget_desc"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

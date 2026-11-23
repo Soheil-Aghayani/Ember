@@ -1,5 +1,19 @@
 # Releasing Ember (local build instructions)
 
+## Local multi-target candidate bundle
+
+`tools/prepare-local-release-candidate.ps1` builds a Windows x64 installer from the Rust app and one arm64 Android release APK for both phones and Android TV. It writes a unique local folder containing `release-manifest.json` (source commit, versions, targets and signing state) plus `SHA256SUMS.txt` for the installer and APK.
+
+Pass the Windows runtime resources explicitly so the candidate uses the files you reviewed. Add `-AndroidKeystoreDir` to sign the Android APK with the local keystore; without it, the script creates an unsigned Android candidate. The Windows installer remains unsigned. The Android phone and TV versions share one release APK; `-PtvPreview` is a separate debug-only emulator package.
+
+```powershell
+.\tools\prepare-local-release-candidate.ps1 `
+  -WindowsResources 'C:\Program Files\Ember\app\resources' `
+  -AndroidKeystoreDir 'D:\Programming\Ember-releases\signing'
+```
+
+The default output is `D:\Programming\Ember-releases\local-candidates`. The script never deletes an existing candidate folder, publishes files, updates `release/updates.json`, runs the installer, or launches the VPN helper. Review signing and real-device results before distributing a candidate.
+
 ## Current native Windows preview
 
 The Rust/Slint build is a separate preview installer that installs side-by-side with the older Kotlin desktop app. It is not the default replacement, and whole-device networking still needs owner testing.

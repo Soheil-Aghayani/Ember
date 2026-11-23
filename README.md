@@ -81,7 +81,7 @@ See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the
 | `core/` | Platform-neutral JVM logic. The Windows app uses only its logging and connection-check helpers; the rest belongs to the older Android version |
 | `helper/` | Native Rust helper for Windows whole-device tunnel setup |
 | `design/` | Design tokens, brand assets, store graphics, and third-party notices |
-| `tools/` | Repository utilities, including asset converters |
+| `tools/` | Repository utilities, asset converters, and local release-candidate packaging |
 | `docs/` | Architecture map, platform status, and contributor documentation |
 | `.github/` | Repository metadata and workflow definitions |
 | Root Gradle files | Shared build configuration and module inclusion |
@@ -122,7 +122,7 @@ Set-Location ..
 
 Build the debug-only TV layout with `.\gradlew.bat :android:assembleDebug -PtvPreview`; it uses the `.tvpreview` package suffix. Both builds write `android/build/outputs/apk/debug/android-debug.apk`, so save the first APK before building the other variant. These are local debug packages, not release artifacts.
 
-The signed release script (`tools/build-apk.ps1`) was not run for the Flutter port. Review and update its toolchain before preparing a signed Android release.
+The signed Android release script uses the root Gradle wrapper and verifies the APK signature. It has not yet been run against the Flutter port; signing requires the Android keystore kept outside the repository. For a local, versioned candidate bundle across PC, phone and TV, see [`docs/RELEASING.md`](docs/RELEASING.md).
 
 The helper's unit tests run with `cargo test --manifest-path helper/Cargo.toml`.
 
