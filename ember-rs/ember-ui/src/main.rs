@@ -18,6 +18,7 @@ use std::{
     rc::Rc,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
+        mpsc::{self, Receiver},
         Arc,
     },
     time::{Duration, Instant},
@@ -1145,11 +1146,43 @@ fn wire_servers_page(app: &App, engine: &Engine, ui: &Rc<servers::ServersUi>, di
 const TRAY_OPEN: u32 = 1;
 const TRAY_TOGGLE: u32 = 2;
 const TRAY_QUIT: u32 = 3;
+const TRAY_RECONNECT: u32 = 4;
+const TRAY_LOGS: u32 = 5;
+const TRAY_UPDATE: u32 = 6;
 
-fn tray_menu(s: &strings::Strings, state: ConnState) -> Vec<ember_win::tray::MenuEntry> {
+fn tray_menu(s: &strings::Strings, state: ConnState, show_failure_actions: bool, update: Option<&str>) -> Vec<ember_win::tray::MenuEntry> {
     use ember_win::tray::MenuEntry;
     let toggle = if state == ConnState::Disconnected { s.connect } else { s.disconnect };
-    vec![MenuEntry::item(TRAY_OPEN, s.open_ember), MenuEntry::item(TRAY_TOGGLE, toggle), MenuEntry::Separator, MenuEntry::item(TRAY_QUIT, s.quit)]
+    let mut menu = vec![MenuEntry::item(TRAY_OPEN, s.open_ember), MenuEntry::item(TRAY_TOGGLE, toggle)];
+    if show_failure_actions {
+        menu.extend([
+            MenuEntry::Separator,
+            MenuEntry::item(TRAY_RECONNECT, s.reconnect),
+            MenuEntry::item(TRAY_LOGS, s.open_logs),
+        ]);
+    }
+    if let Some(version) = update {
+        menu.extend([MenuEntry::Separator, MenuEntry::item(TRAY_UPDATE, format!("{} · {version}", s.update_available))]);
+    }
+    menu.extend([MenuEntry::Separator, MenuEntry::item(TRAY_QUIT, s.quit)]);
+    menu
+}
+
+fn spawn_update_checker() -> Receiver<ember_win::release_updates::AvailableUpdate> {
+    let (send, receive) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut delivered = String::new();
+        loop {
+            if let Some(update) = ember_win::release_updates::check("windows", env!("CARGO_PKG_VERSION")) {
+                if update.version != delivered {
+                    if send.send(update.clone()).is_err() { return; }
+                    delivered = update.version;
+                }
+            }
+            std::thread::sleep(Duration::from_secs(6 * 60 * 60));
+        }
+    });
+    receive
 }
 
 fn main() {
@@ -1266,11 +1299,14 @@ fn main() {
         error("EmberEngine", "connecting failed: key 3q2-9Ab_cdEFghIJklMNopQRstUVwxYZ012345 was refused");
     }
 
+    let intentional_disconnect = Rc::new(std::cell::Cell::new(false));
     {
         let engine = engine.clone();
+        let intentional_disconnect = Rc::clone(&intentional_disconnect);
         let weak = app.as_weak();
         app.on_orb_clicked(move || {
             if engine.snapshot().state != ConnState::Disconnected {
+                intentional_disconnect.set(true);
                 engine.disconnect();
             } else if engine.selected_node().is_none() {
                 weak.unwrap().set_page(1); // nothing to connect to yet: the Servers page
@@ -1293,13 +1329,14 @@ fn main() {
         engine.connect_selected();
     }
 
-    // the notification-area icon: Open, Connect/Disconnect, Quit (test runs with their own folder skip it unless --tray)
+    // the notification-area icon; isolated preview runs skip it unless --tray is requested
     let tray = if custom_dir && !has("--tray") {
         None
     } else {
         let wake: Box<dyn Fn() + Send> = Box::new(|| {});
-        ember_win::tray::Tray::spawn("Ember", tray_menu(lang::current(), ConnState::Disconnected), wake)
+        ember_win::tray::Tray::spawn("Ember", tray_menu(lang::current(), ConnState::Disconnected, false, None), wake)
     };
+    let update_events = if custom_dir { None } else { Some(spawn_update_checker()) };
     {
         use slint::winit_030::{winit, WinitWindowAccessor};
         let w = app.as_weak();
@@ -1334,6 +1371,9 @@ fn main() {
     }
     let has_tray = tray.is_some();
     let mut tray_state = None;
+    let mut previous_connection_state = ConnState::Disconnected;
+    let mut show_failure_actions = false;
+    let mut update_version: Option<String> = None;
     let mut chimed = ConnState::Disconnected;
 
     let timer = slint::Timer::default();
@@ -1341,6 +1381,7 @@ fn main() {
     let engine_for_timer = engine.clone();
     let state_cell = Rc::new(std::cell::Cell::new(ConnState::Disconnected));
     let state_for_main = Rc::clone(&state_cell);
+    let intentional_disconnect_for_timer = Rc::clone(&intentional_disconnect);
     let servers_for_motion = Rc::clone(&servers_ui);
     let touch_cell = Rc::new(std::cell::Cell::new(0i32));
     {
@@ -1358,6 +1399,7 @@ fn main() {
     timer.start(slint::TimerMode::Repeated, Duration::from_millis(33), move || {
         let app = weak.unwrap();
         let engine = &engine_for_timer;
+        let intentional_disconnect = &intentional_disconnect_for_timer;
         tick += 1;
         // while Appearance is "System", follow Windows when its setting changes (checked every two seconds)
         if forced_theme.is_none() && tick.is_multiple_of(60) && engine.settings().theme() == "System" {
@@ -1375,7 +1417,32 @@ fn main() {
         if connect_at != 0 && tick == connect_at {
             engine.connect_selected();
         }
-        let state = engine.snapshot().state;
+        let snapshot = engine.snapshot();
+        let state = snapshot.state;
+        if state != ConnState::Disconnected {
+            show_failure_actions = false;
+        } else if previous_connection_state != ConnState::Disconnected {
+            if snapshot.last_error.is_some() && !intentional_disconnect.get() {
+                show_failure_actions = true;
+                if let Some((tray, _)) = &tray {
+                    tray.notify(lang::current().connection_lost, lang::current().connection_lost_body);
+                }
+            }
+            intentional_disconnect.set(false);
+        }
+        previous_connection_state = state;
+
+        if let Some(events) = &update_events {
+            while let Ok(update) = events.try_recv() {
+                if update_version.as_deref() != Some(update.version.as_str()) {
+                    update_version = Some(update.version.clone());
+                    if let Some((tray, _)) = &tray {
+                        let s = lang::current();
+                        tray.notify(&format!("{} · {}", s.update_available, update.version), s.update_available_body);
+                    }
+                }
+            }
+        }
         // a soft chime when the connection comes up, and a lower one when it was up and goes down
         if state != chimed {
             if engine.settings().sounds() {
@@ -1398,9 +1465,21 @@ fn main() {
                         if engine.snapshot().state == ConnState::Disconnected {
                             engine.connect_selected();
                         } else {
+                            intentional_disconnect.set(true);
                             engine.disconnect();
                         }
                     }
+                    ember_win::tray::TrayEvent::Command(TRAY_RECONNECT) => {
+                        show_failure_actions = false;
+                        engine.connect_selected();
+                    }
+                    ember_win::tray::TrayEvent::Command(TRAY_LOGS) => {
+                        let _ = app.show();
+                        app.set_page(3);
+                        logs::apply(&app, &logs_ui, true);
+                        style_window_soon(&app);
+                    }
+                    ember_win::tray::TrayEvent::Command(TRAY_UPDATE) => ember_win::release_updates::open_release_page(),
                     ember_win::tray::TrayEvent::Command(TRAY_QUIT) => {
                         let _ = slint::quit_event_loop();
                     }
@@ -1408,10 +1487,10 @@ fn main() {
                 }
             }
             // the menu and tooltip follow the state and the language
-            let key = (state, lang::code());
-            if tray_state != Some(key) {
+            let key = (state, show_failure_actions, update_version.clone(), lang::code());
+            if tray_state.as_ref() != Some(&key) {
                 tray_state = Some(key);
-                tray.set_menu(tray_menu(lang::current(), state));
+                tray.set_menu(tray_menu(lang::current(), state, show_failure_actions, update_version.as_deref()));
             }
         }
         // the log page follows the log twice a second while it is open

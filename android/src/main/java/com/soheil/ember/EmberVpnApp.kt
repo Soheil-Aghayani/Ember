@@ -13,7 +13,8 @@ import com.soheil.ember.widget.ConnectWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 class EmberVpnApp : Application() {
@@ -26,8 +27,14 @@ class EmberVpnApp : Application() {
         AppLogger.sink = AndroidLogSink
         createNotificationChannel()
         CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
-            combine(VpnState.phase, VpnState.node, engine.language) { phase, node, language -> Triple(phase, node?.id, language) }
-                .collect { ConnectWidget.refresh(this@EmberVpnApp) }
+            merge(
+                VpnState.phase.map { Unit },
+                VpnState.node.map { Unit },
+                VpnState.progress.map { Unit },
+                VpnState.error.map { Unit },
+                engine.selectedId.map { Unit },
+                engine.language.map { Unit },
+            ).collect { ConnectWidget.refresh(this@EmberVpnApp) }
         }
     }
 

@@ -26,7 +26,7 @@ class ConnectWidget : AppWidgetProvider() {
     }
 
     companion object {
-        /** Redraws every placed widget from the current state (called whenever the VPN state or language changes). */
+        /** Redraws placed widgets when VPN state, connection detail, language, or the selected server changes. */
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, ConnectWidget::class.java))
@@ -40,8 +40,8 @@ class ConnectWidget : AppWidgetProvider() {
                 R.id.widget_status,
                 when (phase) {
                     ConnectionState.CONNECTED -> words.connected
-                    ConnectionState.CONNECTING -> words.connecting
-                    ConnectionState.DISCONNECTED -> words.disconnected
+                    ConnectionState.CONNECTING -> VpnState.progress.value?.takeIf(String::isNotBlank) ?: words.connecting
+                    ConnectionState.DISCONNECTED -> VpnState.error.value?.takeIf(String::isNotBlank) ?: words.disconnected
                 },
             )
             views.setTextViewText(R.id.widget_server, (VpnState.node.value ?: engine.selectedNode())?.title.orEmpty())

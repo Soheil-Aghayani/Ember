@@ -43,6 +43,9 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -55,7 +58,20 @@ class MainActivity : FlutterFragmentActivity() {
     private val engine: AndroidEngine get() = (application as EmberVpnApp).engine
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var stateJob: Job? = null
+    private var releaseUpdateJob: Job? = null
     private var pendingImport: MethodChannel.Result? = null
+    private val releaseUpdatePreferences by lazy { getSharedPreferences("release_updates", MODE_PRIVATE) }
+
+    override fun onStart() {
+        super.onStart()
+        checkForReleaseUpdates()
+    }
+
+    override fun onStop() {
+        releaseUpdateJob?.cancel()
+        releaseUpdateJob = null
+        super.onStop()
+    }
 
     private val vpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) startVpn()
@@ -115,6 +131,22 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onDestroy() {
         scope.coroutineContext[Job]?.cancel()
         super.onDestroy()
+    }
+
+    private fun checkForReleaseUpdates() {
+        releaseUpdateJob?.cancel()
+        releaseUpdateJob = scope.launch {
+            while (isActive) {
+                val version = withContext(Dispatchers.IO) {
+                    ReleaseUpdateChecker.check("android", BuildConfig.VERSION_NAME)
+                }
+                if (version != null && releaseUpdatePreferences.getString(LAST_UPDATE_NOTICE, null) != version) {
+                    releaseUpdatePreferences.edit().putString(LAST_UPDATE_NOTICE, version).apply()
+                    engine.announce("update_available:$version")
+                }
+                delay(UPDATE_CHECK_INTERVAL_MS)
+            }
+        }
     }
 
     private val isTv: Boolean
@@ -316,6 +348,10 @@ class MainActivity : FlutterFragmentActivity() {
                 openUrl("https://t.me/env_soh")
                 result.success(null)
             }
+            "openUpdates" -> {
+                openUrl(ReleaseUpdateChecker.RELEASE_PAGE)
+                result.success(null)
+            }
             "openBatterySettings" -> {
                 runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
                 result.success(null)
@@ -452,5 +488,7 @@ class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val APP_CHANNEL = "com.soheil.ember/app"
         private const val STATE_CHANNEL = "com.soheil.ember/state"
+        private const val LAST_UPDATE_NOTICE = "last_android_update_notice"
+        private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
     }
 }

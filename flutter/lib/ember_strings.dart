@@ -109,6 +109,8 @@ class EmberStrings {
     'whatsNewMint': 'The Mint background, glass power orb and server selector follow Ember’s familiar design.',
     'whatsNewEngine': 'Your Android VPN engine still manages permissions, servers and connections.',
     'languageChanged': 'Language updated',
+    'updateAvailable': 'Ember {version} is available.',
+    'viewUpdate': 'View',
   };
 
   static const _fa = <String, String>{
@@ -207,5 +209,7 @@ class EmberStrings {
     'whatsNewMint': 'پس‌زمینهٔ نعناعی، گوی شیشه‌ای و انتخاب‌گر سرور، ظاهر آشنای Ember را حفظ می‌کنند.',
     'whatsNewEngine': 'موتور بومی VPN اندروید همچنان مجوزها، سرورها و اتصال را مدیریت می‌کند.',
     'languageChanged': 'زبان به‌روز شد',
+    'updateAvailable': 'نسخهٔ {version} Ember آماده است.',
+    'viewUpdate': 'مشاهده',
   };
 }

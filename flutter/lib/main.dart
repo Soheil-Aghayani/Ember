@@ -52,9 +52,16 @@ class _EmberAppState extends State<EmberApp> {
       _lastNotice = null;
     } else if (next.notice != _lastNotice) {
       _lastNotice = next.notice;
+      final updateVersion = next.notice!.startsWith('update_available:')
+          ? next.notice!.substring('update_available:'.length)
+          : null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _showMessage(next.notice!);
+        if (updateVersion != null) {
+          _showUpdateAvailable(updateVersion, next);
+        } else {
+          _showMessage(next.notice!);
+        }
         unawaited(_api.clearNotice());
       });
     }
@@ -85,6 +92,22 @@ class _EmberAppState extends State<EmberApp> {
     _messengerKey.currentState
       ?..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showUpdateAvailable(String version, EmberState state) {
+    final strings = EmberStrings(_effectivePersian(state));
+    _messengerKey.currentState
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(strings.get('updateAvailable', {'version': version})),
+          duration: const Duration(seconds: 12),
+          action: SnackBarAction(
+            label: strings.get('viewUpdate'),
+            onPressed: () => unawaited(_api.openUpdates().catchError((_) {})),
+          ),
+        ),
+      );
   }
 
   @override

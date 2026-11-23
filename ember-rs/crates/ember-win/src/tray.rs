@@ -81,6 +81,14 @@ impl Tray {
         #[cfg(not(windows))]
         let _ = menu;
     }
+
+    /// Shows a native notification-area balloon. Clicking it opens Ember; contextual actions live in the tray menu.
+    pub fn notify(&self, title: &str, message: &str) {
+        #[cfg(windows)]
+        self.imp.notify(title, message);
+        #[cfg(not(windows))]
+        let _ = (title, message);
+    }
 }
 
 #[cfg(windows)]
@@ -100,7 +108,10 @@ mod imp {
     use windows::core::{w, PCWSTR};
     use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows::Win32::UI::Shell::{ExtractIconW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW};
+    use windows::Win32::UI::Shell::{
+        ExtractIconW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
+        NIIF_INFO, NIN_BALLOONUSERCLICK, NOTIFYICONDATAW,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
         AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetCursorPos,
         GetMessageW, LoadIconW, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow,
@@ -142,6 +153,25 @@ mod imp {
                     *current = menu;
                 }
             }
+        }
+
+        pub fn notify(&self, title: &str, message: &str) {
+            let Some(shared) = SHARED.get() else { return };
+            let Ok(icon) = shared.icon.lock() else { return };
+            let mut data = NOTIFYICONDATAW {
+                cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+                hWnd: icon.0.hWnd,
+                uID: icon.0.uID,
+                uFlags: NIF_INFO,
+                dwInfoFlags: NIIF_INFO,
+                ..Default::default()
+            };
+            let title = wide(title, data.szInfoTitle.len());
+            let message = wide(message, data.szInfo.len());
+            data.szInfoTitle[..title.len()].copy_from_slice(&title);
+            data.szInfo[..message.len()].copy_from_slice(&message);
+            // SAFETY: the icon is active and the notification data has its fixed buffers and NUL terminators populated.
+            let _ = unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
         }
 
         pub fn close(&mut self) {
@@ -245,6 +275,7 @@ mod imp {
             CALLBACK => {
                 match (lparam.0 & 0xFFFF) as u32 {
                     WM_LBUTTONUP | WM_LBUTTONDBLCLK => send(shared, TrayEvent::Open),
+                    NIN_BALLOONUSERCLICK => send(shared, TrayEvent::Open),
                     WM_RBUTTONUP => {
                         if let Some(id) = show_menu(shared, hwnd) {
                             send(shared, TrayEvent::Command(id));

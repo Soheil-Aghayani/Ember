@@ -286,6 +286,7 @@ class EmberApi {
   Future<void> openAppSettings() =>
       _methods.invokeMethod<void>('openAppSettings');
   Future<void> openContact() => _methods.invokeMethod<void>('openContact');
+  Future<void> openUpdates() => _methods.invokeMethod<void>('openUpdates');
 
   Future<int> _importCount(String method) async {
     final response = await _methods.invokeMapMethod<Object?, Object?>(method);
