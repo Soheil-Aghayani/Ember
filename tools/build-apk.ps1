@@ -35,18 +35,24 @@ if (-not (Test-Path -LiteralPath $store -PathType Leaf) -or -not (Test-Path -Lit
 $versionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $root 'android\build.gradle.kts') -Raw), '(?m)^\s*versionName\s*=\s*"([^"]+)"')
 if (-not $versionMatch.Success) { throw 'Could not read Android versionName from android/build.gradle.kts.' }
 $version = $versionMatch.Groups[1].Value
+$pubLock = Join-Path $flutterRoot 'pubspec.lock'
+$pubHostMatch = [regex]::Match((Get-Content -LiteralPath $pubLock -Raw), '(?m)^\s*url:\s*"([^"]+)"')
+if (-not $pubHostMatch.Success) { throw "Could not read the package host from $pubLock." }
+$lockedPubHost = $pubHostMatch.Groups[1].Value
 $password = [System.Net.NetworkCredential]::new('', (Get-Content -LiteralPath $saved | ConvertTo-SecureString)).Password
 $signingNames = 'SIGNING_KEYSTORE', 'SIGNING_KEY_ALIAS', 'SIGNING_KEY_PASSWORD', 'SIGNING_STORE_PASSWORD'
 $originalSigningValues = @{}
 foreach ($name in $signingNames) { $originalSigningValues[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+$originalPubHostedUrl = $env:PUB_HOSTED_URL
 
 try {
     if (-not $env:JAVA_HOME) { $env:JAVA_HOME = $javaHome }
     if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = $sdkRoot }
     if (-not $env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT = $sdkRoot }
+    $env:PUB_HOSTED_URL = $lockedPubHost
     Push-Location -LiteralPath $flutterRoot
     try {
-        & $flutter pub get
+        & $flutter pub get --offline --enforce-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
     } finally {
         Pop-Location
@@ -94,5 +100,7 @@ try {
     else { Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue }
     if ($originalAndroidSdkRoot) { $env:ANDROID_SDK_ROOT = $originalAndroidSdkRoot }
     else { Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue }
+    if ($originalPubHostedUrl) { $env:PUB_HOSTED_URL = $originalPubHostedUrl }
+    else { Remove-Item Env:PUB_HOSTED_URL -ErrorAction SilentlyContinue }
     $password = $null
 }

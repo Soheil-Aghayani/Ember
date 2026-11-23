@@ -44,6 +44,11 @@ $windowsVersion = Read-Version (Join-Path $rustRoot 'ember-ui\Cargo.toml') '(?m)
 $androidBuildFile = Join-Path $androidRoot 'build.gradle.kts'
 $androidVersion = Read-Version $androidBuildFile '(?m)^\s*versionName\s*=\s*"([^"]+)"' 'Android app version'
 $androidVersionCode = [int](Read-Version $androidBuildFile '(?m)^\s*versionCode\s*=\s*(\d+)' 'Android version code')
+$pubLock = Join-Path $repoRoot 'flutter\pubspec.lock'
+$pubHostMatch = [regex]::Match((Get-Content -LiteralPath $pubLock -Raw), '(?m)^\s*url:\s*"([^"]+)"')
+if (-not $pubHostMatch.Success) { throw "Could not read the package host from $pubLock." }
+$lockedPubHost = $pubHostMatch.Groups[1].Value
+$originalPubHostedUrl = $env:PUB_HOSTED_URL
 
 $cargo = (Get-Command cargo -ErrorAction SilentlyContinue).Source
 if (-not $cargo) { throw 'Cargo is not available on PATH.' }
@@ -90,6 +95,7 @@ try {
     if (-not $env:JAVA_HOME) { $env:JAVA_HOME = $javaHome }
     if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = $androidSdk }
     if (-not $env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT = $androidSdk }
+    $env:PUB_HOSTED_URL = $lockedPubHost
     Write-Host "Building Windows PC candidate $windowsVersion..."
     Invoke-Checked $cargo @('build', '--release', '--manifest-path', (Join-Path $rustRoot 'Cargo.toml'), '-p', 'ember-ui') $repoRoot
     & $windowsStageScript -Resources $WindowsResources -Out $windowsStage
@@ -104,7 +110,7 @@ try {
     if (-not (Test-Path -LiteralPath $windowsArtifact -PathType Leaf)) { throw "Windows installer was not produced: $windowsArtifact" }
 
     Write-Host "Fetching Flutter packages and building Android release $androidVersion..."
-    Invoke-Checked $flutter @('pub', 'get') (Join-Path $repoRoot 'flutter')
+    Invoke-Checked $flutter @('pub', 'get', '--offline', '--enforce-lockfile') (Join-Path $repoRoot 'flutter')
     if ($AndroidKeystoreDir) {
         & $androidSigningScript -KeystoreDir $AndroidKeystoreDir -OutDir $androidOutput
         if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Signed Android build failed.' }
@@ -185,4 +191,6 @@ try {
     else { Remove-Item Env:ANDROID_HOME -ErrorAction SilentlyContinue }
     if ($originalAndroidSdkRoot) { $env:ANDROID_SDK_ROOT = $originalAndroidSdkRoot }
     else { Remove-Item Env:ANDROID_SDK_ROOT -ErrorAction SilentlyContinue }
+    if ($originalPubHostedUrl) { $env:PUB_HOSTED_URL = $originalPubHostedUrl }
+    else { Remove-Item Env:PUB_HOSTED_URL -ErrorAction SilentlyContinue }
 }
