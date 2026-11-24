@@ -96,6 +96,9 @@ class EmberStrings {
     'openFirefox': 'Open Firefox',
     'firefoxNotInstalled':
         'Firefox is not installed. Opening its Google Play page.',
+    'firefoxVpnTvTitle': 'Protect this Android TV',
+    'firefoxVpnTvHelp': 'Firefox’s built-in VPN only protects browsing inside Firefox, not TV apps. To use VPN beyond the browser on this TV, open Ember Home and connect an Ember server.',
+    'useEmberOnTv': 'Open Ember Home',
     'version': 'Version',
     'engine': 'Engine',
     'tunnel': 'Tunnel',
@@ -202,6 +205,9 @@ class EmberStrings {
     'openFirefox': 'باز کردن Firefox',
     'firefoxNotInstalled':
         'Firefox نصب نیست؛ صفحهٔ آن در Google Play باز می‌شود.',
+    'firefoxVpnTvTitle': 'محافظت از Android TV',
+    'firefoxVpnTvHelp': 'VPN داخلی Firefox فقط مرور در خود Firefox را پوشش می‌دهد، نه برنامه‌های تلویزیون را. برای استفاده از VPN خارج از مرورگر در تلویزیون، به خانهٔ Ember بروید و به یک سرور Ember وصل شوید.',
+    'useEmberOnTv': 'رفتن به خانهٔ Ember',
     'version': 'نسخه',
     'engine': 'موتور',
     'tunnel': 'تونل',

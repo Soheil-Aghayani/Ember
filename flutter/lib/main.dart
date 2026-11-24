@@ -349,7 +349,7 @@ class _EmberShellState extends State<_EmberShell> {
         ),
         TickerMode(
           enabled: selected == 2,
-          child: SettingsScreen(ui: ui),
+          child: SettingsScreen(ui: ui, onOpenHome: () => _select(_Page.home)),
         ),
         LogsScreen(ui: ui),
         WhatsNewScreen(ui: ui),

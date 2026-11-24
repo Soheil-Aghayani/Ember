@@ -202,6 +202,10 @@ pub struct Strings {
     pub sounds_help: &'static str,
     pub mint: &'static str,
     pub kitkat: &'static str,
+    pub firefox_vpn_title: &'static str,
+    pub firefox_vpn_help: &'static str,
+    pub open_firefox: &'static str,
+    pub firefox_not_found: &'static str,
 }
 
 pub const EN: Strings = Strings {
@@ -403,6 +407,10 @@ pub const EN: Strings = Strings {
     sounds_help: "A short chime, quiet by design.",
     mint: "Mint",
     kitkat: "KitKat",
+    firefox_vpn_title: "Firefox's free built-in VPN",
+    firefox_vpn_help: "In Firefox 149 or newer, open VPN from the toolbar, sign in to your Mozilla account, and turn it on. It protects Firefox browsing only; availability depends on Mozilla's rollout for your account and region.",
+    open_firefox: "Open Firefox",
+    firefox_not_found: "Firefox was not found. Opening Mozilla's download page.",
 };
 
 pub const FA: Strings = Strings {
@@ -604,6 +612,10 @@ pub const FA: Strings = Strings {
     sounds_help: "یک زنگ کوتاه و آرام.",
     mint: "نعنا",
     kitkat: "کیت‌کت",
+    firefox_vpn_title: "VPN رایگان داخلی Firefox",
+    firefox_vpn_help: "در Firefox نسخهٔ ۱۴۹ یا جدیدتر، از نوار ابزار VPN را باز کنید، وارد حساب Mozilla شوید و آن را روشن کنید. این VPN فقط مرور داخل Firefox را پوشش می‌دهد؛ فعال بودنش به حساب و منطقهٔ شما بستگی دارد.",
+    open_firefox: "باز کردن Firefox",
+    firefox_not_found: "Firefox پیدا نشد؛ صفحهٔ دریافت آن از Mozilla باز می‌شود.",
 };
 
 pub fn for_language(code: &str) -> &'static Strings {

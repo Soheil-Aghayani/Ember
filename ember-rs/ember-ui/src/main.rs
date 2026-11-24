@@ -315,6 +315,9 @@ fn apply_language(app: &App, language: &str) {
     tr.set_dark(s.dark.into());
     tr.set_mint(s.mint.into());
     tr.set_kitkat(s.kitkat.into());
+    tr.set_firefox_vpn_title(s.firefox_vpn_title.into());
+    tr.set_firefox_vpn_help(s.firefox_vpn_help.into());
+    tr.set_open_firefox(s.open_firefox.into());
     tr.set_system(s.system.into());
     tr.set_startup_tray(s.startup_and_tray.into());
     tr.set_protection(s.protection.into());
@@ -1247,6 +1250,18 @@ fn main() {
     app.on_open_contact(|| {
         ember_win::shell::open_url(about::CONTACT_LINK);
     });
+    {
+        let weak = app.as_weak();
+        app.on_open_firefox_vpn(move || {
+            if !ember_win::shell::open_firefox()
+                && ember_win::shell::open_url("https://www.mozilla.org/firefox/new/")
+            {
+                if let Some(app) = weak.upgrade() {
+                    app.set_toast(lang::current().firefox_not_found.into());
+                }
+            }
+        });
+    }
     {
         let engine = engine.clone();
         app.on_restore_internet(move || engine.restore_internet());

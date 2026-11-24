@@ -4,9 +4,10 @@ import 'ember_api.dart';
 import 'ember_ui.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.ui});
+  const SettingsScreen({super.key, required this.ui, required this.onOpenHome});
 
   final EmberUi ui;
+  final VoidCallback onOpenHome;
 
   @override
   Widget build(BuildContext context) {
@@ -126,9 +127,9 @@ class SettingsScreen extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 14),
+        if (state.isTv) _tvVpnCard(context) else _firefoxVpnCard(context),
+        const SizedBox(height: 14),
         if (!state.isTv) ...[
-          _firefoxVpnCard(context),
-          const SizedBox(height: 8),
           EmberActionTile(
             icon: 'power',
             title: copy.get('addTileTitle'),
@@ -151,6 +152,33 @@ class SettingsScreen extends StatelessWidget {
           onPressed: () => ui.run(() => ui.api.openBatterySettings()),
         ),
       ],
+    );
+  }
+
+  Widget _tvVpnCard(BuildContext context) {
+    final copy = ui.strings;
+    final colors = Theme.of(context).colorScheme;
+    return EmberCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            copy.get('firefoxVpnTvTitle'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(copy.get('firefoxVpnTvHelp')),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onOpenHome,
+              icon: SolarIcon('home', color: colors.onPrimary),
+              label: Text(copy.get('useEmberOnTv')),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

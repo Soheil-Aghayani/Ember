@@ -13,22 +13,41 @@ pub fn is_web_link(url: &str) -> bool {
 /// Opens `url` with the default browser. False when it is not a web link or Windows could not open it.
 #[cfg(windows)]
 pub fn open_url(url: &str) -> bool {
+    if !is_web_link(url) {
+        return false;
+    }
+    shell_execute(url, None)
+}
+
+/// Opens desktop Firefox at its privacy settings, where the built-in VPN setup is available.
+#[cfg(windows)]
+pub fn open_firefox() -> bool {
+    shell_execute("firefox.exe", Some("about:preferences#privacy"))
+}
+
+#[cfg(windows)]
+fn shell_execute(file: &str, parameters: Option<&str>) -> bool {
     use windows::core::{w, HSTRING};
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-    if !is_web_link(url) {
-        return false;
-    }
-    let target = HSTRING::from(url);
+    let target = HSTRING::from(file);
+    let parameters = parameters.map(HSTRING::from);
     // SAFETY: all strings are valid, NUL-terminated wide strings that outlive the call; no window handle is passed.
-    let result = unsafe { ShellExecuteW(None, w!("open"), &target, None, None, SW_SHOWNORMAL) };
+    let result = unsafe {
+        ShellExecuteW(None, w!("open"), &target, parameters.as_ref(), None, SW_SHOWNORMAL)
+    };
     // ShellExecuteW reports success with a value above 32
     result.0 as usize > 32
 }
 
 #[cfg(not(windows))]
 pub fn open_url(_url: &str) -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn open_firefox() -> bool {
     false
 }
 

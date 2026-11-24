@@ -89,6 +89,7 @@ export component App inherits Window {
     in property <[InfoItem]> about-licenses;
     in property <[ReleaseRow]> releases;
     callback open-contact();
+    callback open-firefox-vpn();
     in property <string> toast;
     in property <bool> toast-error;
     callback log-filter-changed(int);
@@ -243,6 +244,7 @@ export component App inherits Window {
                     mtu-apply(v) => { root.mtu-apply(v); }
                     backup-save => { root.backup-save(); }
                     backup-restore => { root.backup-restore(); }
+                    open-firefox-vpn => { root.open-firefox-vpn(); }
                     language-chosen(v) => { root.language-chosen(v); }
                     theme-chosen(v) => { root.theme-chosen(v); }
                     flag-toggled(key, v) => { root.flag-toggled(key, v); }

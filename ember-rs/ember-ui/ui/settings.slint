@@ -221,6 +221,7 @@ export component SettingsPage inherits Rectangle {
     callback mtu-apply(string);
     callback backup-save();
     callback backup-restore();
+    callback open-firefox-vpn();
     in property <string> backup-message;
 
     property <string> mtu-draft;
@@ -273,6 +274,18 @@ export component SettingsPage inherits Rectangle {
                         NavRow { title: Tr.backup; clicked => { root.section = 7; } }
                         Divider { }
                         NavRow { title: Tr.advanced; clicked => { root.section = 3; } }
+                    }
+                }
+                GroupLabel { text: Tr.firefox-vpn-title; }
+                Card {
+                    height: firefox-vpn-card.preferred-height;
+                    firefox-vpn-card := VerticalLayout {
+                        padding: 16px; spacing: 10px;
+                        Label { text: Tr.firefox-vpn-help; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                        Button {
+                            text: Tr.open-firefox; primary: true;
+                            clicked => { root.open-firefox-vpn(); }
+                        }
                     }
                 }
             }
