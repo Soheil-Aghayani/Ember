@@ -73,20 +73,33 @@ class ConnectWidget : AppWidgetProvider() {
                 val options = manager.getAppWidgetOptions(id)
                 val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
                 val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+                val wide = width >= WIDE_MIN_WIDTH_DP && height < EXPANDED_MIN_HEIGHT_DP
                 val compact = width < EXPANDED_MIN_WIDTH_DP || height < EXPANDED_MIN_HEIGHT_DP
-                val layout = if (compact) R.layout.widget_connect_compact else R.layout.widget_connect
+                val layout = when {
+                    wide -> R.layout.widget_connect_wide
+                    compact -> R.layout.widget_connect_compact
+                    else -> R.layout.widget_connect
+                }
                 val views = RemoteViews(context.packageName, layout)
                 views.setTextViewText(R.id.widget_status, status)
                 views.setTextViewText(R.id.widget_server, server)
+                val actionDescription = if (phase == ConnectionState.DISCONNECTED) {
+                    if (engine.selectedNode() == null) words.chooseServer else words.connect
+                } else {
+                    words.disconnect
+                }
+                views.setContentDescription(R.id.widget_power, actionDescription)
                 // The orb glows while connecting or connected and dims when off.
                 views.setInt(R.id.widget_orb, "setImageAlpha", if (phase == ConnectionState.DISCONNECTED) 70 else 255)
                 views.setInt(R.id.widget_power, "setImageAlpha", if (connected) 255 else 140)
                 views.setOnClickPendingIntent(R.id.widget_root, tap)
+                views.setOnClickPendingIntent(R.id.widget_power, tap)
                 manager.updateAppWidget(id, views)
             }
         }
 
         private const val EXPANDED_MIN_WIDTH_DP = 160
         private const val EXPANDED_MIN_HEIGHT_DP = 130
+        private const val WIDE_MIN_WIDTH_DP = 210
     }
 }
