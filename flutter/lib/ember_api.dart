@@ -283,6 +283,8 @@ class EmberApi {
       await _methods.invokeMethod<bool>('requestWidget') ?? false;
   Future<void> openBatterySettings() =>
       _methods.invokeMethod<void>('openBatterySettings');
+  Future<bool> openFirefoxVpn() async =>
+      await _methods.invokeMethod<bool>('openFirefoxVpn') ?? false;
   Future<void> openAppSettings() =>
       _methods.invokeMethod<void>('openAppSettings');
   Future<void> openContact() => _methods.invokeMethod<void>('openContact');

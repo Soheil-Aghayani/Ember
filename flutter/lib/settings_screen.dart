@@ -127,6 +127,8 @@ class SettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         if (!state.isTv) ...[
+          _firefoxVpnCard(context),
+          const SizedBox(height: 8),
           EmberActionTile(
             icon: 'power',
             title: copy.get('addTileTitle'),
@@ -150,6 +152,46 @@ class SettingsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _firefoxVpnCard(BuildContext context) {
+    final copy = ui.strings;
+    final colors = Theme.of(context).colorScheme;
+    return EmberCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            copy.get('firefoxVpnTitle'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(copy.get('firefoxVpnSteps')),
+          const SizedBox(height: 8),
+          Text(
+            copy.get('firefoxVpnLimit'),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _openFirefoxVpn,
+              icon: SolarIcon('global', color: colors.onPrimary),
+              label: Text(copy.get('openFirefox')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openFirefoxVpn() async {
+    final openedFirefox = await ui.run(() => ui.api.openFirefoxVpn());
+    if (openedFirefox == false) {
+      ui.tell(ui.strings.get('firefoxNotInstalled'));
+    }
   }
 
   Widget _languageOptions(BuildContext context) => RadioGroup<String>(

@@ -352,6 +352,7 @@ class MainActivity : FlutterFragmentActivity() {
                 openUrl(ReleaseUpdateChecker.RELEASE_PAGE)
                 result.success(null)
             }
+            "openFirefoxVpn" -> result.success(openFirefox())
             "openBatterySettings" -> {
                 runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
                 result.success(null)
@@ -474,6 +475,16 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun openUrl(url: String) {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    }
+
+    private fun openFirefox(): Boolean {
+        val packageName = "org.mozilla.firefox"
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent != null && runCatching { startActivity(launchIntent) }.isSuccess) {
+            return true
+        }
+        openUrl("https://play.google.com/store/apps/details?id=$packageName")
+        return false
     }
 
     private fun MethodCall.requiredString(key: String, result: MethodChannel.Result): String? {
