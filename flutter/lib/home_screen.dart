@@ -208,8 +208,10 @@ class _HomeScreenState extends State<HomeScreen>
                   : widget.ui.strings.get('connect'),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                focusColor: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: .12),
+                focusColor: EmberFocus.overlay(
+                  Theme.of(context).colorScheme.primary,
+                  isTv: state.isTv,
+                ),
                 onTap: () {
                   if (!state.disconnected) {
                     widget.ui.run(() => widget.ui.api.disconnect());
@@ -335,7 +337,11 @@ class _HomeScreenState extends State<HomeScreen>
     return InkWell(
       onTap: state.disconnected ? widget.onOpenServers : null,
       borderRadius: BorderRadius.circular(18),
-      focusColor: Theme.of(context).colorScheme.primary.withValues(alpha: .08),
+      focusColor: EmberFocus.overlay(
+        Theme.of(context).colorScheme.primary,
+        isTv: state.isTv,
+        mobileAlpha: .08,
+      ),
       child: EmberCard(
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 20 : 16,

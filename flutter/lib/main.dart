@@ -119,11 +119,12 @@ class _EmberAppState extends State<EmberApp> {
   @override
   Widget build(BuildContext context) {
     final brightness = MediaQuery.platformBrightnessOf(context);
+    final isTv = _state?.isTv ?? false;
     return MaterialApp(
       title: 'Ember',
       debugShowCheckedModeBanner: false,
-      theme: _theme(Brightness.light),
-      darkTheme: _theme(Brightness.dark),
+      theme: _theme(Brightness.light, isTv: isTv),
+      darkTheme: _theme(Brightness.dark, isTv: isTv),
       themeMode: ThemeMode.system,
       scaffoldMessengerKey: _messengerKey,
       home: _state == null
@@ -160,7 +161,7 @@ class _EmberAppState extends State<EmberApp> {
       (state.language == 'system' &&
           ui.PlatformDispatcher.instance.locale.languageCode == 'fa');
 
-  ThemeData _theme(Brightness brightness) {
+  ThemeData _theme(Brightness brightness, {required bool isTv}) {
     const light = ColorScheme.light(
       primary: EmberColors.mintPrimary,
       onPrimary: Color(0xFFFFFFFF),
@@ -200,6 +201,9 @@ class _EmberAppState extends State<EmberApp> {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
+      focusColor: isTv
+          ? EmberFocus.overlay(scheme.primary, isTv: true)
+          : null,
       fontFamily: 'Inter',
       scaffoldBackgroundColor: brightness == Brightness.dark
           ? const Color(0xFF1A1714)
@@ -489,7 +493,7 @@ class _TvRail extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        focusColor: colors.primary.withValues(alpha: .1),
+        focusColor: EmberFocus.overlay(colors.primary, isTv: true),
         autofocus: index == selectedIndex,
         onTap: () => onSelect(index),
         child: Padding(

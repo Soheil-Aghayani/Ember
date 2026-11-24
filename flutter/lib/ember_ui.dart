@@ -12,6 +12,16 @@ abstract final class EmberColors {
   static const mintOrb = Color(0xFF2F8F78);
 }
 
+abstract final class EmberFocus {
+  static const tvAlpha = .24;
+
+  static Color overlay(
+    Color primary, {
+    required bool isTv,
+    double mobileAlpha = .12,
+  }) => primary.withValues(alpha: isTv ? tvAlpha : mobileAlpha);
+}
+
 typedef EmberRunner = Future<T?> Function<T>(
   Future<T> Function() action, {
   String? success,
