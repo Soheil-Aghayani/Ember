@@ -10,7 +10,7 @@ The feed is static and contains no device identifiers. It does not push notifica
 2. Copy the file to the website root as `updates.json` alongside the catalogue `index.html`.
 3. Keep the top-level `schemaVersion` at `1` unless clients are changed to understand a new schema.
 
-The file starts at the versions listed by the current catalogue candidate: Windows `2.0.1` and Android `2.7.2`. Add future apps under `apps` using the app's stable key and the platform key its client checks.
+The published catalogue versions are Windows `2.0.1` and Android `2.7.3`. Add future apps under `apps` using the app's stable key and the platform key its client checks.
 
 ## Format
 
@@ -20,7 +20,7 @@ The file starts at the versions listed by the current catalogue candidate: Windo
   "apps": {
     "ember": {
       "windows": { "version": "2.0.1" },
-      "android": { "version": "2.7.2" }
+      "android": { "version": "2.7.3" }
     }
   }
 }
