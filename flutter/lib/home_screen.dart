@@ -20,6 +20,8 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _orbit;
   Timer? _clock;
+  bool _orbFocused = false;
+  bool _serverCardFocused = false;
 
   @override
   void initState() {
@@ -208,6 +210,11 @@ class _HomeScreenState extends State<HomeScreen>
                   : widget.ui.strings.get('connect'),
               child: InkWell(
                 customBorder: const CircleBorder(),
+                onFocusChange: (focused) {
+                  if (state.isTv && _orbFocused != focused) {
+                    setState(() => _orbFocused = focused);
+                  }
+                },
                 focusColor: EmberFocus.overlay(
                   Theme.of(context).colorScheme.primary,
                   isTv: state.isTv,
@@ -260,8 +267,10 @@ class _HomeScreenState extends State<HomeScreen>
                       stops: const [0, .22, .42, .60, .78, 1],
                     ),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: .35),
-                      width: 1.2,
+                      color: state.isTv && _orbFocused
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.white.withValues(alpha: .35),
+                      width: state.isTv && _orbFocused ? 3 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -336,6 +345,11 @@ class _HomeScreenState extends State<HomeScreen>
     final speed = node == null ? null : state.results[node.id]?.mbps;
     return InkWell(
       onTap: state.disconnected ? widget.onOpenServers : null,
+      onFocusChange: (focused) {
+        if (state.isTv && _serverCardFocused != focused) {
+          setState(() => _serverCardFocused = focused);
+        }
+      },
       borderRadius: BorderRadius.circular(18),
       focusColor: EmberFocus.overlay(
         Theme.of(context).colorScheme.primary,
@@ -343,6 +357,7 @@ class _HomeScreenState extends State<HomeScreen>
         mobileAlpha: .08,
       ),
       child: EmberCard(
+        focused: state.isTv && _serverCardFocused,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 20 : 16,
           vertical: compact ? 14 : 18,

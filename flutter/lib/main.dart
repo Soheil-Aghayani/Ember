@@ -201,9 +201,7 @@ class _EmberAppState extends State<EmberApp> {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      focusColor: isTv
-          ? EmberFocus.overlay(scheme.primary, isTv: true)
-          : null,
+      focusColor: isTv ? EmberFocus.overlay(scheme.primary, isTv: true) : null,
       fontFamily: 'Inter',
       scaffoldBackgroundColor: brightness == Brightness.dark
           ? const Color(0xFF1A1714)
@@ -422,7 +420,7 @@ class _EmberShellState extends State<_EmberShell> {
   void _select(_Page page) => setState(() => _page = page);
 }
 
-class _TvRail extends StatelessWidget {
+class _TvRail extends StatefulWidget {
   const _TvRail({
     required this.selectedIndex,
     required this.label,
@@ -451,6 +449,13 @@ class _TvRail extends StatelessWidget {
   ];
 
   @override
+  State<_TvRail> createState() => _TvRailState();
+}
+
+class _TvRailState extends State<_TvRail> {
+  int? _focusedIndex;
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return FocusTraversalGroup(
@@ -476,7 +481,7 @@ class _TvRail extends StatelessWidget {
             for (var index = 0; index < 4; index++)
               _item(context, index, colors),
             const Spacer(),
-            for (var index = 4; index < _icons.length; index++)
+            for (var index = 4; index < _TvRail._icons.length; index++)
               _item(context, index, colors),
           ],
         ),
@@ -487,33 +492,47 @@ class _TvRail extends StatelessWidget {
   Widget _item(BuildContext context, int index, ColorScheme colors) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
     child: Material(
-      color: selectedIndex == index
+      color: widget.selectedIndex == index
           ? colors.primaryContainer.withValues(alpha: .88)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: _focusedIndex == index ? colors.primary : Colors.transparent,
+          width: 3,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         focusColor: EmberFocus.overlay(colors.primary, isTv: true),
-        autofocus: index == selectedIndex,
-        onTap: () => onSelect(index),
+        autofocus: index == widget.selectedIndex,
+        onFocusChange: (focused) {
+          if (focused && _focusedIndex != index) {
+            setState(() => _focusedIndex = index);
+          } else if (!focused && _focusedIndex == index) {
+            setState(() => _focusedIndex = null);
+          }
+        },
+        onTap: () => widget.onSelect(index),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               SolarIcon(
-                _icons[index],
-                color: selectedIndex == index
+                _TvRail._icons[index],
+                color: widget.selectedIndex == index
                     ? colors.primary
                     : colors.onSurface,
               ),
               const SizedBox(width: 14),
               Text(
-                label(_labels[index]),
+                widget.label(_TvRail._labels[index]),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: selectedIndex == index
+                  color: widget.selectedIndex == index
                       ? colors.primary
                       : colors.onSurface,
-                  fontWeight: selectedIndex == index
+                  fontWeight: widget.selectedIndex == index
                       ? FontWeight.w600
                       : FontWeight.w400,
                 ),

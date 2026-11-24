@@ -85,10 +85,12 @@ class EmberCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
+    this.focused = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final bool focused;
 
   @override
   Widget build(BuildContext context) {
@@ -100,9 +102,12 @@ class EmberCard extends StatelessWidget {
         color: dark ? colors.surface : colors.surface.withValues(alpha: .78),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: dark
+          color: focused
+              ? colors.primary
+              : dark
               ? colors.outlineVariant.withValues(alpha: .75)
               : Colors.white.withValues(alpha: .72),
+          width: focused ? 2.5 : 1,
         ),
       ),
       child: child,
