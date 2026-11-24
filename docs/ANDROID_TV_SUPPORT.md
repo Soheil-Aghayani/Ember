@@ -30,6 +30,8 @@ This profile comes from the owner's TV information image. Unique device identifi
 
 On 2026-11-19, the debug-only `.tvpreview` APK was installed and launched on an Android TV API 34 x86_64 emulator. The Mint home screen rendered; D-pad navigation reached Home, Servers, Settings, Logs, What's new, and About; the disconnected orb opened Servers when no server was selected. The app stayed running without Flutter runtime or layout errors. No server was configured, so VPN connection behavior was not tested. Physical BRAVIA BF1 validation remains pending.
 
+On 2026-11-24, the preview was rebuilt after adding stronger focus rings. The rail, Home orb, server card, and six-page D-pad navigation responded on the same emulator. The first focus input after cold launch produced one emulator input ANR; subsequent focus and navigation responded. This emulator check does not verify the physical BRAVIA BF1 or VPN traffic.
+
 - [x] Assemble the normal debug APK and debug-only TV preview APK.
 - [x] Check D-pad focus and Select navigation across Home, Servers, Settings, Logs, What's new, and About on an Android TV emulator.
 - [ ] Open and dismiss the Add link and Logs dialogs with a remote.
