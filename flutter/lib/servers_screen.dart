@@ -34,6 +34,34 @@ class ServersScreen extends StatelessWidget {
             ),
           ),
         ),
+        if (state.testLimitReason != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: EmberCard(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    const SolarIcon('info_circle'),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        copy.get(switch (state.testLimitReason) {
+                          'battery_saver' => 'testLimitedBattery',
+                          'low_battery' => 'testLimitedCharge',
+                          _ => 'testLimitedMetered',
+                        }),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         if (state.subscriptions.isNotEmpty)
           SliverToBoxAdapter(child: _autoRow(context)),
         if (state.siteLabel != null)
@@ -366,8 +394,25 @@ class ServersScreen extends StatelessWidget {
       state.favorites.contains(a.id) ? 1 : 0,
     );
     if (byFavorite != 0) return byFavorite;
+    int recentRank(String id) {
+      final index = state.recentIds.indexOf(id);
+      return index < 0 ? 0x7fffffff : index;
+    }
+
+    final byRecent = recentRank(a.id).compareTo(recentRank(b.id));
+    if (byRecent != 0) return byRecent;
     final aResult = state.results[a.id];
     final bResult = state.results[b.id];
+    final aReliability =
+        aResult?.successRate ?? (aResult?.pingMs == null ? 0.0 : 1.0);
+    final bReliability =
+        bResult?.successRate ?? (bResult?.pingMs == null ? 0.0 : 1.0);
+    final byReliability = bReliability.compareTo(aReliability);
+    if (byReliability != 0) return byReliability;
+    final byJitter = (aResult?.jitterMs ?? 0x7fffffff).compareTo(
+      bResult?.jitterMs ?? 0x7fffffff,
+    );
+    if (byJitter != 0) return byJitter;
     if (aResult?.mbps != null && bResult?.mbps != null) {
       final bySpeed = bResult!.mbps!.compareTo(aResult!.mbps!);
       if (bySpeed != 0) return bySpeed;
@@ -426,10 +471,7 @@ class _SubscriptionRow extends StatelessWidget {
           if (subscription.canRefresh)
             IconButton(
               tooltip: ui.strings.get('refresh'),
-              onPressed: () => ui.run(
-                () => ui.api.refreshSubscription(subscription.id),
-                success: ui.strings.get('updated'),
-              ),
+              onPressed: () => _previewRefresh(context),
               icon: const SolarIcon('refresh'),
             ),
           IconButton(
@@ -440,6 +482,44 @@ class _SubscriptionRow extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _previewRefresh(BuildContext context) async {
+    final preview = await ui.run(() => ui.api.previewRefresh(subscription.id));
+    if (preview == null || !context.mounted) return;
+    final apply = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ui.strings.get('refreshPreviewTitle')),
+        content: Text(
+          ui.strings.get('refreshPreviewBody', {
+            'added': preview.added,
+            'removed': preview.removed,
+            'unchanged': preview.unchanged,
+          }),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            icon: const SolarIcon('close'),
+            label: Text(ui.strings.get('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const SolarIcon('check_circle', color: Colors.white),
+            label: Text(ui.strings.get('refreshNow')),
+          ),
+        ],
+      ),
+    );
+    if (apply == true) {
+      await ui.run(
+        () => ui.api.applyRefreshPreview(preview.token),
+        success: ui.strings.get('updated'),
+      );
+    } else {
+      await ui.run(() => ui.api.discardRefreshPreview(preview.token));
+    }
   }
 
   Future<void> _confirmRemove(BuildContext context) async {
@@ -486,6 +566,12 @@ class _ServerRow extends StatelessWidget {
         : result?.pingMs != null
         ? '${result!.pingMs} ms'
         : null;
+    final stability = result?.jitterMs == null || result?.successRate == null
+        ? null
+        : ui.strings.get('stabilityDetail', {
+            'jitter': result!.jitterMs,
+            'reliability': (result.successRate! * 100).round(),
+          });
     return InkWell(
       onTap: () => ui.run(() => ui.api.selectServer(node.id)),
       borderRadius: BorderRadius.circular(16),
@@ -506,7 +592,9 @@ class _ServerRow extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   Text(
-                    node.protocol.toUpperCase(),
+                    [node.protocol.toUpperCase(), ?stability].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: colors.onSurfaceVariant),
                   ),

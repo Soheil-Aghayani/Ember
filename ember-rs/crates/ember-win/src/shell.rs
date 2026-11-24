@@ -32,10 +32,10 @@ fn shell_execute(file: &str, parameters: Option<&str>) -> bool {
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     let target = HSTRING::from(file);
-    let parameters = parameters.map(HSTRING::from);
+    let parameters = parameters.map(HSTRING::from).unwrap_or_default();
     // SAFETY: all strings are valid, NUL-terminated wide strings that outlive the call; no window handle is passed.
     let result = unsafe {
-        ShellExecuteW(None, w!("open"), &target, parameters.as_ref(), None, SW_SHOWNORMAL)
+        ShellExecuteW(None, w!("open"), &target, &parameters, None, SW_SHOWNORMAL)
     };
     // ShellExecuteW reports success with a value above 32
     result.0 as usize > 32

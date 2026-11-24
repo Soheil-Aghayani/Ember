@@ -70,16 +70,20 @@ class EmberSubscription {
 }
 
 class EmberResult {
-  const EmberResult({this.pingMs, this.mbps});
+  const EmberResult({this.pingMs, this.mbps, this.jitterMs, this.successRate});
 
   final int? pingMs;
   final double? mbps;
+  final int? jitterMs;
+  final double? successRate;
 
   factory EmberResult.fromMap(Object? value) {
     final data = _map(value);
     return EmberResult(
       pingMs: (data['pingMs'] as num?)?.toInt(),
       mbps: (data['mbps'] as num?)?.toDouble(),
+      jitterMs: (data['jitterMs'] as num?)?.toInt(),
+      successRate: (data['successRate'] as num?)?.toDouble(),
     );
   }
 }
@@ -116,6 +120,80 @@ class EmberAppChoice {
   }
 }
 
+class EmberDiagnostics {
+  const EmberDiagnostics({required this.report, this.directIp, this.tunnelIp});
+
+  final String report;
+  final String? directIp;
+  final String? tunnelIp;
+
+  factory EmberDiagnostics.fromMap(Object? value) {
+    final data = _map(value);
+    return EmberDiagnostics(
+      report: data['report'] as String? ?? '',
+      directIp: data['directIp'] as String?,
+      tunnelIp: data['tunnelIp'] as String?,
+    );
+  }
+}
+
+class EmberRefreshPreview {
+  const EmberRefreshPreview({
+    required this.token,
+    required this.added,
+    required this.removed,
+    required this.unchanged,
+    required this.total,
+  });
+
+  final String token;
+  final int added;
+  final int removed;
+  final int unchanged;
+  final int total;
+
+  factory EmberRefreshPreview.fromMap(Object? value) {
+    final data = _map(value);
+    int number(String key) => (data[key] as num?)?.toInt() ?? 0;
+    return EmberRefreshPreview(
+      token: data['token'] as String? ?? '',
+      added: number('added'),
+      removed: number('removed'),
+      unchanged: number('unchanged'),
+      total: number('total'),
+    );
+  }
+}
+
+class EmberProfile {
+  const EmberProfile({
+    required this.id,
+    required this.name,
+    required this.selectedId,
+    required this.appMode,
+    required this.appPackages,
+  });
+
+  final String id;
+  final String name;
+  final String selectedId;
+  final String appMode;
+  final Set<String> appPackages;
+
+  factory EmberProfile.fromMap(Object? value) {
+    final data = _map(value);
+    return EmberProfile(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      selectedId: data['selectedId'] as String? ?? 'auto',
+      appMode: data['appMode'] as String? ?? 'off',
+      appPackages: (data['appPackages'] as List? ?? const [])
+          .whereType<String>()
+          .toSet(),
+    );
+  }
+}
+
 class EmberState {
   const EmberState({
     required this.isTv,
@@ -129,15 +207,20 @@ class EmberState {
     required this.favorites,
     required this.subscriptions,
     required this.results,
+    this.recentIds = const [],
+    this.profiles = const [],
     this.progress,
     this.error,
     this.connectedAt,
+    this.uploadBytes = 0,
+    this.downloadBytes = 0,
     this.connectedNode,
     this.selectedNode,
     this.testProgress,
     this.notice,
     this.siteLabel,
     this.siteResults = const {},
+    this.testLimitReason,
   });
 
   final bool isTv;
@@ -149,17 +232,22 @@ class EmberState {
   final String appMode;
   final Set<String> appPackages;
   final Set<String> favorites;
+  final List<String> recentIds;
+  final List<EmberProfile> profiles;
   final List<EmberSubscription> subscriptions;
   final Map<String, EmberResult> results;
   final String? progress;
   final String? error;
   final int? connectedAt;
+  final int uploadBytes;
+  final int downloadBytes;
   final EmberNode? connectedNode;
   final EmberNode? selectedNode;
   final String? testProgress;
   final String? notice;
   final String? siteLabel;
   final Map<String, EmberSiteResult> siteResults;
+  final String? testLimitReason;
 
   bool get connected => phase == 'connected';
   bool get connecting => phase == 'connecting';
@@ -186,6 +274,12 @@ class EmberState {
       favorites: (data['favorites'] as List? ?? const [])
           .whereType<String>()
           .toSet(),
+      recentIds: (data['recentIds'] as List? ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      profiles: (data['profiles'] as List? ?? const [])
+          .map(EmberProfile.fromMap)
+          .toList(growable: false),
       subscriptions: (data['subscriptions'] as List? ?? const [])
           .map(EmberSubscription.fromMap)
           .toList(growable: false),
@@ -195,6 +289,8 @@ class EmberState {
       progress: vpn['progress'] as String?,
       error: vpn['error'] as String?,
       connectedAt: (vpn['connectedAt'] as num?)?.toInt(),
+      uploadBytes: (vpn['uploadBytes'] as num?)?.toInt() ?? 0,
+      downloadBytes: (vpn['downloadBytes'] as num?)?.toInt() ?? 0,
       connectedNode: vpn['node'] == null
           ? null
           : EmberNode.fromMap(vpn['node']),
@@ -207,6 +303,7 @@ class EmberState {
       siteResults: rawSiteResults.map(
         (key, value) => MapEntry(key, EmberSiteResult.fromMap(value)),
       ),
+      testLimitReason: data['testLimitReason'] as String?,
     );
   }
 }
@@ -250,6 +347,22 @@ class EmberApi {
       _methods.invokeMethod<void>('addWarpThroughServer');
   Future<void> refreshSubscription(String id) =>
       _methods.invokeMethod<void>('refreshSubscription', {'id': id});
+  Future<EmberRefreshPreview> previewRefresh(String id) async =>
+      EmberRefreshPreview.fromMap(
+        await _methods.invokeMapMethod<Object?, Object?>('previewRefresh', {
+          'id': id,
+        }),
+      );
+  Future<bool> applyRefreshPreview(String token) async =>
+      (await _methods.invokeMethod<bool>('applyRefreshPreview', {
+        'token': token,
+      })) ??
+      false;
+  Future<bool> discardRefreshPreview(String token) async =>
+      (await _methods.invokeMethod<bool>('discardRefreshPreview', {
+        'token': token,
+      })) ??
+      false;
   Future<void> removeSubscription(String id) =>
       _methods.invokeMethod<void>('removeSubscription', {'id': id});
   Future<void> checkSite(String url) =>
@@ -265,6 +378,18 @@ class EmberApi {
       _methods.invokeMethod<void>('setAppMode', {'mode': mode});
   Future<void> setAppPackages(Set<String> packages) => _methods
       .invokeMethod<void>('setAppPackages', {'packages': packages.toList()});
+  Future<bool> saveProfile(String name) async {
+    final result = await _methods.invokeMapMethod<Object?, Object?>(
+      'saveProfile',
+      {'name': name},
+    );
+    return result?['id'] is String;
+  }
+
+  Future<bool> applyProfile(String id) async =>
+      (await _methods.invokeMethod<bool>('applyProfile', {'id': id})) ?? false;
+  Future<bool> deleteProfile(String id) async =>
+      (await _methods.invokeMethod<bool>('deleteProfile', {'id': id})) ?? false;
 
   Future<List<EmberAppChoice>> listApps() async =>
       (await _methods.invokeListMethod<Object?>('listApps') ?? const [])
@@ -277,12 +402,27 @@ class EmberApi {
       _methods.invokeMethod<void>('copyServerLink', {'id': id});
   Future<String> getLogs() async =>
       await _methods.invokeMethod<String>('getLogs') ?? '';
+  Future<EmberDiagnostics> runDiagnostics() async => EmberDiagnostics.fromMap(
+    await _methods.invokeMapMethod<Object?, Object?>('runDiagnostics'),
+  );
+  Future<bool> exportBackup(String password) async =>
+      (await _methods.invokeMethod<bool>('exportBackup', {
+        'password': password,
+      })) ??
+      false;
+  Future<bool> importBackup(String password) async =>
+      (await _methods.invokeMethod<bool>('importBackup', {
+        'password': password,
+      })) ??
+      false;
   Future<bool> requestTile() async =>
       await _methods.invokeMethod<bool>('requestTile') ?? false;
   Future<bool> requestWidget() async =>
       await _methods.invokeMethod<bool>('requestWidget') ?? false;
   Future<void> openBatterySettings() =>
       _methods.invokeMethod<void>('openBatterySettings');
+  Future<void> openAlwaysOnSettings() =>
+      _methods.invokeMethod<void>('openAlwaysOnSettings');
   Future<bool> openFirefoxVpn() async =>
       await _methods.invokeMethod<bool>('openFirefoxVpn') ?? false;
   Future<void> openAppSettings() =>

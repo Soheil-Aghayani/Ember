@@ -24,6 +24,23 @@ private const val SPEED_SECONDS = 4
 private const val PING_PARALLEL = 16
 private const val SPEED_TOP = 12
 
+internal data class PingMeasure(val medianMs: Int?, val jitterMs: Int?, val successRate: Double)
+
+internal fun summarizePings(samples: List<Int>): PingMeasure {
+    val sorted = samples.sorted()
+    val reliable = sorted.size >= 2
+    val median = when {
+        sorted.size < 2 -> null
+        sorted.size % 2 == 1 -> sorted[sorted.size / 2]
+        else -> (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2
+    }
+    return PingMeasure(
+        medianMs = median.takeIf { reliable },
+        jitterMs = if (reliable) sorted.last() - sorted.first() else null,
+        successRate = (sorted.size.coerceAtMost(3)) / 3.0,
+    )
+}
+
 /** An IPv4 address for [host], or null when it cannot be looked up. */
 fun resolveIpv4(host: String): String? = runCatching {
     InetAddress.getAllByName(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
@@ -43,6 +60,7 @@ class NodeTester(private val xray: XrayProcess) {
         onProgress: (String) -> Unit,
         onResult: (ProxyNode, NodeResult) -> Unit,
         onAddress: (ProxyNode, String) -> Unit = { _, _ -> },
+        measureSpeed: Boolean = true,
     ) = withContext(Dispatchers.IO) {
         loggedPingFailure = false
         val candidates = nodes.filterNot { it.isInfo }
@@ -55,7 +73,7 @@ class NodeTester(private val xray: XrayProcess) {
         resolved.forEach { (node, ip) -> if (ip != null) onAddress(node, ip) }
         AppLogger.i(TAG, "looked up ${resolved.count { it.second != null }} of ${resolved.size} servers")
         val reachable = resolved.mapNotNull { (node, ip) -> ip?.let { Triple(node, it, 0) } }
-        resolved.filter { it.second == null }.forEach { (node, _) -> onResult(node, NodeResult(null, null, System.currentTimeMillis())) }
+        resolved.filter { it.second == null }.forEach { (node, _) -> onResult(node, NodeResult(null, null, System.currentTimeMillis(), successRate = 0.0)) }
         if (reachable.isEmpty()) return@withContext
 
         val ports = freePorts(reachable.size)
@@ -72,17 +90,18 @@ class NodeTester(private val xray: XrayProcess) {
                     async {
                         val ping = semaphore.withPermit { ping(port) }
                         synchronized(this@NodeTester) { done++; onProgress("Measuring delay… $done of ${entries.size}") }
-                        onResult(node, NodeResult(ping, null, System.currentTimeMillis()))
+                        onResult(node, NodeResult(ping.medianMs, null, System.currentTimeMillis(), ping.jitterMs, ping.successRate))
                         Triple(node, port, ping)
                     }
                 }.awaitAll()
             }
 
-            val fastest = pings.filter { it.third != null }.sortedBy { it.third }.take(SPEED_TOP)
+            if (!measureSpeed) return@withContext
+            val fastest = pings.filter { it.third.medianMs != null }.sortedBy { it.third.medianMs }.take(SPEED_TOP)
             fastest.forEachIndexed { i, (node, port, ping) ->
                 onProgress("Measuring speed… ${i + 1} of ${fastest.size}")
                 val mbps = speed(port)
-                onResult(node, NodeResult(ping, mbps, System.currentTimeMillis()))
+                onResult(node, NodeResult(ping.medianMs, mbps, System.currentTimeMillis(), ping.jitterMs, ping.successRate))
             }
         } finally {
             xray.stop()
@@ -97,11 +116,11 @@ class NodeTester(private val xray: XrayProcess) {
         .retryOnConnectionFailure(false)
         .build()
 
-    /** Round trip through the server in milliseconds: the best of two requests (the first one opens the connection). */
-    private fun ping(port: Int): Int? {
+    /** Median round trip through the server; three samples reduce one-off spikes before Ember picks a server. */
+    private fun ping(port: Int): PingMeasure {
         val client = client(port, 7)
         return try {
-            val times = (1..2).mapNotNull {
+            val times = (1..3).mapNotNull {
                 val start = System.nanoTime()
                 runCatching {
                     client.newCall(Request.Builder().url(PING_URL).build()).execute().use { r -> r.body?.bytes(); r.code in 200..399 }
@@ -112,7 +131,7 @@ class NodeTester(private val xray: XrayProcess) {
                     }
                 }.getOrNull()?.takeIf { ok -> ok }?.let { ((System.nanoTime() - start) / 1_000_000L).toInt() }
             }
-            times.minOrNull()
+            summarizePings(times)
         } finally {
             client.dispatcher.executorService.shutdown()
             client.connectionPool.evictAll()

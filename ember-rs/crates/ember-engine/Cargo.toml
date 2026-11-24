@@ -7,6 +7,10 @@ license.workspace = true
 [dependencies]
 ember-subs = { path = "../ember-subs" }
 ember-win = { path = "../ember-win" }
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+rand = "0.8"
+sha2 = "0.10"
 serde_json = "1"
 regex = { version = "1", default-features = false, features = ["std", "unicode-perl", "unicode-case"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }

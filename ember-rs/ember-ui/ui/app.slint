@@ -1,6 +1,6 @@
 // The window: backdrop, sidebar, the current page. Port of MainShell/Sidebar in desktop/.../ui/App.kt.
 import { Palette, Type, Icons, Motion, Tr } from "theme.slint";
-import { Label, HRow, Button, TextField } from "widgets.slint";
+import { Label, HRow, Button, TextField, IconAction } from "widgets.slint";
 import { HomePage, ServerRow } from "home.slint";
 import { ServersPage, SubRow, NodeRow, SitePreset } from "servers.slint";
 import { LogsPage } from "logs.slint";
@@ -78,13 +78,22 @@ export component App inherits Window {
     callback backup-restore();
     callback restore-confirm();
     callback restore-cancel();
+    callback backup-password-submit(string, string);
+    callback backup-password-cancel();
     in property <string> backup-message;
     in property <bool> restore-open;
     in property <string> restore-text;
+    in-out property <bool> backup-password-open: false;
+    in property <bool> backup-password-confirmation: false;
+    in property <string> backup-password-title: "";
+    in-out property <string> backup-password: "";
+    in-out property <string> backup-password-repeat: "";
+    in-out property <string> backup-password-error: "";
     callback restore-internet();
     callback cred-submit(string, string);
     callback cred-cancel();
     changed cred-open => { if cred-open { cred-user = ""; cred-pass = ""; } }
+    changed backup-password-open => { if backup-password-open { backup-password = ""; backup-password-repeat = ""; } }
     in property <[InfoItem]> about-info;
     in property <[InfoItem]> about-licenses;
     in property <[ReleaseRow]> releases;
@@ -280,6 +289,36 @@ export component App inherits Window {
                     alignment: end; height: 40px; spacing: 8px;
                     Button { text: Tr.cancel; clicked => { root.restore-cancel(); } }
                     Button { text: Tr.restore-and-restart; primary: true; clicked => { root.restore-confirm(); } }
+                }
+            }
+        }
+    }
+
+    if backup-password-open : Rectangle {
+        background: #00000088;
+        TouchArea { }
+        Rectangle {
+            width: min(440px, parent.width - 32px); height: backup-password-card.preferred-height + 48px;
+            x: (parent.width - self.width) / 2; y: max(24px, (parent.height - self.height) / 3);
+            border-radius: 16px; border-width: 1px; border-color: Palette.glass-edge;
+            background: Palette.dark ? #24201c : #ffffff;
+            backup-password-card := VerticalLayout {
+                padding: 24px; spacing: 12px;
+                Label { text: root.backup-password-title; font-size: Type.headline-small; font-weight: 600; wrap: word-wrap; }
+                Label { text: Tr.backup-hint; muted: true; font-size: Type.body-small; wrap: word-wrap; }
+                Label { text: Tr.password; muted: true; font-size: Type.body-small; }
+                TextField { password: true; text <=> root.backup-password; }
+                if root.backup-password-error != "" : Label { text: root.backup-password-error; color: Palette.error; wrap: word-wrap; }
+                if root.backup-password-confirmation : Label { text: Tr.confirm-password; muted: true; font-size: Type.body-small; }
+                if root.backup-password-confirmation : TextField { password: true; text <=> root.backup-password-repeat; }
+                HRow {
+                    alignment: end; height: 40px; spacing: 8px;
+                    IconAction { icon: Icons.close; caption: Tr.cancel; clicked => { root.backup-password-cancel(); } }
+                    IconAction {
+                        icon: Icons.check; caption: Tr.continue-text; filled: true;
+                        enabled: root.backup-password != "" && (!root.backup-password-confirmation || root.backup-password-repeat != "");
+                        clicked => { root.backup-password-submit(root.backup-password, root.backup-password-repeat); }
+                    }
                 }
             }
         }

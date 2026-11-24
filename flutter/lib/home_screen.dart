@@ -79,7 +79,11 @@ class _HomeScreenState extends State<HomeScreen>
         ? copy.get('connecting')
         : copy.get('disconnected');
     final detail = state.connected
-        ? _duration(state.connectedAt)
+        ? copy.get('sessionStats', {
+            'time': _duration(state.connectedAt) ?? '00:00:00',
+            'up': _formatBytes(state.uploadBytes),
+            'down': _formatBytes(state.downloadBytes),
+          })
         : state.connecting
         ? state.progress
         : node != null && state.selectedId == 'auto'
@@ -170,12 +174,79 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                   const SizedBox(height: 30),
                   _serverCard(context, state, node, compact: true),
+                  const SizedBox(height: 14),
+                  _tvQuickServers(context, state),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _tvQuickServers(BuildContext context, EmberState state) {
+    final byId = {for (final node in state.allNodes) node.id: node};
+    final ids = <String>{...state.recentIds, ...state.favorites};
+    final nodes = ids
+        .map((id) => byId[id])
+        .whereType<EmberNode>()
+        .take(4)
+        .toList();
+    if (nodes.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            widget.ui.strings.get('recentServers'),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final quick in nodes)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 184,
+                    child: OutlinedButton(
+                      onPressed: state.disconnected
+                          ? () => widget.ui.run(
+                              () => widget.ui.api.selectServer(quick.id),
+                            )
+                          : null,
+                      child: Row(
+                        children: [
+                          EmberFlagBadge(quick.flagCode, size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              quick.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (state.selectedId == quick.id)
+                            SolarIcon(
+                              'check_circle',
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -434,6 +505,13 @@ class _HomeScreenState extends State<HomeScreen>
     final minutes = ((elapsed % 3600) ~/ 60).toString().padLeft(2, '0');
     final seconds = (elapsed % 60).toString().padLeft(2, '0');
     return '$hours:$minutes:$seconds';
+  }
+
+  String _formatBytes(int value) {
+    if (value < 1000) return '$value B';
+    if (value < 1000000) return '${(value / 1000).toStringAsFixed(1)} KB';
+    if (value < 1000000000) return '${(value / 1000000).toStringAsFixed(1)} MB';
+    return '${(value / 1000000000).toStringAsFixed(1)} GB';
   }
 }
 

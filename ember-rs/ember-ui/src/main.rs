@@ -387,6 +387,8 @@ fn apply_language(app: &App, language: &str) {
     tr.set_sign_in(s.sign_in.into());
     tr.set_credentials_not_saved(s.credentials_not_saved.into());
     tr.set_password(s.password.into());
+    tr.set_confirm_password(s.confirm_backup_password.into());
+    tr.set_continue_text(s.continue_button.into());
     tr.set_app_off(s.app_rules_off.into());
     tr.set_app_skip(s.app_rules_skip.into());
     tr.set_app_skip_help(s.app_rules_skip_help.into());
@@ -736,20 +738,23 @@ fn wire_settings_page(
 /// Backup and restore. The file dialogs block, so they run on their own thread and hand the answer back to the UI thread.
 fn wire_backup(app: &App, engine: &Engine, data_dir: &std::path::Path) {
     let pending: Arc<std::sync::Mutex<Option<std::path::PathBuf>>> = Arc::default();
+    #[derive(Clone, Copy)]
+    enum BackupAction {
+        Save,
+        Restore,
+    }
+    let action: Arc<std::sync::Mutex<Option<BackupAction>>> = Arc::default();
     {
-        let (data_dir, weak) = (data_dir.to_path_buf(), app.as_weak());
+        let action = Arc::clone(&action);
+        let weak = app.as_weak();
         app.on_backup_save(move || {
-            let (data_dir, weak) = (data_dir.clone(), weak.clone());
-            std::thread::spawn(move || {
-                let Some(target) = rfd::FileDialog::new().set_title(lang::current().save_backup).set_file_name("Ember-backup.zip").add_filter("Ember backup", &["zip"]).save_file() else { return };
-                let t = lang::current();
-                let name = target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                let message = match ember_engine::backup::write(&data_dir, &target) {
-                    Ok(()) => strings::fill(t.backup_saved, &[("name", &name)]),
-                    Err(e) => strings::fill(t.backup_failed, &[("reason", &e)]),
-                };
-                let _ = weak.upgrade_in_event_loop(move |app| app.set_backup_message(message.into()));
-            });
+            *action.lock().unwrap() = Some(BackupAction::Save);
+            if let Some(app) = weak.upgrade() {
+                app.set_backup_password_error("".into());
+                app.set_backup_password_title(lang::current().save_backup.into());
+                app.set_backup_password_confirmation(true);
+                app.set_backup_password_open(true);
+            }
         });
     }
     {
@@ -757,8 +762,17 @@ fn wire_backup(app: &App, engine: &Engine, data_dir: &std::path::Path) {
         app.on_backup_restore(move || {
             let (pending, weak) = (Arc::clone(&pending), weak.clone());
             std::thread::spawn(move || {
-                let Some(file) = rfd::FileDialog::new().set_title(lang::current().restore_backup).add_filter("Ember backup", &["zip"]).pick_file() else { return };
-                let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let Some(file) = rfd::FileDialog::new()
+                    .set_title(lang::current().restore_backup)
+                    .add_filter("Ember backup", &["emberbackup", "zip"])
+                    .pick_file()
+                else {
+                    return;
+                };
+                let name = file
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
                 *pending.lock().unwrap() = Some(file);
                 let text = strings::fill(lang::current().restore_confirm, &[("name", &name)]);
                 let _ = weak.upgrade_in_event_loop(move |app| {
@@ -769,33 +783,155 @@ fn wire_backup(app: &App, engine: &Engine, data_dir: &std::path::Path) {
         });
     }
     {
-        let (pending, weak) = (Arc::clone(&pending), app.as_weak());
+        let (pending, action, weak) = (Arc::clone(&pending), Arc::clone(&action), app.as_weak());
         app.on_restore_cancel(move || {
             *pending.lock().unwrap() = None;
+            *action.lock().unwrap() = None;
             if let Some(app) = weak.upgrade() {
                 app.set_restore_open(false);
             }
         });
     }
     {
-        let (engine, data_dir, weak) = (engine.clone(), data_dir.to_path_buf(), app.as_weak());
+        let (pending, action, weak, engine, data_dir) = (
+            Arc::clone(&pending),
+            Arc::clone(&action),
+            app.as_weak(),
+            engine.clone(),
+            data_dir.to_path_buf(),
+        );
         app.on_restore_confirm(move || {
             let Some(app) = weak.upgrade() else { return };
             app.set_restore_open(false);
-            let Some(file) = pending.lock().unwrap().take() else { return };
-            let (engine, data_dir) = (engine.clone(), data_dir.clone());
-            std::thread::spawn(move || {
-                // stop everything first: the running app would write its own copies of these files over the restored ones
-                engine.shutdown();
-                if let Err(e) = ember_engine::backup::restore(&data_dir, &file) {
-                    ember_engine::log::warn("Ember", &format!("restore failed: {e}"));
-                }
-                // start again either way: the app is stopped now, and a failed restore left the old files as they were
-                let _ = ember_win::single_instance::relaunch(&["--restarted"]);
-                std::process::exit(0);
-            });
+            let Some(file) = pending.lock().unwrap().clone() else {
+                return;
+            };
+            if ember_engine::backup::is_encrypted_backup(&file) {
+                *action.lock().unwrap() = Some(BackupAction::Restore);
+                app.set_backup_password_error("".into());
+                app.set_backup_password_title(lang::current().restore_backup.into());
+                app.set_backup_password_confirmation(false);
+                app.set_backup_password_open(true);
+            } else {
+                restore_after_confirmation(
+                    file,
+                    engine.clone(),
+                    data_dir.clone(),
+                    None,
+                    weak.clone(),
+                );
+            }
         });
     }
+    {
+        let (data_dir, weak, action, pending, engine) = (
+            data_dir.to_path_buf(),
+            app.as_weak(),
+            Arc::clone(&action),
+            Arc::clone(&pending),
+            engine.clone(),
+        );
+        app.on_backup_password_submit(move |password, repeated| {
+            let Some(app) = weak.upgrade() else { return };
+            match *action.lock().unwrap() {
+                Some(BackupAction::Save) if password == repeated => {
+                    if !(8..=128).contains(&password.chars().count()) {
+                        app.set_backup_password_error(
+                            lang::current().backup_password_length.into(),
+                        );
+                        return;
+                    }
+                    app.set_backup_password_error("".into());
+                    app.set_backup_password_open(false);
+                    let (data_dir, weak) = (data_dir.clone(), weak.clone());
+                    let password = password.to_string();
+                    std::thread::spawn(move || {
+                        let Some(target) = rfd::FileDialog::new()
+                            .set_title(lang::current().save_backup)
+                            .set_file_name("Ember-backup.emberbackup")
+                            .add_filter("Encrypted Ember backup", &["emberbackup"])
+                            .save_file()
+                        else {
+                            return;
+                        };
+                        let t = lang::current();
+                        let name = target
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        let message = match ember_engine::backup::write_encrypted(
+                            &data_dir, &target, &password,
+                        ) {
+                            Ok(()) => strings::fill(t.backup_saved, &[("name", &name)]),
+                            Err(e) => strings::fill(t.backup_failed, &[("reason", &e)]),
+                        };
+                        let _ = weak.upgrade_in_event_loop(move |app| {
+                            app.set_backup_message(message.into())
+                        });
+                    });
+                }
+                Some(BackupAction::Save) => {
+                    app.set_backup_password_error(lang::current().backup_password_mismatch.into());
+                }
+                Some(BackupAction::Restore) => {
+                    app.set_backup_password_open(false);
+                    let Some(file) = pending.lock().unwrap().clone() else {
+                        return;
+                    };
+                    let (engine, data_dir, weak) = (engine.clone(), data_dir.clone(), weak.clone());
+                    let password = password.to_string();
+                    restore_after_confirmation(file, engine, data_dir, Some(password), weak);
+                }
+                None => {}
+            }
+        });
+    }
+    {
+        let (pending, action, weak) = (Arc::clone(&pending), Arc::clone(&action), app.as_weak());
+        app.on_backup_password_cancel(move || {
+            *pending.lock().unwrap() = None;
+            *action.lock().unwrap() = None;
+            if let Some(app) = weak.upgrade() {
+                app.set_backup_password_open(false);
+            }
+        });
+    }
+}
+
+fn restore_after_confirmation(
+    file: std::path::PathBuf,
+    engine: Engine,
+    data_dir: std::path::PathBuf,
+    password: Option<String>,
+    weak: slint::Weak<App>,
+) {
+    std::thread::spawn(move || {
+        if let Err(error) = ember_engine::backup::validate_backup(&file, password.as_deref()) {
+            let message = strings::fill(lang::current().backup_failed, &[("reason", &error)]);
+            let retry_password = password.is_some();
+            let _ = weak.upgrade_in_event_loop(move |app| {
+                if retry_password {
+                    app.set_backup_password_open(true);
+                    app.set_backup_password_error(lang::current().backup_password_failed.into());
+                } else {
+                    app.set_restore_open(true);
+                    app.set_backup_message(message.into());
+                }
+            });
+            return;
+        }
+        // Stop the app only after the backup has passed validation.
+        engine.shutdown();
+        let restored = match password {
+            Some(password) => ember_engine::backup::restore_encrypted(&data_dir, &file, &password),
+            None => ember_engine::backup::restore(&data_dir, &file),
+        };
+        if let Err(error) = restored {
+            ember_engine::log::warn("Ember", &format!("restore failed: {error}"));
+        }
+        let _ = ember_win::single_instance::relaunch(&["--restarted"]);
+        std::process::exit(0);
+    });
 }
 
 /// What the skip list stores for what was typed: a pasted link becomes its host name (as in the Kotlin app).

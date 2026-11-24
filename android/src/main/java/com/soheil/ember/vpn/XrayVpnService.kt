@@ -13,6 +13,7 @@ import com.soheil.ember.EmberVpnApp
 import com.soheil.ember.MainActivity
 import com.soheil.ember.R
 import com.soheil.ember.data.AppLogger
+import com.soheil.ember.widget.ConnectWidget
 import com.soheil.ember.data.model.ConnectionState
 import com.soheil.ember.engine.AndroidEngine
 import com.soheil.ember.engine.SOCKS_PORT
@@ -77,6 +78,8 @@ class XrayVpnService : VpnService() {
     private fun connect(nodeId: String?) {
         if (job?.isActive == true) return
         val words = (application as EmberVpnApp).engine.strings
+        VpnState.uploadBytes.value = 0L
+        VpnState.downloadBytes.value = 0L
         startForegroundNow(words.connecting)
         VpnState.error.value = null
         VpnState.phase.value = ConnectionState.CONNECTING
@@ -97,7 +100,9 @@ class XrayVpnService : VpnService() {
                 tun = fd
                 val config = HevSocks5TunnelConfig.write(filesDir, SOCKS_PORT, useMapDns = true, tcpBufferSize = TCP_BUFFER_BYTES)
                 if (!HevSocks5Tunnel.start(config, fd.fd)) error(words.errTunnel)
+                val startStats = HevSocks5Tunnel.stats()
                 VpnState.connectedAt.value = System.currentTimeMillis()
+                engine.recordRecent(node.id)
                 VpnState.progress.value = null
                 VpnState.phase.value = ConnectionState.CONNECTED
                 startForegroundNow("${words.connected} · ${node.title}")
@@ -109,9 +114,24 @@ class XrayVpnService : VpnService() {
                 var switches = 0
                 var failures = 0
                 var waited = 0
+                var sinceNotification = 0
+                var sinceWidgetRefresh = 0
                 while (isActive) {
                     delay(2_000)
                     if (!engine.xray.isRunning()) error(words.errXrayStopped)
+                    val stats = HevSocks5Tunnel.stats()
+                    VpnState.uploadBytes.value = (stats.getOrElse(1) { 0L } - startStats.getOrElse(1) { 0L }).coerceAtLeast(0)
+                    VpnState.downloadBytes.value = (stats.getOrElse(3) { 0L } - startStats.getOrElse(3) { 0L }).coerceAtLeast(0)
+                    sinceNotification += 2
+                    if (sinceNotification >= 10) {
+                        sinceNotification = 0
+                        startForegroundNow("${words.connected} · ${node.title}")
+                    }
+                    sinceWidgetRefresh += 2
+                    if (sinceWidgetRefresh >= 30) {
+                        sinceWidgetRefresh = 0
+                        ConnectWidget.refresh(this@XrayVpnService)
+                    }
                     waited += 2
                     if (!engine.autoFailover.value || waited < CHECK_EVERY_SECONDS) continue
                     waited = 0
@@ -196,6 +216,8 @@ class XrayVpnService : VpnService() {
         tun = null
         runCatching { (application as EmberVpnApp).engine.xray.stop() }
         VpnState.connectedAt.value = null
+        VpnState.uploadBytes.value = 0L
+        VpnState.downloadBytes.value = 0L
         VpnState.progress.value = null
         VpnState.node.value = null
         VpnState.phase.value = ConnectionState.DISCONNECTED
@@ -218,9 +240,11 @@ class XrayVpnService : VpnService() {
         val notification: Notification = NotificationCompat.Builder(this, EmberVpnApp.VPN_NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Ember")
             .setContentText(text)
+            .setSubText("↑ ${formatBytes(VpnState.uploadBytes.value)}  ·  ↓ ${formatBytes(VpnState.downloadBytes.value)}")
             .setSmallIcon(R.drawable.ic_tile_ember)
             .setContentIntent(open)
             .addAction(0, (application as EmberVpnApp).engine.strings.disconnect, disconnect)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
@@ -229,6 +253,13 @@ class XrayVpnService : VpnService() {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+    }
+
+    private fun formatBytes(value: Long): String = when {
+        value < 1_000 -> "$value B"
+        value < 1_000_000 -> String.format(java.util.Locale.ROOT, "%.1f KB", value / 1_000.0)
+        value < 1_000_000_000 -> String.format(java.util.Locale.ROOT, "%.1f MB", value / 1_000_000.0)
+        else -> String.format(java.util.Locale.ROOT, "%.1f GB", value / 1_000_000_000.0)
     }
 
     companion object {

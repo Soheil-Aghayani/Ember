@@ -10,6 +10,15 @@ pub struct Release {
 
 pub const RELEASES: &[Release] = &[
     Release {
+        version: "2.0.3",
+        en: &[
+            "Settings backups are now encrypted with a password and can be restored in Ember on Android. Previous ZIP backups can still be opened.",
+        ],
+        fa: &[
+            "پشتیبان تنظیمات حالا با رمز عبور رمزگذاری می‌شود و در Ember اندروید هم بازیابی می‌شود. پشتیبان‌های ZIP قبلی همچنان قابل‌بازیابی‌اند.",
+        ],
+    },
+    Release {
         version: "2.0.2",
         en: &[
             "KitKat brings a chocolate backdrop and playful connection lines, including “Getting your break ready…” and “Take a break.”",

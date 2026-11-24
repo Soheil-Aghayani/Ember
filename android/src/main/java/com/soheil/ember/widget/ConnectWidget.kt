@@ -83,6 +83,10 @@ class ConnectWidget : AppWidgetProvider() {
                 val views = RemoteViews(context.packageName, layout)
                 views.setTextViewText(R.id.widget_status, status)
                 views.setTextViewText(R.id.widget_server, server)
+                views.setTextViewText(
+                    R.id.widget_usage,
+                    if (connected) "↑ ${formatBytes(VpnState.uploadBytes.value)}  ·  ↓ ${formatBytes(VpnState.downloadBytes.value)}" else "",
+                )
                 val actionDescription = if (phase == ConnectionState.DISCONNECTED) {
                     if (engine.selectedNode() == null) words.chooseServer else words.connect
                 } else {
@@ -101,5 +105,16 @@ class ConnectWidget : AppWidgetProvider() {
         private const val EXPANDED_MIN_WIDTH_DP = 160
         private const val EXPANDED_MIN_HEIGHT_DP = 130
         private const val WIDE_MIN_WIDTH_DP = 210
+
+        private fun formatBytes(bytes: Long): String {
+            val units = arrayOf("B", "KB", "MB", "GB", "TB")
+            var value = bytes.coerceAtLeast(0).toDouble()
+            var unit = 0
+            while (value >= 1024 && unit < units.lastIndex) {
+                value /= 1024
+                unit++
+            }
+            return if (unit == 0) "${value.toLong()} ${units[unit]}" else "%.1f %s".format(java.util.Locale.ROOT, value, units[unit])
+        }
     }
 }

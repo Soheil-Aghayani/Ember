@@ -104,8 +104,8 @@ android {
         manifestPlaceholders["launcherActivity"] = if (useFlutterUi) ".MainActivity" else ".ComposeMainActivity"
         minSdk = 26
         targetSdk = 35
-        versionCode = 173
-        versionName = "2.7.3"
+        versionCode = 174
+        versionName = "2.7.4"
 
         externalNativeBuild {
             ndkBuild {

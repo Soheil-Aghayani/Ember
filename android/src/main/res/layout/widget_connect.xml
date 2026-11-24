@@ -45,6 +45,15 @@
             android:maxLines="1"
             android:textColor="#FF9A9AA0"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widget_usage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFB8D9CF"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <ImageView

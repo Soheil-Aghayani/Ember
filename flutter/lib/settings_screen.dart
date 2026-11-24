@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 
 import 'ember_api.dart';
 import 'ember_ui.dart';
@@ -45,6 +46,13 @@ class SettingsScreen extends StatelessWidget {
             title: Text(copy.get('autoSwitch')),
             subtitle: Text(copy.get('autoSwitchHelp')),
           ),
+        ),
+        const SizedBox(height: 8),
+        EmberActionTile(
+          icon: 'refresh',
+          title: copy.get('autoReconnectTitle'),
+          subtitle: copy.get('autoReconnectHelp'),
+          onPressed: () => ui.run(() => ui.api.openAlwaysOnSettings()),
         ),
         const SizedBox(height: 14),
         _sectionTitle(context, copy.get('apps')),
@@ -127,6 +135,30 @@ class SettingsScreen extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 14),
+        _sectionTitle(context, copy.get('profiles')),
+        _ProfilesSection(ui: ui),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          child: Text(
+            copy.get('profilesHelp'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _sectionTitle(context, copy.get('backupTitle')),
+        _BackupSection(ui: ui),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          child: Text(
+            copy.get('backupHelp'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
         if (state.isTv) _tvVpnCard(context) else _firefoxVpnCard(context),
         const SizedBox(height: 14),
         if (!state.isTv) ...[
@@ -150,6 +182,13 @@ class SettingsScreen extends StatelessWidget {
           title: copy.get('keepBgTitle'),
           subtitle: copy.get('keepBgHelp'),
           onPressed: () => ui.run(() => ui.api.openBatterySettings()),
+        ),
+        const SizedBox(height: 8),
+        EmberActionTile(
+          icon: 'info_circle',
+          title: copy.get('diagnosticsTitle'),
+          subtitle: copy.get('diagnosticsHelp'),
+          onPressed: () => _runDiagnostics(context),
         ),
       ],
     );
@@ -349,5 +388,331 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _requestWidget() async {
     final added = await ui.run(() => ui.api.requestWidget());
     if (added == false) ui.tell(ui.strings.get('addWidgetManual'));
+  }
+
+  Future<void> _runDiagnostics(BuildContext context) async {
+    final result = await ui.run(() => ui.api.runDiagnostics());
+    if (result == null || !context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ui.strings.get('diagnosticsTitle')),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(ui.strings.get('diagnosticsPrivacy')),
+                if (result.directIp != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    ui.strings.get('outsideIp'),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  SelectableText(result.directIp!),
+                ],
+                if (result.tunnelIp != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    ui.strings.get('tunnelIp'),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  SelectableText(result.tunnelIp!),
+                ],
+                if (result.directIp == null && result.tunnelIp == null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '${ui.strings.get('outsideIp')}: ${ui.strings.get('ipUnavailable')}',
+                  ),
+                ],
+                const SizedBox(height: 12),
+                SelectableText(result.report),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: result.report));
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              ui.tell(ui.strings.get('copied'));
+            },
+            icon: const SolarIcon('copy'),
+            label: Text(ui.strings.get('copy')),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(dialogContext),
+            icon: const SolarIcon('close'),
+            label: Text(ui.strings.get('close')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilesSection extends StatefulWidget {
+  const _ProfilesSection({required this.ui});
+
+  final EmberUi ui;
+
+  @override
+  State<_ProfilesSection> createState() => _ProfilesSectionState();
+}
+
+class _ProfilesSectionState extends State<_ProfilesSection> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ui = widget.ui;
+    final state = ui.state;
+    final copy = ui.strings;
+    return EmberCard(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    maxLength: 36,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _save(),
+                    decoration: InputDecoration(
+                      labelText: copy.get('profileName'),
+                      counterText: '',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  tooltip: copy.get('saveProfile'),
+                  onPressed: _save,
+                  icon: const SolarIcon('check_circle'),
+                ),
+              ],
+            ),
+          ),
+          if (state.profiles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  copy.get('noProfiles'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else
+            for (final profile in state.profiles)
+              ListTile(
+                title: Text(profile.name),
+                subtitle: Text(
+                  '${profile.appMode} · ${profile.appPackages.length} ${copy.get('apps')}',
+                ),
+                leading: const SolarIcon('global'),
+                trailing: Wrap(
+                  spacing: 4,
+                  children: [
+                    IconButton(
+                      tooltip: copy.get('applyProfile'),
+                      onPressed: () async {
+                        final done = await ui.run(
+                          () => ui.api.applyProfile(profile.id),
+                        );
+                        if (done == true) ui.tell(copy.get('profileApplied'));
+                      },
+                      icon: const SolarIcon('check_circle'),
+                    ),
+                    IconButton(
+                      tooltip: copy.get('remove'),
+                      onPressed: () =>
+                          ui.run(() => ui.api.deleteProfile(profile.id)),
+                      icon: const SolarIcon('trash_bin_trash'),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final ui = widget.ui;
+    if (_name.text.trim().isEmpty) return;
+    final saved = await ui.run(() => ui.api.saveProfile(_name.text.trim()));
+    if (saved != null) {
+      _name.clear();
+      ui.tell(ui.strings.get('profileSaved'));
+    }
+  }
+}
+
+class _BackupSection extends StatelessWidget {
+  const _BackupSection({required this.ui});
+
+  final EmberUi ui;
+
+  @override
+  Widget build(BuildContext context) => EmberCard(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Column(
+      children: [
+        ListTile(
+          leading: const SolarIcon('copy'),
+          title: Text(ui.strings.get('createBackup')),
+          onTap: () => _run(context, restore: false),
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const SolarIcon('refresh'),
+          title: Text(ui.strings.get('restoreBackup')),
+          onTap: () => _run(context, restore: true),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _run(BuildContext context, {required bool restore}) async {
+    final password = await _passwordDialog(context, restore: restore);
+    if (password == null) return;
+    final done = await ui.run(
+      () => restore
+          ? ui.api.importBackup(password)
+          : ui.api.exportBackup(password),
+    );
+    if (done == true) {
+      ui.tell(ui.strings.get(restore ? 'backupRestored' : 'backupExported'));
+    }
+  }
+
+  Future<String?> _passwordDialog(
+    BuildContext context, {
+    required bool restore,
+  }) async {
+    final password = TextEditingController();
+    final confirm = TextEditingController();
+    String? error;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(
+            ui.strings.get(restore ? 'restoreBackup' : 'createBackup'),
+          ),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(ui.strings.get('backupPasswordHelp')),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: password,
+                  autofocus: true,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: ui.strings.get('backupPassword'),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (!restore) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: confirm,
+                    obscureText: true,
+                    onSubmitted: (_) => _submit(
+                      dialogContext,
+                      restore,
+                      password,
+                      confirm,
+                      setDialogState,
+                      (value) => error = value,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: ui.strings.get('confirmBackupPassword'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.pop(dialogContext),
+              icon: const SolarIcon('close'),
+              label: Text(ui.strings.get('cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: () => _submit(
+                dialogContext,
+                restore,
+                password,
+                confirm,
+                setDialogState,
+                (value) => error = value,
+              ),
+              icon: const SolarIcon('check_circle', color: Colors.white),
+              label: Text(
+                ui.strings.get(restore ? 'restoreBackup' : 'createBackup'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    password.dispose();
+    confirm.dispose();
+    return result;
+  }
+
+  void _submit(
+    BuildContext context,
+    bool restore,
+    TextEditingController password,
+    TextEditingController confirm,
+    StateSetter setState,
+    ValueChanged<String?> setError,
+  ) {
+    if (password.text.runes.length < 8 || password.text.runes.length > 128) {
+      setState(() => setError(ui.strings.get('passwordTooShort')));
+      return;
+    }
+    if (!restore && password.text != confirm.text) {
+      setState(() => setError(ui.strings.get('passwordMismatch')));
+      return;
+    }
+    Navigator.pop(context, password.text);
   }
 }
