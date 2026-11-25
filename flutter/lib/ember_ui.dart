@@ -32,6 +32,8 @@ class EmberUi {
     required this.api,
     required this.state,
     required this.strings,
+    required this.appearance,
+    required this.onAppearanceChanged,
     required this.run,
     required this.tell,
   });
@@ -39,6 +41,8 @@ class EmberUi {
   final EmberApi api;
   final EmberState state;
   final EmberStrings strings;
+  final String appearance;
+  final ValueChanged<String> onAppearanceChanged;
   final EmberRunner run;
   final ValueChanged<String> tell;
 }

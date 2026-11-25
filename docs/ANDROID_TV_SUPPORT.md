@@ -32,6 +32,10 @@ On 2026-11-19, the debug-only `.tvpreview` APK was installed and launched on an 
 
 On 2026-11-24, the preview was rebuilt after adding stronger focus rings. The rail, Home orb, server card, and six-page D-pad navigation responded on the same emulator. The first focus input after cold launch produced one emulator input ANR; subsequent focus and navigation responded. This emulator check does not verify the physical BRAVIA BF1 or VPN traffic.
 
+On 2026-11-25, the Flutter TV preview was rebuilt from the current release source, installed and launched on the Android TV API 34 emulator. Mint appearance and the Home/Servers/Settings rail were visible; D-pad focus and Select navigation changed pages. The first launch after installing the debug preview took about 19 seconds while Flutter initialized; no VPN was configured or started. Physical BRAVIA BF1 behavior remains pending.
+
+The same day, the signed release APK was installed on the TV-named AVD. Its feature list does not include `android.software.leanback` (`ro.build.characteristics` reports `emulator`), so the shared APK correctly selected the phone layout there. The forced debug TV preview verifies the TV layout and D-pad controls, but this AVD cannot verify release-time Leanback detection or launcher behavior.
+
 - [x] Assemble the normal debug APK and debug-only TV preview APK.
 - [x] Check D-pad focus and Select navigation across Home, Servers, Settings, Logs, What's new, and About on an Android TV emulator.
 - [ ] Open and dismiss the Add link and Logs dialogs with a remote.

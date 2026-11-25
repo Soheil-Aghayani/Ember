@@ -30,9 +30,9 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 | Device | Status | Notes |
 |---|---|---|
-| Windows PC | Current local review build: native Rust app 2.0.2; latest prepared installer: 2.0.1 | Windows 10/11, 64-bit. Whole-device mode is experimental; the preview is packaged side-by-side with the earlier Kotlin app. |
-| Android phone | Android 2.7.3 published; physical-device validation pending | Android 8.0 or newer; arm64. The Kotlin VPN engine remains native. The Flutter build has not been checked on a physical phone. |
-| Android TV | Android 2.7.3 shared APK; Flutter TV preview checked on API 34 emulator | The emulator check covered Home, Servers, Settings, Logs, What's new and About. Physical Sony BRAVIA BF1 launcher and VPN behavior remain unverified. |
+| Windows PC | Native Rust app 2.0.3 portable release | Windows 10/11, 64-bit. Whole-device mode is experimental. The portable ZIP includes the tunnel runtime; the executable has no publicly trusted code-signing certificate. |
+| Android phone | Android 2.7.4 arm64 APK | Android 8.0 or newer. Install and UI navigation were checked in an emulator; physical phone VPN and QR behavior remain unverified. |
+| Android TV | Android 2.7.4 shared APK; forced TV preview checked on API 34 emulator | D-pad navigation and visible focus were checked in the debug preview. This AVD lacks `FEATURE_LEANBACK`, so release auto-detection was not verified; physical Sony BRAVIA BF1 behavior remains unverified. |
 
 | Windows | |
 |---|---|
@@ -51,11 +51,11 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 ## Download
 
-The shared app catalogue at `https://app.agseyl.ir/` hosts downloads for multiple apps. The signed Android 2.7.3 arm64 APK is published for phones and Android TV; physical phone and Sony BRAVIA validation remain pending.
+The shared app catalogue at `https://app.agseyl.ir/` hosts downloads for multiple apps. Android phone and TV share the signed 2.7.4 arm64 APK; physical phone and Sony BRAVIA validation remain pending.
 
-- **Windows:** the Rust 2.0.1 preview installer remains the latest prepared installer. A local 2.0.2 review build is available, but it is not packaged or published as a release.
-- **Android phone and TV:** the signed arm64 APK, version 2.7.3, is live on the shared catalogue. Physical phone VPN/QR behavior and Sony BRAVIA BF1 launcher/VPN behavior remain unverified.
-- The Android package keeps the phone launcher and adds a Leanback launcher entry for Android TV. The latest Flutter TV preview was checked on an API 34 emulator for D-pad navigation across all six pages and updated visible focus treatment. This does not verify the physical TV or VPN traffic.
+- **Windows:** the native Rust 2.0.3 portable ZIP includes its runtime resources and is unsigned by a public code-signing authority. Whole-device networking remains experimental and was not exercised for this release.
+- **Android phone and TV:** the signed arm64 APK, version 2.7.4, is available on the shared catalogue. The phone and Leanback TV launcher entries share the same package. Physical phone VPN/QR behavior and Sony BRAVIA BF1 launcher/VPN behavior remain unverified.
+- Emulator checks covered phone UI launch/navigation and TV preview layout/D-pad navigation; no VPN tunnel was started. The API 34 TV-named AVD lacks `FEATURE_LEANBACK`, so the release APK's automatic TV layout selection remains unverified. The app checks the shared update feed on launch and every six hours while open; it cannot notify a closed app.
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
 
@@ -105,7 +105,7 @@ cargo build --release --manifest-path ..\helper\Cargo.toml
 
 # Stage with the resources from an existing Ember install, then compile the installer.
 powershell -File installer\stage.ps1 -Resources 'C:\Program Files\Ember\app\resources' -Out .\stage
-& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.1 `
+& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.3 `
   "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\Output" installer\ember-rs.iss
 ```
 

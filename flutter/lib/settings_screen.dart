@@ -36,6 +36,30 @@ class SettingsScreen extends StatelessWidget {
           child: _languageOptions(context),
         ),
         const SizedBox(height: 14),
+        _sectionTitle(context, copy.get('appearance')),
+        EmberCard(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: RadioGroup<String>(
+            groupValue: ui.appearance,
+            onChanged: (value) {
+              if (value != null) ui.onAppearanceChanged(value);
+            },
+            child: Column(
+              children: [
+                for (final appearance in ['mint', 'system', 'dark'])
+                  RadioListTile<String>(
+                    value: appearance,
+                    title: Text(copy.get(appearance)),
+                    subtitle: appearance == 'mint'
+                        ? Text(copy.get('appearanceHelp'))
+                        : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
         EmberCard(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: SwitchListTile(

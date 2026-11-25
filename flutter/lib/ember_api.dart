@@ -322,6 +322,12 @@ class EmberApi {
     _map(await _methods.invokeMethod<Object?>('getState')),
   );
 
+  Future<String> getAppearance() async =>
+      await _methods.invokeMethod<String>('getAppearance') ?? 'mint';
+
+  Future<void> setAppearance(String appearance) =>
+      _methods.invokeMethod<void>('setAppearance', {'appearance': appearance});
+
   Future<void> connect() => _methods.invokeMethod<void>('connect');
   Future<void> disconnect() => _methods.invokeMethod<void>('disconnect');
   Future<void> selectServer(String id) =>

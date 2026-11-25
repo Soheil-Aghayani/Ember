@@ -56,6 +56,8 @@ class WhatsNewScreen extends StatelessWidget {
                 'whatsNewTv',
                 'whatsNewSmartTests',
                 'whatsNewUpdates',
+                'whatsNewAppearance',
+                'whatsNewMotion',
               ])
                 _FeatureLine(text: copy.get(feature)),
             ],

@@ -29,12 +29,43 @@ class _EmberAppState extends State<EmberApp> {
   StreamSubscription<EmberState>? _subscription;
   EmberState? _state;
   String? _lastNotice;
+  String _appearance = 'mint';
 
   @override
   void initState() {
     super.initState();
     _subscription = _api.changes.listen(_accept, onError: (_) {});
     _loadState();
+    _loadAppearance();
+  }
+
+  Future<void> _loadAppearance() async {
+    try {
+      final appearance = await _api.getAppearance();
+      if (mounted && const {'system', 'mint', 'dark'}.contains(appearance)) {
+        setState(() => _appearance = appearance);
+      }
+    } catch (_) {
+      // Keep the Mint default if the native preference is unavailable.
+    }
+  }
+
+  Future<void> _setAppearance(String appearance) async {
+    if (!const {'system', 'mint', 'dark'}.contains(appearance) ||
+        appearance == _appearance) {
+      return;
+    }
+    final previous = _appearance;
+    setState(() => _appearance = appearance);
+    try {
+      await _api.setAppearance(appearance);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _appearance = previous);
+      _showMessage(
+        EmberStrings(_effectivePersian(_state!)).get('appearanceSaveFailed'),
+      );
+    }
   }
 
   Future<void> _loadState() async {
@@ -118,14 +149,18 @@ class _EmberAppState extends State<EmberApp> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = MediaQuery.platformBrightnessOf(context);
     final isTv = _state?.isTv ?? false;
+    final themeMode = switch (_appearance) {
+      'mint' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
     return MaterialApp(
       title: 'Ember',
       debugShowCheckedModeBanner: false,
       theme: _theme(Brightness.light, isTv: isTv),
       darkTheme: _theme(Brightness.dark, isTv: isTv),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       scaffoldMessengerKey: _messengerKey,
       home: _state == null
           ? const _LaunchScreen()
@@ -134,11 +169,16 @@ class _EmberAppState extends State<EmberApp> {
                 api: _api,
                 state: _state!,
                 strings: EmberStrings(_effectivePersian(_state!)),
+                appearance: _appearance,
+                onAppearanceChanged: (value) => unawaited(
+                  _setAppearance(value),
+                ),
                 run: _run,
                 tell: _showMessage,
               ),
             ),
       builder: (context, child) {
+        final brightness = Theme.of(context).brightness;
         SystemChrome.setSystemUIOverlayStyle(
           SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
@@ -333,7 +373,7 @@ class _EmberShellState extends State<_EmberShell> {
     final phoneNavigationIndex = phoneSelected < 0
         ? _phonePages.indexOf(_Page.about)
         : phoneSelected;
-    final content = IndexedStack(
+    final content = _PageMotionStack(
       index: selected,
       children: [
         TickerMode(
@@ -418,6 +458,103 @@ class _EmberShellState extends State<_EmberShell> {
   }
 
   void _select(_Page page) => setState(() => _page = page);
+}
+
+class _PageMotionStack extends StatefulWidget {
+  const _PageMotionStack({required this.index, required this.children});
+
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<_PageMotionStack> createState() => _PageMotionStackState();
+}
+
+class _PageMotionStackState extends State<_PageMotionStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  int? _outgoingIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 170),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _outgoingIndex = null);
+        }
+      });
+  }
+
+  @override
+  void didUpdateWidget(covariant _PageMotionStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      _outgoingIndex = oldWidget.index;
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final progress = Curves.easeOutCubic.transform(_controller.value);
+      return Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.hardEdge,
+        children: [
+          for (var index = 0; index < widget.children.length; index++)
+            _page(index, progress),
+        ],
+      );
+    },
+  );
+
+  Widget _page(int index, double progress) {
+    final current = index == widget.index;
+    final outgoing = index == _outgoingIndex;
+    final transitioning = _outgoingIndex != null;
+    final opacity = !transitioning
+        ? 1.0
+        : current
+        ? .90 + (.10 * progress)
+        : outgoing
+        ? 1.0 - (.10 * progress)
+        : 0.0;
+    final offset = !transitioning
+        ? Offset.zero
+        : current
+        ? Offset(0, .012 * (1 - progress))
+        : outgoing
+        ? Offset(0, -.006 * progress)
+        : Offset.zero;
+
+    return Offstage(
+      offstage: !current && !outgoing,
+      child: IgnorePointer(
+        ignoring: !current,
+        child: TickerMode(
+          enabled: current,
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: offset,
+              child: widget.children[index],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }
 
 class _TvRail extends StatefulWidget {

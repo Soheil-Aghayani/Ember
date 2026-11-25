@@ -70,6 +70,7 @@ class MainActivity : FlutterFragmentActivity() {
     private data class PendingBackup(val password: String, val result: MethodChannel.Result)
     private var pendingBackup: PendingBackup? = null
     private val releaseUpdatePreferences by lazy { getSharedPreferences("release_updates", MODE_PRIVATE) }
+    private val uiPreferences by lazy { getSharedPreferences("ember_ui", MODE_PRIVATE) }
 
     override fun onStart() {
         super.onStart()
@@ -297,6 +298,15 @@ class MainActivity : FlutterFragmentActivity() {
     private fun handleCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getState" -> result.success(snapshot())
+            "getAppearance" -> result.success(uiPreferences.getString("appearance", "mint") ?: "mint")
+            "setAppearance" -> {
+                val appearance = call.requiredString("appearance", result) ?: return
+                if (appearance !in setOf("system", "mint", "dark")) result.error("invalid_appearance", "Choose a supported appearance.", null)
+                else {
+                    uiPreferences.edit().putString("appearance", appearance).apply()
+                    result.success(null)
+                }
+            }
             "connect" -> connect(result)
             "disconnect" -> {
                 XrayVpnService.stop(this)
