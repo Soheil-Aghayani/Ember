@@ -470,90 +470,142 @@ class _PageMotionStack extends StatefulWidget {
   State<_PageMotionStack> createState() => _PageMotionStackState();
 }
 
-class _PageMotionStackState extends State<_PageMotionStack>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  int? _outgoingIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 170),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          setState(() => _outgoingIndex = null);
-        }
-      });
-  }
+class _PageMotionStackState extends State<_PageMotionStack> {
+  final Set<int> _outgoingIndices = <int>{};
 
   @override
   void didUpdateWidget(covariant _PageMotionStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
-      _outgoingIndex = oldWidget.index;
-      _controller.forward(from: 0);
+      _outgoingIndices
+        ..add(oldWidget.index)
+        ..remove(widget.index);
     }
   }
 
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, _) {
-      final progress = Curves.easeOutCubic.transform(_controller.value);
-      return Stack(
-        fit: StackFit.expand,
-        clipBehavior: Clip.hardEdge,
-        children: [
-          for (var index = 0; index < widget.children.length; index++)
-            _page(index, progress),
-        ],
-      );
-    },
-  );
+  void _finishExit(int index) {
+    if (!mounted ||
+        index == widget.index ||
+        !_outgoingIndices.contains(index)) {
+      return;
+    }
+    setState(() => _outgoingIndices.remove(index));
+  }
 
-  Widget _page(int index, double progress) {
-    final current = index == widget.index;
-    final outgoing = index == _outgoingIndex;
-    final transitioning = _outgoingIndex != null;
-    final opacity = !transitioning
-        ? 1.0
-        : current
-        ? .90 + (.10 * progress)
-        : outgoing
-        ? 1.0 - (.10 * progress)
-        : 0.0;
-    final offset = !transitioning
-        ? Offset.zero
-        : current
-        ? Offset(0, .012 * (1 - progress))
-        : outgoing
-        ? Offset(0, -.006 * progress)
-        : Offset.zero;
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.hardEdge,
+      children: [
+        for (var index = 0; index < widget.children.length; index++)
+          _MotionPage(
+            key: ValueKey(index),
+            active: index == widget.index,
+            exiting: !reduceMotion && _outgoingIndices.contains(index),
+            reduceMotion: reduceMotion,
+            onExitComplete: () => _finishExit(index),
+            child: widget.children[index],
+          ),
+      ],
+    );
+  }
+}
+
+class _MotionPage extends StatefulWidget {
+  const _MotionPage({
+    super.key,
+    required this.active,
+    required this.exiting,
+    required this.reduceMotion,
+    required this.onExitComplete,
+    required this.child,
+  });
+
+  final bool active;
+  final bool exiting;
+  final bool reduceMotion;
+  final VoidCallback onExitComplete;
+  final Widget child;
+
+  @override
+  State<_MotionPage> createState() => _MotionPageState();
+}
+
+class _MotionPageState extends State<_MotionPage> {
+  static const _enterDuration = Duration(milliseconds: 220);
+  static const _exitDuration = Duration(milliseconds: 145);
+  static const _restOffset = Offset(0, .012);
+  static const _exitOffset = Offset(0, -.008);
+  static const _restScale = .985;
+
+  late bool _offstage;
+
+  @override
+  void initState() {
+    super.initState();
+    _offstage = !widget.active;
+  }
+
+  @override
+  void didUpdateWidget(covariant _MotionPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active) _offstage = false;
+  }
+
+  void _finishExit() {
+    if (widget.active || _offstage) return;
+    setState(() => _offstage = true);
+    widget.onExitComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    final duration = widget.reduceMotion
+        ? Duration.zero
+        : active
+        ? _enterDuration
+        : _exitDuration;
+    final curve = active ? Curves.easeOutCubic : Curves.easeInCubic;
 
     return Offstage(
-      offstage: !current && !outgoing,
+      offstage: !active && (_offstage || widget.reduceMotion),
       child: IgnorePointer(
-        ignoring: !current,
-        child: TickerMode(
-          enabled: current,
-          child: Opacity(
-            opacity: opacity,
-            child: Transform.translate(
-              offset: offset,
-              child: widget.children[index],
-            ),
+        ignoring: !active,
+        child: ExcludeSemantics(
+          excluding: !active,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: active ? 1 : 0, end: active ? 1 : 0),
+            duration: duration,
+            curve: curve,
+            onEnd: _finishExit,
+            builder: (context, progress, child) {
+              final offset = active
+                  ? Offset.lerp(_restOffset, Offset.zero, progress)!
+                  : widget.exiting
+                  ? Offset.lerp(_exitOffset, Offset.zero, progress)!
+                  : _restOffset;
+              final scale = _restScale + ((1 - _restScale) * progress);
+
+              return Opacity(
+                opacity: progress,
+                child: FractionalTranslation(
+                  translation: offset,
+                  child: Transform.scale(
+                    scale: scale,
+                    alignment: Alignment.center,
+                    child: child,
+                  ),
+                ),
+              );
+            },
+            child: TickerMode(enabled: active, child: widget.child),
           ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 }
 

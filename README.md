@@ -31,8 +31,8 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 | Device | Status | Notes |
 |---|---|---|
 | Windows PC | Native Rust app 2.0.3 portable release | Windows 10/11, 64-bit. Whole-device mode is experimental. The portable ZIP includes the tunnel runtime; the executable has no publicly trusted code-signing certificate. |
-| Android phone | Android 2.7.4 arm64 APK | Android 8.0 or newer. Install and UI navigation were checked in an emulator; physical phone VPN and QR behavior remain unverified. |
-| Android TV | Android 2.7.4 shared APK; forced TV preview checked on API 34 emulator | D-pad navigation and visible focus were checked in the debug preview. This AVD lacks `FEATURE_LEANBACK`, so release auto-detection was not verified; physical Sony BRAVIA BF1 behavior remains unverified. |
+| Android phone | Android 2.7.5 arm64 APK | Android 8.0 or newer. Release build and signature are checked; the 2.7.5 page transition was not visually confirmed in an emulator. Physical phone VPN and QR behavior remain unverified. |
+| Android TV | Android 2.7.5 shared APK; forced TV preview checked on API 34 emulator | D-pad navigation and visible focus were checked in the debug preview. This AVD lacks `FEATURE_LEANBACK`, so release auto-detection was not verified; the 2.7.5 page transition and physical Sony BRAVIA BF1 behavior remain unverified. |
 
 | Windows | |
 |---|---|
@@ -51,10 +51,10 @@ You paste a subscription link (`https://…/sub/…`). Ember downloads the serve
 
 ## Download
 
-The shared app catalogue at `https://app.agseyl.ir/` hosts downloads for multiple apps. Android phone and TV share the signed 2.7.4 arm64 APK; physical phone and Sony BRAVIA validation remain pending.
+The shared app catalogue at `https://app.agseyl.ir/` hosts downloads for multiple apps. Android phone and TV share the signed 2.7.5 arm64 APK; physical phone and Sony BRAVIA validation remain pending.
 
 - **Windows:** the native Rust 2.0.3 portable ZIP includes its runtime resources and is unsigned by a public code-signing authority. Whole-device networking remains experimental and was not exercised for this release.
-- **Android phone and TV:** the signed arm64 APK, version 2.7.4, is available on the shared catalogue. The phone and Leanback TV launcher entries share the same package. Physical phone VPN/QR behavior and Sony BRAVIA BF1 launcher/VPN behavior remain unverified.
+- **Android phone and TV:** the signed arm64 APK, version 2.7.5, is available on the shared catalogue. The phone and Leanback TV launcher entries share the same package. Physical phone VPN/QR behavior and Sony BRAVIA BF1 launcher/VPN behavior remain unverified.
 - Emulator checks covered phone UI launch/navigation and TV preview layout/D-pad navigation; no VPN tunnel was started. The API 34 TV-named AVD lacks `FEATURE_LEANBACK`, so the release APK's automatic TV layout selection remains unverified. The app checks the shared update feed on launch and every six hours while open; it cannot notify a closed app.
 
 See [`desktop/README.md`](desktop/README.md) for how the Windows modes work, the administrator prompt, troubleshooting and how to undo the kill switch.
