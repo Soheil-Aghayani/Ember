@@ -170,9 +170,8 @@ class _EmberAppState extends State<EmberApp> {
                 state: _state!,
                 strings: EmberStrings(_effectivePersian(_state!)),
                 appearance: _appearance,
-                onAppearanceChanged: (value) => unawaited(
-                  _setAppearance(value),
-                ),
+                onAppearanceChanged: (value) =>
+                    unawaited(_setAppearance(value)),
                 run: _run,
                 tell: _showMessage,
               ),
@@ -291,14 +290,6 @@ class _EmberAppState extends State<EmberApp> {
           side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .75)),
         ),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: brightness == Brightness.dark
-            ? scheme.surface.withValues(alpha: .96)
-            : scheme.surface.withValues(alpha: .84),
-        indicatorColor: brightness == Brightness.dark
-            ? scheme.secondaryContainer
-            : scheme.primaryContainer,
-      ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: Colors.transparent,
         indicatorColor: scheme.secondaryContainer,
@@ -373,7 +364,7 @@ class _EmberShellState extends State<_EmberShell> {
     final phoneNavigationIndex = phoneSelected < 0
         ? _phonePages.indexOf(_Page.about)
         : phoneSelected;
-    final content = _PageMotionStack(
+    final content = _PageStack(
       index: selected,
       children: [
         TickerMode(
@@ -438,20 +429,11 @@ class _EmberShellState extends State<_EmberShell> {
         ),
         bottomNavigationBar: ui.state.isTv
             ? null
-            : NavigationBar(
+            : _PhoneNavigationBar(
                 selectedIndex: phoneNavigationIndex,
-                onDestinationSelected: (index) => _select(_phonePages[index]),
-                destinations: List.generate(_phonePages.length, (index) {
-                  return NavigationDestination(
-                    icon: SolarIcon(_phoneIcons[index], size: 23),
-                    selectedIcon: SolarIcon(
-                      _phoneIcons[index],
-                      size: 23,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    label: copy.get(_phoneLabels[index]),
-                  );
-                }),
+                icons: _phoneIcons,
+                labels: _phoneLabels.map(copy.get).toList(growable: false),
+                onSelected: (index) => _select(_phonePages[index]),
               ),
       ),
     );
@@ -460,151 +442,339 @@ class _EmberShellState extends State<_EmberShell> {
   void _select(_Page page) => setState(() => _page = page);
 }
 
-class _PageMotionStack extends StatefulWidget {
-  const _PageMotionStack({required this.index, required this.children});
+class _PhoneNavigationBar extends StatefulWidget {
+  const _PhoneNavigationBar({
+    required this.selectedIndex,
+    required this.icons,
+    required this.labels,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final List<String> icons;
+  final List<String> labels;
+  final ValueChanged<int> onSelected;
+
+  @override
+  State<_PhoneNavigationBar> createState() => _PhoneNavigationBarState();
+}
+
+class _PhoneNavigationBarState extends State<_PhoneNavigationBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _morph;
+  Animation<double> _indicatorRatio = const AlwaysStoppedAnimation<double>(0);
+  bool? _isRtl;
+
+  @override
+  void initState() {
+    super.initState();
+    _morph = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 340),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    if (_isRtl == null) {
+      _isRtl = isRtl;
+      _indicatorRatio = AlwaysStoppedAnimation<double>(
+        _ratioFor(widget.selectedIndex, isRtl),
+      );
+    } else if (_isRtl != isRtl) {
+      _isRtl = isRtl;
+      _moveIndicator(widget.selectedIndex, isRtl);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PhoneNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _moveIndicator(
+        widget.selectedIndex,
+        Directionality.of(context) == TextDirection.rtl,
+      );
+    }
+  }
+
+  double _ratioFor(int index, bool isRtl) {
+    final count = widget.icons.length;
+    if (count <= 1) return .5;
+    final visualIndex = isRtl ? count - 1 - index : index;
+    return (visualIndex + .5) / count;
+  }
+
+  void _moveIndicator(int index, bool isRtl) {
+    final currentRatio = _indicatorRatio.value;
+    final targetRatio = _ratioFor(index, isRtl);
+    if ((currentRatio - targetRatio).abs() < .001) return;
+
+    _morph.stop();
+    _indicatorRatio = Tween<double>(
+      begin: currentRatio,
+      end: targetRatio,
+    ).animate(CurvedAnimation(parent: _morph, curve: Curves.easeInOutCubic));
+    _morph.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _morph.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final radius = BorderRadius.circular(24);
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: colors.primary.withValues(alpha: isDark ? .12 : .10),
+                blurRadius: 22,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                height: 68,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: isDark
+                        ? [
+                            colors.surface.withValues(alpha: .94),
+                            colors.surface.withValues(alpha: .84),
+                          ]
+                        : [
+                            Colors.white.withValues(alpha: .84),
+                            Colors.white.withValues(alpha: .68),
+                          ],
+                  ),
+                  border: Border.all(
+                    color: isDark
+                        ? colors.outlineVariant.withValues(alpha: .72)
+                        : Colors.white.withValues(alpha: .92),
+                  ),
+                  borderRadius: radius,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Positioned.fill(
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: AnimatedBuilder(
+                            animation: _morph,
+                            builder: (context, _) {
+                              final progress = _morph.value;
+                              final stretch = progress < .5
+                                  ? progress * .36
+                                  : (1 - progress) * .36;
+                              final indicatorWidth = 34 * (1 + stretch);
+                              final offset = Offset(
+                                constraints.maxWidth *
+                                    (_indicatorRatio.value - .5),
+                                -11,
+                              );
+                              return IgnorePointer(
+                                child: Transform.translate(
+                                  offset: offset,
+                                  child: Container(
+                                    width: indicatorWidth,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: colors.primaryContainer.withValues(
+                                        alpha: .9,
+                                      ),
+                                      borderRadius: BorderRadius.circular(34),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < widget.icons.length;
+                            index++
+                          )
+                            Expanded(
+                              child: _PhoneNavigationItem(
+                                icon: widget.icons[index],
+                                label: widget.labels[index],
+                                selected: index == widget.selectedIndex,
+                                onTap: () => widget.onSelected(index),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhoneNavigationItem extends StatelessWidget {
+  const _PhoneNavigationItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final foreground = selected ? colors.primary : colors.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        onTap: onTap,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            excludeFromSemantics: true,
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox.expand(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(end: foreground),
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    builder: (context, iconColor, _) => SolarIcon(
+                      icon,
+                      size: 21,
+                      color: iconColor ?? foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: foreground,
+                    ),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PageStack extends StatefulWidget {
+  const _PageStack({required this.index, required this.children});
 
   final int index;
   final List<Widget> children;
 
   @override
-  State<_PageMotionStack> createState() => _PageMotionStackState();
+  State<_PageStack> createState() => _PageStackState();
 }
 
-class _PageMotionStackState extends State<_PageMotionStack> {
-  final Set<int> _outgoingIndices = <int>{};
-
-  @override
-  void didUpdateWidget(covariant _PageMotionStack oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.index != widget.index) {
-      _outgoingIndices
-        ..add(oldWidget.index)
-        ..remove(widget.index);
-    }
-  }
-
-  void _finishExit(int index) {
-    if (!mounted ||
-        index == widget.index ||
-        !_outgoingIndices.contains(index)) {
-      return;
-    }
-    setState(() => _outgoingIndices.remove(index));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return Stack(
-      fit: StackFit.expand,
-      clipBehavior: Clip.hardEdge,
-      children: [
-        for (var index = 0; index < widget.children.length; index++)
-          _MotionPage(
-            key: ValueKey(index),
-            active: index == widget.index,
-            exiting: !reduceMotion && _outgoingIndices.contains(index),
-            reduceMotion: reduceMotion,
-            onExitComplete: () => _finishExit(index),
-            child: widget.children[index],
-          ),
-      ],
-    );
-  }
-}
-
-class _MotionPage extends StatefulWidget {
-  const _MotionPage({
-    super.key,
-    required this.active,
-    required this.exiting,
-    required this.reduceMotion,
-    required this.onExitComplete,
-    required this.child,
-  });
-
-  final bool active;
-  final bool exiting;
-  final bool reduceMotion;
-  final VoidCallback onExitComplete;
-  final Widget child;
-
-  @override
-  State<_MotionPage> createState() => _MotionPageState();
-}
-
-class _MotionPageState extends State<_MotionPage> {
-  static const _enterDuration = Duration(milliseconds: 220);
-  static const _exitDuration = Duration(milliseconds: 145);
-  static const _restOffset = Offset(0, .012);
-  static const _exitOffset = Offset(0, -.008);
-  static const _restScale = .985;
-
-  late bool _offstage;
+class _PageStackState extends State<_PageStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _transition;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
     super.initState();
-    _offstage = !widget.active;
+    _transition = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1,
+    );
+    final curve = CurvedAnimation(
+      parent: _transition,
+      curve: Curves.easeOutCubic,
+    );
+    _opacity = Tween<double>(begin: .84, end: 1).animate(curve);
+    _slide = Tween<Offset>(
+      begin: const Offset(.018, 0),
+      end: Offset.zero,
+    ).animate(curve);
   }
 
   @override
-  void didUpdateWidget(covariant _MotionPage oldWidget) {
+  void didUpdateWidget(covariant _PageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.active) _offstage = false;
+    if (oldWidget.index != widget.index) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _transition.value = 1;
+      } else {
+        _transition.forward(from: 0);
+      }
+    }
   }
 
-  void _finishExit() {
-    if (widget.active || _offstage) return;
-    setState(() => _offstage = true);
-    widget.onExitComplete();
+  @override
+  void dispose() {
+    _transition.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.active;
-    final duration = widget.reduceMotion
-        ? Duration.zero
-        : active
-        ? _enterDuration
-        : _exitDuration;
-    final curve = active ? Curves.easeOutCubic : Curves.easeInCubic;
-
-    return Offstage(
-      offstage: !active && (_offstage || widget.reduceMotion),
-      child: IgnorePointer(
-        ignoring: !active,
-        child: ExcludeSemantics(
-          excluding: !active,
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: active ? 1 : 0, end: active ? 1 : 0),
-            duration: duration,
-            curve: curve,
-            onEnd: _finishExit,
-            builder: (context, progress, child) {
-              final offset = active
-                  ? Offset.lerp(_restOffset, Offset.zero, progress)!
-                  : widget.exiting
-                  ? Offset.lerp(_exitOffset, Offset.zero, progress)!
-                  : _restOffset;
-              final scale = _restScale + ((1 - _restScale) * progress);
-
-              return Opacity(
-                opacity: progress,
-                child: FractionalTranslation(
-                  translation: offset,
-                  child: Transform.scale(
-                    scale: scale,
-                    alignment: Alignment.center,
-                    child: child,
-                  ),
-                ),
-              );
-            },
-            child: TickerMode(enabled: active, child: widget.child),
-          ),
-        ),
-      ),
+    final stack = IndexedStack(index: widget.index, children: widget.children);
+    if (MediaQuery.disableAnimationsOf(context)) return stack;
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(position: _slide, child: stack),
     );
   }
 }
