@@ -261,7 +261,9 @@ class _EmberAppState extends State<EmberApp> {
       cardTheme: CardThemeData(
         color: brightness == Brightness.dark
             ? scheme.surface
-            : scheme.surface.withValues(alpha: .78),
+            : scheme.surface.withValues(
+                alpha: appearance == 'kitkat' ? .96 : .78,
+              ),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -377,7 +379,11 @@ class _EmberShellState extends State<_EmberShell> {
       child: Scaffold(
         body: Stack(
           children: [
-            Positioned.fill(child: EmberBackdrop(appearance: ui.appearance)),
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: EmberBackdrop(appearance: ui.appearance),
+              ),
+            ),
             SafeArea(
               child: ui.state.isTv
                   ? Row(
@@ -533,7 +539,7 @@ class _PhoneNavigationBarState extends State<_PhoneNavigationBar>
           child: ClipRRect(
             borderRadius: radius,
             child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: Container(
                 height: 68,
                 decoration: BoxDecoration(

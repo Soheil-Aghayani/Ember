@@ -361,10 +361,13 @@ class EmberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardTheme.color;
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: dark ? colors.surface : colors.surface.withValues(alpha: .78),
+        color: dark
+            ? colors.surface
+            : cardColor ?? colors.surface.withValues(alpha: .78),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: focused

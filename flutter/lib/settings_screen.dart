@@ -140,15 +140,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Text(
-            copy.get('appsApply'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
+        _settingsHelp(context, copy.get('appsApply')),
         Row(
           children: [
             Expanded(
@@ -199,27 +191,11 @@ class SettingsScreen extends StatelessWidget {
         const SizedBox(height: 14),
         _sectionTitle(context, copy.get('profiles')),
         _ProfilesSection(ui: ui),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Text(
-            copy.get('profilesHelp'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
+        _settingsHelp(context, copy.get('profilesHelp')),
         const SizedBox(height: 14),
         _sectionTitle(context, copy.get('backupTitle')),
         _BackupSection(ui: ui),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Text(
-            copy.get('backupHelp'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
+        _settingsHelp(context, copy.get('backupHelp')),
         const SizedBox(height: 14),
         if (state.isTv) _tvVpnCard(context) else _firefoxVpnCard(context),
         const SizedBox(height: 14),
@@ -253,6 +229,37 @@ class SettingsScreen extends StatelessWidget {
           onPressed: () => _runDiagnostics(context),
         ),
       ],
+    );
+  }
+
+  Widget _settingsHelp(BuildContext context, String text) {
+    final colors = Theme.of(context).colorScheme;
+    final label = Text(
+      text,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: ui.appearance == 'kitkat'
+            ? colors.onSurface
+            : colors.onSurfaceVariant,
+      ),
+    );
+    if (ui.appearance != 'kitkat') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+        child: label,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colors.surface.withValues(alpha: .97),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: .9)),
+        ),
+        child: label,
+      ),
     );
   }
 
