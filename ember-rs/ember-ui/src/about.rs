@@ -9,7 +9,7 @@ use crate::strings::Strings;
 use crate::{InfoItem, ReleaseRow};
 
 // Keep in step with the pinned downloads in desktop/build.gradle.kts (the Rust build uses the same programs).
-const XRAY_VERSION: &str = "26.10.31";
+const XRAY_VERSION: &str = "26.11.9";
 const TUNNEL_VERSION: &str = "hev-socks5-tunnel 2.19.1 \u{b7} Wintun 0.14.1";
 
 pub const CONTACT_LINK: &str = "https://t.me/env_soh";
@@ -87,7 +87,7 @@ mod tests {
         }
         assert_eq!(RELEASES[0].version, env!("CARGO_PKG_VERSION"));
         assert_eq!(RELEASES[1].version, "2.0.2");
-        assert_eq!(RELEASES[2].version, "2.0.1");
+        assert_eq!(RELEASES[3].version, "2.0.1");
         assert_eq!(RELEASES[3].version, "2.0.0");
     }
 

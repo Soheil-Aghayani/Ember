@@ -722,6 +722,7 @@ class _PageStackState extends State<_PageStack>
     with SingleTickerProviderStateMixin {
   late final AnimationController _transition;
   late final Animation<double> _opacity;
+  late final Animation<double> _scale;
   late final Animation<Offset> _slide;
 
   @override
@@ -729,16 +730,17 @@ class _PageStackState extends State<_PageStack>
     super.initState();
     _transition = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 280),
       value: 1,
     );
     final curve = CurvedAnimation(
       parent: _transition,
       curve: Curves.easeOutCubic,
     );
-    _opacity = Tween<double>(begin: .84, end: 1).animate(curve);
+    _opacity = Tween<double>(begin: .92, end: 1).animate(curve);
+    _scale = Tween<double>(begin: .985, end: 1).animate(curve);
     _slide = Tween<Offset>(
-      begin: const Offset(.018, 0),
+      begin: const Offset(.035, 0),
       end: Offset.zero,
     ).animate(curve);
   }
@@ -767,7 +769,10 @@ class _PageStackState extends State<_PageStack>
     if (MediaQuery.disableAnimationsOf(context)) return stack;
     return FadeTransition(
       opacity: _opacity,
-      child: SlideTransition(position: _slide, child: stack),
+      child: SlideTransition(
+        position: _slide,
+        child: ScaleTransition(scale: _scale, child: stack),
+      ),
     );
   }
 }

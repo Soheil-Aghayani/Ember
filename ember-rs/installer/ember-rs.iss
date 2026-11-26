@@ -7,7 +7,7 @@
 ; Kotlin ones (and drop the "EmberRust" scheduled-task folder) in one commit.
 
 #ifndef Version
-  #define Version "2.0.1"
+  #define Version "2.0.4"
 #endif
 #ifndef SourceDir
   #define SourceDir "stage"

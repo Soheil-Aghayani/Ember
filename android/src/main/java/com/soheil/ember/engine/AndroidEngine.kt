@@ -378,7 +378,7 @@ class AndroidEngine(private val context: Context) {
     }
 
     /** Measures delay and speed of [nodes]. Only while disconnected, or the test would go through the VPN. */
-    fun testNodes(nodes: List<ProxyNode>) {
+    fun testNodes(nodes: List<ProxyNode>, measureSpeed: Boolean = true) {
         if (VpnState.phase.value != ConnectionState.DISCONNECTED || _testProgress.value != null) return
         val limit = testLimitReason()
         _testProgress.value = strings.testStarting
@@ -389,7 +389,7 @@ class AndroidEngine(private val context: Context) {
                     { _testProgress.value = it },
                     { node, result -> subscriptions.recordResult(node, result) },
                     { node, ip -> subscriptions.rememberAddress(node, ip) },
-                    measureSpeed = limit == null,
+                    measureSpeed = measureSpeed && limit == null,
                 )
                 val answered = nodes.count { subscriptions.results.value[it.id]?.pingMs != null }
                 if (answered == 0) {

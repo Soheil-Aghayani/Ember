@@ -10,6 +10,15 @@ pub struct Release {
 
 pub const RELEASES: &[Release] = &[
     Release {
+        version: "2.0.4",
+        en: &[
+            "Updated Xray-core to 26.11.9. Windows per-app routing continues to use sing-box 1.14.4.",
+        ],
+        fa: &[
+            "هستهٔ Xray به نسخهٔ 26.11.9 به‌روز شد. مسیریابی برنامه‌ها در Windows همچنان از sing-box نسخهٔ 1.14.4 استفاده می‌کند.",
+        ],
+    },
+    Release {
         version: "2.0.3",
         en: &[
             "Settings backups are now encrypted with a password and can be restored in Ember on Android. Previous ZIP backups can still be opened.",

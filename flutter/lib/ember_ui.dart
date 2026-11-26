@@ -351,23 +351,26 @@ class EmberCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.focused = false,
+    this.selected = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final bool focused;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = Theme.of(context).cardTheme.color;
+    final baseColor = dark
+        ? colors.surface
+        : cardColor ?? colors.surface.withValues(alpha: .78);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: dark
-            ? colors.surface
-            : cardColor ?? colors.surface.withValues(alpha: .78),
+        color: selected ? Color.lerp(baseColor, Colors.black, .11) : baseColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: focused

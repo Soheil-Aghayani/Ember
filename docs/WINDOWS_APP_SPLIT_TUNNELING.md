@@ -28,7 +28,7 @@ Do not call the feature app-specific until it also has a tested policy for TCP, 
 
 ## Update: what Xray offers (config checks only, not run live)
 
-Ember now runs Xray-core 26.10.31 for every connection. Checked with `xray run -test` (it validates a configuration without starting anything):
+Ember now packages Xray-core 26.11.9 for every connection. Generated Xray configurations are validated before the core starts.
 
 - A `tun` inbound (Wintun adapter created by Xray itself) is accepted.
 - A routing rule that matches `process` names (`"process": ["chrome.exe"]`) is accepted.

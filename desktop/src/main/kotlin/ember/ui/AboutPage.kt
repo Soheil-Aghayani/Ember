@@ -29,7 +29,7 @@ import java.awt.Desktop
 import java.net.URI
 
 // Keep in step with the pinned downloads in desktop/build.gradle.kts.
-private const val XRAY_VERSION = "26.10.31"
+private const val XRAY_VERSION = "26.11.9"
 private const val TUNNEL_VERSION = "hev-socks5-tunnel 2.19.1 · Wintun 0.14.1"
 
 private const val CONTACT_HANDLE = "@env_soh"

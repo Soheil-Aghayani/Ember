@@ -29,7 +29,8 @@ class _HomeScreenState extends State<HomeScreen>
     _orbit = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 18),
-    )..repeat();
+    );
+    _orbit.repeat();
   }
 
   @override
@@ -270,30 +271,40 @@ class _HomeScreenState extends State<HomeScreen>
         : connecting
         ? EmberPalettes.connectingOrb
         : palette.orbOff;
-    return RepaintBoundary(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: RepaintBoundary(
               child: CustomPaint(
-                painter: _OrbitPainter(
-                  animation: _orbit,
+                painter: _OrbitTrackPainter(
                   orbitColor: palette.orbitColor,
                   connected: connected,
                 ),
               ),
             ),
-            Semantics(
-              button: true,
-              label: connected
-                  ? widget.ui.strings.get('disconnect')
-                  : connecting
-                  ? widget.ui.strings.get('cancel')
-                  : widget.ui.strings.get('connect'),
+          ),
+          Positioned.fill(
+            child: _OrbitParticlesLayer(
+              animation: _orbit,
+              orbitColor: palette.orbitColor,
+              connected: connected,
+              foreground: false,
+              size: size,
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: connected
+                ? widget.ui.strings.get('disconnect')
+                : connecting
+                ? widget.ui.strings.get('cancel')
+                : widget.ui.strings.get('connect'),
+            child: RepaintBoundary(
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onFocusChange: (focused) {
@@ -388,8 +399,19 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _OrbitParticlesLayer(
+                animation: _orbit,
+                orbitColor: palette.orbitColor,
+                connected: connected,
+                foreground: true,
+                size: size,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -503,14 +525,39 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-class _OrbitPainter extends CustomPainter {
-  _OrbitPainter({
-    required this.animation,
-    required this.orbitColor,
-    required this.connected,
-  }) : super(repaint: animation);
+const _orbitPaths = <_OrbitPath>[
+  _OrbitPath(rx: .52, ry: .23, tilt: -.25, speed: 1, phase: 0, dotRadius: 3.3),
+  _OrbitPath(
+    rx: .43,
+    ry: .17,
+    tilt: -.25,
+    speed: -.83,
+    phase: 1.05,
+    dotRadius: 2.8,
+  ),
+];
 
-  final Animation<double> animation;
+class _OrbitPath {
+  const _OrbitPath({
+    required this.rx,
+    required this.ry,
+    required this.tilt,
+    required this.speed,
+    required this.phase,
+    required this.dotRadius,
+  });
+
+  final double rx;
+  final double ry;
+  final double tilt;
+  final double speed;
+  final double phase;
+  final double dotRadius;
+}
+
+class _OrbitTrackPainter extends CustomPainter {
+  const _OrbitTrackPainter({required this.orbitColor, required this.connected});
+
   final Color orbitColor;
   final bool connected;
 
@@ -522,36 +569,92 @@ class _OrbitPainter extends CustomPainter {
       ..color = orbitColor.withValues(alpha: connected ? .28 : .2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1;
-    final dot = Paint()
-      ..color = orbitColor.withValues(alpha: .64)
-      ..style = PaintingStyle.fill;
-    final phase = animation.value * math.pi * 2;
 
-    for (var index = 0; index < 2; index++) {
-      final tilt = index == 0 ? -.27 : .24;
-      final rx = base * .49;
-      final ry = base * (index == 0 ? .19 : .16);
+    for (final orbit in _orbitPaths) {
       canvas.save();
       canvas.translate(center.dx, center.dy);
-      canvas.rotate(tilt);
+      canvas.rotate(orbit.tilt);
       canvas.drawOval(
-        Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2),
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: base * orbit.rx * 2,
+          height: base * orbit.ry * 2,
+        ),
         line,
       );
-      for (var point = 0; point < 2; point++) {
-        final angle = phase * (index == 0 ? 1 : -.83) + point * math.pi;
-        canvas.drawCircle(
-          Offset(rx * math.cos(angle), ry * math.sin(angle)),
-          index == 0 ? 3.4 : 2.8,
-          dot,
-        );
-      }
       canvas.restore();
     }
   }
 
   @override
-  bool shouldRepaint(covariant _OrbitPainter oldDelegate) =>
+  bool shouldRepaint(covariant _OrbitTrackPainter oldDelegate) =>
       oldDelegate.orbitColor != orbitColor ||
       oldDelegate.connected != connected;
+}
+
+class _OrbitParticlesLayer extends StatelessWidget {
+  const _OrbitParticlesLayer({
+    required this.animation,
+    required this.orbitColor,
+    required this.connected,
+    required this.foreground,
+    required this.size,
+  });
+
+  final Animation<double> animation;
+  final Color orbitColor;
+  final bool connected;
+  final bool foreground;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: animation,
+    builder: (context, _) {
+      final center = size / 2;
+      final phase = animation.value * math.pi * 2;
+      final particles = <Widget>[];
+
+      for (var orbitIndex = 0; orbitIndex < _orbitPaths.length; orbitIndex++) {
+        final orbit = _orbitPaths[orbitIndex];
+        for (var point = 0; point < 2; point++) {
+          final angle = phase * orbit.speed + orbit.phase + point * math.pi;
+          final localX = size * orbit.rx * math.cos(angle);
+          final localY = size * orbit.ry * math.sin(angle);
+          final x =
+              localX * math.cos(orbit.tilt) - localY * math.sin(orbit.tilt);
+          final y =
+              localX * math.sin(orbit.tilt) + localY * math.cos(orbit.tilt);
+          if ((y >= 0) != foreground) continue;
+
+          final diameter = orbit.dotRadius * 2;
+          particles.add(
+            Positioned(
+              key: ValueKey('orbit-$orbitIndex-dot-$point'),
+              left: center + x - orbit.dotRadius,
+              top: center + y - orbit.dotRadius,
+              child: RepaintBoundary(
+                child: SizedBox(
+                  width: diameter,
+                  height: diameter,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: orbitColor.withValues(
+                        alpha: connected
+                            ? (foreground ? .82 : .46)
+                            : (foreground ? .68 : .4),
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+
+      return Stack(clipBehavior: Clip.none, children: particles);
+    },
+  );
 }

@@ -34,7 +34,7 @@ On 2026-11-24, the preview was rebuilt after adding stronger focus rings. The ra
 
 On 2026-11-25, the Flutter TV preview was rebuilt from the current release source, installed and launched on the Android TV API 34 emulator. Mint appearance and the Home/Servers/Settings rail were visible; D-pad focus and Select navigation changed pages. The first launch after installing the debug preview took about 19 seconds while Flutter initialized; no VPN was configured or started. Physical BRAVIA BF1 behavior remains pending.
 
-On 2026-11-26, the signed 2.7.5 release build completed. The phone emulator stopped responding while installing its debug APK, so the updated page transition was not visually checked. No VPN was configured or started. The existing TV preview checks above describe the prior UI and do not verify the 2.7.5 transition; physical BRAVIA BF1 behavior remains pending.
+On 2026-11-26, the signed 2.7.6 release build completed. The phone emulator stopped responding while installing its debug APK, so the updated page transition was not visually checked. No VPN was configured or started. The existing TV preview checks above describe the prior UI and do not verify the 2.7.6 transition; physical BRAVIA BF1 behavior remains pending.
 
 The same day, the signed release APK was installed on the TV-named AVD. Its feature list does not include `android.software.leanback` (`ro.build.characteristics` reports `emulator`), so the shared APK correctly selected the phone layout there. The forced debug TV preview verifies the TV layout and D-pad controls, but this AVD cannot verify release-time Leanback detection or launcher behavior.
 

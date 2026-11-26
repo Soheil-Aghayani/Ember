@@ -194,6 +194,11 @@ class MainActivity : FlutterFragmentActivity() {
     private val isTv: Boolean
         get() = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) || BuildConfig.TV_PREVIEW
 
+    private val isEmulator: Boolean
+        get() = Build.FINGERPRINT.startsWith("generic") ||
+            Build.MODEL.startsWith("sdk_gphone") ||
+            Build.HARDWARE in setOf("goldfish", "ranchu")
+
     private fun updates(): Flow<Unit> = merge(
         VpnState.phase.map { Unit },
         VpnState.progress.map { Unit },
@@ -222,6 +227,7 @@ class MainActivity : FlutterFragmentActivity() {
         val connected = VpnState.node.value
         return mapOf(
             "isTv" to isTv,
+            "isEmulator" to isEmulator,
             "version" to BuildConfig.VERSION_NAME,
             "vpn" to mapOf(
                 "phase" to VpnState.phase.value.name.lowercase(Locale.ROOT),
@@ -260,6 +266,7 @@ class MainActivity : FlutterFragmentActivity() {
                     "name" to subscription.name,
                     // Do not send the saved subscription URL or server credential to the Flutter layer.
                     "canRefresh" to subscription.url.isNotBlank(),
+                    "canShare" to (subscription.url.isNotBlank() || subscription.nodes.any { it.shareLink != null }),
                     "updatedAt" to subscription.updatedAtMs,
                     "usage" to subscription.usage?.let {
                         mapOf("used" to it.used, "total" to it.total, "expiresAt" to it.expiresAtEpochSeconds)
@@ -334,7 +341,14 @@ class MainActivity : FlutterFragmentActivity() {
                 }
             }
             "testServers" -> {
-                engine.testNodes(engine.subscriptions.subscriptions.value.flatMap { it.nodes })
+                engine.testNodes(
+                    engine.subscriptions.subscriptions.value.flatMap { it.nodes },
+                    measureSpeed = call.argument<Boolean>("measureSpeed") ?: true,
+                )
+                result.success(null)
+            }
+            "testDelay" -> {
+                engine.testNodes(engine.subscriptions.subscriptions.value.flatMap { it.nodes }, measureSpeed = false)
                 result.success(null)
             }
             "cancelTest" -> {
@@ -391,6 +405,17 @@ class MainActivity : FlutterFragmentActivity() {
                 if (subscription?.nodes?.any { it.id == engine.selectedId.value } == true) engine.chooseServer(AUTO_NODE)
                 engine.subscriptions.remove(id)
                 result.success(null)
+            }
+            "removeNode" -> {
+                val id = call.requiredString("id", result) ?: return
+                val subscriptionId = call.requiredString("subscriptionId", result) ?: return
+                val removed = engine.subscriptions.removeNode(id, subscriptionId)
+                if (removed == null) result.error("server_missing", "That server is no longer in the list.", null)
+                else {
+                    if (id == engine.selectedId.value) engine.chooseServer(AUTO_NODE)
+                    if (id in engine.favorites.value) engine.toggleFavorite(removed)
+                    result.success(null)
+                }
             }
             "checkSite" -> {
                 val input = call.requiredString("url", result) ?: return
@@ -455,6 +480,10 @@ class MainActivity : FlutterFragmentActivity() {
             "listApps" -> result.success(installedApps())
             "getQr" -> qrBytes(call.requiredString("id", result), result)
             "copyServerLink" -> copyServerLink(call.requiredString("id", result), result)
+            "shareServer" -> shareServer(call.requiredString("id", result), result)
+            "getSubscriptionQr" -> subscriptionQrBytes(call.requiredString("id", result), result)
+            "copySubscriptionLink" -> copySubscriptionLink(call.requiredString("id", result), result)
+            "shareSubscription" -> shareSubscription(call.requiredString("id", result), result)
             "getLogs" -> result.success(logText())
             "runDiagnostics" -> runWork(result, { diagnostics() }) { it }
             "exportBackup" -> {
@@ -563,9 +592,30 @@ class MainActivity : FlutterFragmentActivity() {
             result.error("qr_unavailable", engine.strings.qrTooLong, null)
             return
         }
+        qrBytesFor(link, result)
+    }
+
+    private fun subscriptionShareText(id: String?): Pair<String, String>? {
+        val subscription = id?.let { key -> engine.subscriptions.subscriptions.value.firstOrNull { it.id == key } }
+            ?: return null
+        val text = subscription.url.takeIf(String::isNotBlank)
+            ?: subscription.nodes.mapNotNull { it.shareLink }.joinToString("\n").takeIf(String::isNotBlank)
+            ?: return null
+        return subscription.name to text
+    }
+
+    private fun subscriptionQrBytes(id: String?, result: MethodChannel.Result) {
+        val (_, text) = subscriptionShareText(id) ?: run {
+            result.error("link_unavailable", "This cluster has no shareable link.", null)
+            return
+        }
+        qrBytesFor(text, result)
+    }
+
+    private fun qrBytesFor(text: String, result: MethodChannel.Result) {
         val bytes = runCatching {
             val matrix = QRCodeWriter().encode(
-                link, BarcodeFormat.QR_CODE, 520, 520,
+                text, BarcodeFormat.QR_CODE, 520, 520,
                 mapOf(EncodeHintType.MARGIN to 2, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.CHARACTER_SET to "UTF-8"),
             )
             val pixels = IntArray(matrix.width * matrix.height) { index ->
@@ -587,6 +637,41 @@ class MainActivity : FlutterFragmentActivity() {
             getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Ember server", link))
             result.success(null)
         }
+    }
+
+    private fun copySubscriptionLink(id: String?, result: MethodChannel.Result) {
+        val (name, text) = subscriptionShareText(id) ?: run {
+            result.error("link_unavailable", "This cluster has no shareable link.", null)
+            return
+        }
+        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(name, text))
+        result.success(null)
+    }
+
+    private fun shareServer(id: String?, result: MethodChannel.Result) {
+        val node = id?.let(engine.subscriptions::nodeById)
+        val link = node?.shareLink
+        if (node == null || link == null) {
+            result.error("link_unavailable", "This server has no shareable link.", null)
+            return
+        }
+        shareText(node.title, link, result)
+    }
+
+    private fun shareSubscription(id: String?, result: MethodChannel.Result) {
+        val (name, text) = subscriptionShareText(id) ?: run {
+            result.error("link_unavailable", "This cluster has no shareable link.", null)
+            return
+        }
+        shareText(name, text, result)
+    }
+
+    private fun shareText(title: String, text: String, result: MethodChannel.Result) {
+        runCatching {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            startActivity(Intent.createChooser(send, title))
+        }.onSuccess { result.success(null) }
+            .onFailure { result.error("share_unavailable", it.message ?: "The share sheet could not be opened.", null) }
     }
 
     private fun installedApps(): List<Map<String, String>> {

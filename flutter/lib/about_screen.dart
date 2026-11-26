@@ -26,7 +26,7 @@ class AboutScreen extends StatelessWidget {
           child: Column(
             children: [
               _aboutRow(context, copy.get('version'), ui.state.version),
-              _aboutRow(context, copy.get('engine'), 'Xray-core 26.10.31'),
+              _aboutRow(context, copy.get('engine'), 'Xray-core 26.11.9'),
               _aboutRow(context, copy.get('tunnel'), 'hev-socks5-tunnel'),
             ],
           ),

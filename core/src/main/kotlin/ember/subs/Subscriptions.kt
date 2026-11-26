@@ -45,6 +45,7 @@ data class Subscription(
     val nodes: List<ProxyNode>,
     val usage: SubscriptionUsage?,
     val updatedAtMs: Long,
+    val excludedNodeIds: Set<String> = emptySet(),
 )
 
 data class SubscriptionRefreshPreview(
@@ -231,14 +232,20 @@ class SubscriptionStore(private val file: File) {
     suspend fun refresh(id: String) {
         val current = _subscriptions.value.firstOrNull { it.id == id }?.takeIf { it.url.isNotBlank() } ?: return
         val fetched = fetch(current.url)
-        replace(current.copy(nodes = fetched.nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
+        val nodes = fetched.nodes.filterNot { it.id in current.excludedNodeIds }
+        replace(current.copy(nodes = nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
     }
 
     /** Fetches a refresh without replacing the last good list; only [applyRefreshPreview] commits it. */
     suspend fun previewRefresh(id: String): SubscriptionRefreshPreview {
         val current = _subscriptions.value.firstOrNull { it.id == id }?.takeIf { it.url.isNotBlank() }
             ?: error("This subscription cannot be updated.")
-        val fetched = fetch(current.url)
+        val fetchedAll = fetch(current.url)
+        val fetched = Fetched(
+            fetchedAll.nodes.filterNot { it.id in current.excludedNodeIds },
+            fetchedAll.usage,
+            fetchedAll.title,
+        )
         val old = current.nodes.mapTo(hashSetOf()) { it.id }
         val new = fetched.nodes.mapTo(hashSetOf()) { it.id }
         val token = java.util.UUID.randomUUID().toString()
@@ -273,7 +280,14 @@ class SubscriptionStore(private val file: File) {
         }
         require(cleanUrl.startsWith("https://") || cleanUrl.startsWith("http://")) { "A subscription link starts with https://" }
         val fetched = fetch(cleanUrl)
-        replace(current.copy(name = cleanName, url = cleanUrl, nodes = fetched.nodes, usage = fetched.usage, updatedAtMs = System.currentTimeMillis()))
+        replace(current.copy(
+            name = cleanName,
+            url = cleanUrl,
+            nodes = fetched.nodes,
+            usage = fetched.usage,
+            updatedAtMs = System.currentTimeMillis(),
+            excludedNodeIds = emptySet(),
+        ))
     }
 
     /** The most reliable measured server, then low jitter, speed and delay; untested servers are the fallback. */
@@ -288,6 +302,24 @@ class SubscriptionStore(private val file: File) {
     fun remove(id: String) {
         _subscriptions.value = _subscriptions.value.filterNot { it.id == id }
         save()
+    }
+
+    /** Removes one server from this device and remembers the choice across subscription refreshes. */
+    fun removeNode(id: String, subscriptionId: String? = null): ProxyNode? {
+        val current = _subscriptions.value.firstOrNull { subscription ->
+            (subscriptionId == null || subscription.id == subscriptionId) &&
+                subscription.nodes.any { it.id == id }
+        } ?: return null
+        val removed = current.nodes.firstOrNull { it.id == id } ?: return null
+        _results.value = _results.value - id
+        addresses.remove(id)
+        replace(
+            current.copy(
+                nodes = current.nodes.filterNot { it.id == id },
+                excludedNodeIds = current.excludedNodeIds + id,
+            ),
+        )
+        return removed
     }
 
     fun recordResult(node: ProxyNode, result: NodeResult) {
@@ -328,6 +360,7 @@ class SubscriptionStore(private val file: File) {
                 array.put(JSONObject()
                     .put("id", s.id).put("name", s.name).put("url", s.url).put("updatedAt", s.updatedAtMs)
                     .put("nodes", JSONArray(s.nodes.map { it.raw }))
+                    .put("excludedNodeIds", JSONArray(s.excludedNodeIds.sorted()))
                     .apply {
                         s.usage?.let {
                             put("usage", JSONObject().put("up", it.uploaded).put("down", it.downloaded).put("total", it.total)
@@ -356,13 +389,21 @@ class SubscriptionStore(private val file: File) {
             val list = root.optJSONArray("subscriptions") ?: JSONArray()
             _subscriptions.value = (0 until list.length()).map { i ->
                 val o = list.getJSONObject(i)
-                val nodes = o.optJSONArray("nodes")?.let { a -> (0 until a.length()).mapNotNull { ShareLinks.parse(a.getString(it)) } }.orEmpty()
+                val excludedNodeIds = o.optJSONArray("excludedNodeIds")?.let { a ->
+                    (0 until a.length()).mapNotNull { index -> a.optString(index).takeIf(String::isNotBlank) }.toSet()
+                }.orEmpty()
+                val nodes = o.optJSONArray("nodes")?.let { a ->
+                    (0 until a.length())
+                        .mapNotNull { ShareLinks.parse(a.getString(it)) }
+                        .filterNot { it.id in excludedNodeIds }
+                }.orEmpty()
                 Subscription(
                     id = o.getString("id"), name = o.getString("name"), url = o.getString("url"), nodes = nodes,
                     usage = o.optJSONObject("usage")?.let {
                         SubscriptionUsage(it.optLong("up"), it.optLong("down"), it.optLong("total"), it.optLong("expire").takeIf { e -> e > 0 })
                     },
                     updatedAtMs = o.optLong("updatedAt"),
+                    excludedNodeIds = excludedNodeIds,
                 )
             }
             root.optJSONObject("addresses")?.let { a -> a.keys().forEach { id -> addresses[id] = a.getString(id) } }

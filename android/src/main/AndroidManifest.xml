@@ -35,12 +35,22 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="false"
+            android:enabled="${flutterUiEnabled}"
+            android:exported="true"
             android:theme="@style/Theme.EmberVpn"
             android:launchMode="singleTop"
             android:hardwareAccelerated="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ComposeMainActivity"
@@ -51,6 +61,7 @@
         <activity-alias
             android:name=".LauncherActivity"
             android:targetActivity="${launcherActivity}"
+            android:enabled="${launcherAliasEnabled}"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"

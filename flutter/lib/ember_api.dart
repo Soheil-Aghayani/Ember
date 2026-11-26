@@ -41,6 +41,7 @@ class EmberSubscription {
     required this.id,
     required this.name,
     required this.canRefresh,
+    required this.canShare,
     required this.nodes,
     this.usedBytes,
     this.totalBytes,
@@ -49,6 +50,7 @@ class EmberSubscription {
   final String id;
   final String name;
   final bool canRefresh;
+  final bool canShare;
   final List<EmberNode> nodes;
   final int? usedBytes;
   final int? totalBytes;
@@ -60,6 +62,7 @@ class EmberSubscription {
       id: data['id'] as String? ?? '',
       name: data['name'] as String? ?? '',
       canRefresh: data['canRefresh'] as bool? ?? false,
+      canShare: data['canShare'] as bool? ?? false,
       nodes: (data['nodes'] as List? ?? const [])
           .map(EmberNode.fromMap)
           .toList(growable: false),
@@ -197,6 +200,7 @@ class EmberProfile {
 class EmberState {
   const EmberState({
     required this.isTv,
+    this.isEmulator = false,
     required this.version,
     required this.phase,
     required this.selectedId,
@@ -224,6 +228,7 @@ class EmberState {
   });
 
   final bool isTv;
+  final bool isEmulator;
   final String version;
   final String phase;
   final String selectedId;
@@ -262,6 +267,7 @@ class EmberState {
     final rawSiteResults = _map(check['results']);
     return EmberState(
       isTv: data['isTv'] as bool? ?? false,
+      isEmulator: data['isEmulator'] as bool? ?? false,
       version: data['version'] as String? ?? '',
       phase: vpn['phase'] as String? ?? 'disconnected',
       selectedId: data['selectedId'] as String? ?? 'auto',
@@ -334,7 +340,9 @@ class EmberApi {
       _methods.invokeMethod<void>('selectServer', {'id': id});
   Future<void> toggleFavorite(String id) =>
       _methods.invokeMethod<void>('toggleFavorite', {'id': id});
-  Future<void> testServers() => _methods.invokeMethod<void>('testServers');
+  Future<void> testServers({bool measureSpeed = true}) => _methods
+      .invokeMethod<void>('testServers', {'measureSpeed': measureSpeed});
+  Future<void> testDelay() => _methods.invokeMethod<void>('testDelay');
   Future<void> cancelTest() => _methods.invokeMethod<void>('cancelTest');
 
   Future<int> addSubscription(String text, {String name = ''}) async {
@@ -371,6 +379,11 @@ class EmberApi {
       false;
   Future<void> removeSubscription(String id) =>
       _methods.invokeMethod<void>('removeSubscription', {'id': id});
+  Future<void> removeNode(String id, String subscriptionId) =>
+      _methods.invokeMethod<void>('removeNode', {
+        'id': id,
+        'subscriptionId': subscriptionId,
+      });
   Future<void> checkSite(String url) =>
       _methods.invokeMethod<void>('checkSite', {'url': url});
   Future<void> clearSiteCheck() =>
@@ -404,8 +417,16 @@ class EmberApi {
 
   Future<Uint8List?> getQr(String id) =>
       _methods.invokeMethod<Uint8List>('getQr', {'id': id});
+  Future<Uint8List?> getSubscriptionQr(String id) =>
+      _methods.invokeMethod<Uint8List>('getSubscriptionQr', {'id': id});
   Future<void> copyServerLink(String id) =>
       _methods.invokeMethod<void>('copyServerLink', {'id': id});
+  Future<void> shareServer(String id) =>
+      _methods.invokeMethod<void>('shareServer', {'id': id});
+  Future<void> copySubscriptionLink(String id) =>
+      _methods.invokeMethod<void>('copySubscriptionLink', {'id': id});
+  Future<void> shareSubscription(String id) =>
+      _methods.invokeMethod<void>('shareSubscription', {'id': id});
   Future<String> getLogs() async =>
       await _methods.invokeMethod<String>('getLogs') ?? '';
   Future<EmberDiagnostics> runDiagnostics() async => EmberDiagnostics.fromMap(

@@ -86,7 +86,7 @@ fun AboutScreen(
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Row(s.version, BuildConfig.VERSION_NAME)
-                Row(s.engineLabel, "Xray-core 26.10.31")
+                Row(s.engineLabel, "Xray-core 26.11.9")
                 Row(s.tunnelLabel, "hev-socks5-tunnel")
             }
         }

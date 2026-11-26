@@ -48,8 +48,8 @@ val tunnelAssets = listOf(
     ),
     // Runs the VLESS / VMess / Trojan / Shadowsocks servers of the user's subscription links.
     TunnelAsset(
-        "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-windows-64.zip",
-        "2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a",
+        "https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-windows-64.zip",
+        "1262522266337b824f07beb8e1375786b437683b3890105469088f8e17e0a69d",
         "Xray-windows-64.zip",
     ),
     // Decides per program whether traffic uses the VPN (the Apps setting).
@@ -61,11 +61,13 @@ val tunnelAssets = listOf(
 )
 
 val tunnelDir = layout.projectDirectory.dir("appResources/windows-x64/tunnel").asFile
+val tunnelAssetsMarker = tunnelAssets.joinToString("\n") { it.fileName + ":" + it.sha256 }
 
 val fetchTunnelBinaries = tasks.register("fetchTunnelBinaries") {
     val marker = File(tunnelDir, ".fetched")
     outputs.file(marker)
-    onlyIf { !marker.exists() }
+    inputs.property("tunnelAssets", tunnelAssetsMarker)
+    onlyIf { !marker.exists() || marker.readText().trim() != tunnelAssetsMarker }
     doLast {
         tunnelDir.mkdirs()
         val downloads = layout.buildDirectory.dir("tunnel-downloads").get().asFile.apply { mkdirs() }
@@ -86,7 +88,7 @@ val fetchTunnelBinaries = tasks.register("fetchTunnelBinaries") {
         tunnelDir.walkTopDown().filter { it.name == "geoip.dat" || it.name == "geosite.dat" }.forEach { it.delete() }
         val wintun = tunnelDir.walkTopDown().first { it.name == "wintun.dll" && it.parentFile.name == "amd64" }
         wintun.copyTo(File(hevExe.parentFile, "wintun.dll"), overwrite = true)
-        marker.writeText("ok")
+        marker.writeText(tunnelAssetsMarker)
     }
 }
 

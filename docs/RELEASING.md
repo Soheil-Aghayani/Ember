@@ -24,7 +24,7 @@ cargo test --workspace
 cargo build --release -p ember-ui
 cargo build --release --manifest-path ..\helper\Cargo.toml
 powershell -File installer\stage.ps1 -Resources 'C:\Program Files\Ember\app\resources' -Out .\stage
-& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.1 `
+& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.4 `
   "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\Output" installer\ember-rs.iss
 ```
 
@@ -37,9 +37,9 @@ installer after Inno Setup finishes:
 ```powershell
 $signArgs = @{ PfxPath = 'D:\keys\ember\ember-signing.pfx'; ExpectedPublisher = 'Ember'; RequireTrustedCertificate = $true }
 & ..\tools\Sign-Files.ps1 -Files .\stage\Ember.exe, .\stage\resources\ember-helper.exe @signArgs
-& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.1 `
+& 'D:\Programming\tools\InnoSetup\ISCC.exe' /DVersion=2.0.4 `
   "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\Output" installer\ember-rs.iss
-& ..\tools\Sign-Files.ps1 -Files .\Output\Ember-Rust-2.0.1.exe @signArgs
+& ..\tools\Sign-Files.ps1 -Files .\Output\Ember-Rust-2.0.4.exe @signArgs
 ```
 
 Keep the stage and output directories task-specific if an existing `ember-rs/installer/stage` is in use. Do not run the installer or network helper during an agent task.

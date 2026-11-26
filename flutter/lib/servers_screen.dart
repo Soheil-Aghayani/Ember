@@ -19,85 +19,92 @@ class ServersScreen extends StatelessWidget {
       entries.add(_Entry.subscription(subscription));
       final nodes = subscription.nodes.toList()
         ..sort((a, b) => _compareNodes(state, a, b));
-      entries.addAll(nodes.map(_Entry.node));
+      entries.addAll(nodes.map((node) => _Entry.node(subscription.id, node)));
     }
 
-    return CustomScrollView(
-      key: const PageStorageKey('servers'),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
-            child: EmberPageHeader(
-              copy.get('servers'),
-              trailing: _actions(context),
-            ),
-          ),
-        ),
-        if (state.testLimitReason != null)
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: state.isTv ? 0 : 10),
+      child: CustomScrollView(
+        key: const PageStorageKey('servers'),
+        slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: EmberCard(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    const SolarIcon('info_circle'),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        copy.get(switch (state.testLimitReason) {
-                          'battery_saver' => 'testLimitedBattery',
-                          'low_battery' => 'testLimitedCharge',
-                          _ => 'testLimitedMetered',
-                        }),
-                        style: Theme.of(context).textTheme.bodySmall,
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+              child: EmberPageHeader(
+                copy.get('servers'),
+                trailing: _actions(context),
+              ),
+            ),
+          ),
+          if (state.testLimitReason != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: EmberCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      const SolarIcon('info_circle'),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          copy.get(switch (state.testLimitReason) {
+                            'battery_saver' => 'testLimitedBattery',
+                            'low_battery' => 'testLimitedCharge',
+                            _ => 'testLimitedMetered',
+                          }),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (state.subscriptions.isNotEmpty)
+            SliverToBoxAdapter(child: _autoRow(context)),
+          if (state.siteLabel != null)
+            SliverToBoxAdapter(child: _siteSummary(context)),
+          if (state.subscriptions.isEmpty)
+            SliverToBoxAdapter(
+              child: EmberCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(copy.get('emptyList')),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: () => _showAddDialog(context),
+                      icon: const SolarIcon('add_circle', color: Colors.white),
+                      label: Text(copy.get('addServers')),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-        if (state.subscriptions.isNotEmpty)
-          SliverToBoxAdapter(child: _autoRow(context)),
-        if (state.siteLabel != null)
-          SliverToBoxAdapter(child: _siteSummary(context)),
-        if (state.subscriptions.isEmpty)
-          SliverToBoxAdapter(
-            child: EmberCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(copy.get('emptyList')),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: () => _showAddDialog(context),
-                    icon: const SolarIcon('add_circle', color: Colors.white),
-                    label: Text(copy.get('addServers')),
-                  ),
-                ],
+            )
+          else
+            SliverList.builder(
+              itemCount: entries.length,
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: entries[index].subscription != null
+                    ? _SubscriptionRow(
+                        ui: ui,
+                        subscription: entries[index].subscription!,
+                      )
+                    : _ServerRow(
+                        ui: ui,
+                        node: entries[index].node!,
+                        subscriptionId: entries[index].subscriptionId!,
+                      ),
               ),
             ),
-          )
-        else
-          SliverList.builder(
-            itemCount: entries.length,
-            itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: entries[index].subscription != null
-                  ? _SubscriptionRow(
-                      ui: ui,
-                      subscription: entries[index].subscription!,
-                    )
-                  : _ServerRow(ui: ui, node: entries[index].node!),
-            ),
-          ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
     );
   }
 
@@ -114,14 +121,20 @@ class ServersScreen extends StatelessWidget {
           onPressed: canTest ? () => _showSiteDialog(context) : null,
           icon: const SolarIcon('magnifier'),
         ),
-        IconButton(
-          tooltip: ui.strings.get(isTesting ? 'stop' : 'testSpeed'),
-          onPressed: isTesting
-              ? () => ui.run(() => ui.api.cancelTest())
-              : canTest
-              ? () => ui.run(() => ui.api.testServers())
-              : null,
-          icon: SolarIcon(isTesting ? 'close' : 'sun_2'),
+        PopupMenuButton<String>(
+          tooltip: ui.strings.get(isTesting ? 'stop' : 'testDelay'),
+          icon: SolarIcon(isTesting ? 'close' : 'speedometer'),
+          onSelected: (action) => _runMenuAction(context, action),
+          itemBuilder: (context) => isTesting
+              ? [_menuItem('stop', 'close')]
+              : [
+                  _menuItem('testDelay', 'magnifier', enabled: canTest),
+                  _menuItem(
+                    'testSpeed',
+                    'speedometer',
+                    enabled: canTest && state.testLimitReason == null,
+                  ),
+                ],
         ),
         PopupMenuButton<String>(
           tooltip: ui.strings.get('addServers'),
@@ -140,8 +153,13 @@ class ServersScreen extends StatelessWidget {
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, String icon) => PopupMenuItem(
+  PopupMenuItem<String> _menuItem(
+    String value,
+    String icon, {
+    bool enabled = true,
+  }) => PopupMenuItem(
     value: value,
+    enabled: enabled,
     child: Row(
       children: [
         SolarIcon(icon, size: 20),
@@ -183,6 +201,15 @@ class ServersScreen extends StatelessWidget {
       case 'warpThrough':
         await ui.run(() => ui.api.addWarpThroughServer());
         break;
+      case 'testDelay':
+        await ui.run(() => ui.api.testDelay());
+        break;
+      case 'testSpeed':
+        await ui.run(() => ui.api.testServers());
+        break;
+      case 'stop':
+        await ui.run(() => ui.api.cancelTest());
+        break;
     }
   }
 
@@ -192,17 +219,13 @@ class ServersScreen extends StatelessWidget {
       onTap: () => ui.run(() => ui.api.selectServer('auto')),
       borderRadius: BorderRadius.circular(18),
       child: EmberCard(
+        selected: ui.state.selectedId == 'auto',
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
             const SolarIcon('sun', size: 22),
             const SizedBox(width: 12),
             Expanded(child: Text(ui.strings.get('auto'))),
-            if (ui.state.selectedId == 'auto')
-              SolarIcon(
-                'check_circle',
-                color: Theme.of(context).colorScheme.primary,
-              ),
           ],
         ),
       ),
@@ -426,12 +449,32 @@ class ServersScreen extends StatelessWidget {
 }
 
 class _Entry {
-  const _Entry.subscription(this.subscription) : node = null;
-  const _Entry.node(this.node) : subscription = null;
+  const _Entry.subscription(this.subscription)
+    : node = null,
+      subscriptionId = null;
+  const _Entry.node(this.subscriptionId, this.node) : subscription = null;
 
   final EmberSubscription? subscription;
   final EmberNode? node;
+  final String? subscriptionId;
 }
+
+PopupMenuItem<String> _actionMenuItem(
+  EmberUi ui,
+  String value,
+  String icon, {
+  bool enabled = true,
+}) => PopupMenuItem(
+  value: value,
+  enabled: enabled,
+  child: Row(
+    children: [
+      SolarIcon(icon, size: 20),
+      const SizedBox(width: 12),
+      Expanded(child: Text(ui.strings.get(value))),
+    ],
+  ),
+);
 
 class _SubscriptionRow extends StatelessWidget {
   const _SubscriptionRow({required this.ui, required this.subscription});
@@ -446,7 +489,7 @@ class _SubscriptionRow extends StatelessWidget {
         ? ' · ${_formatBytes(subscription.usedBytes!)} / ${_formatBytes(subscription.totalBytes!)}'
         : '';
     return EmberCard(
-      padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+      padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
       child: Row(
         children: [
           Expanded(
@@ -468,20 +511,68 @@ class _SubscriptionRow extends StatelessWidget {
               ],
             ),
           ),
-          if (subscription.canRefresh)
-            IconButton(
-              tooltip: ui.strings.get('refresh'),
-              onPressed: () => _previewRefresh(context),
-              icon: const SolarIcon('refresh'),
-            ),
-          IconButton(
-            tooltip: ui.strings.get('remove'),
-            onPressed: () => _confirmRemove(context),
-            icon: const SolarIcon('trash_bin_trash'),
+          PopupMenuButton<String>(
+            tooltip: ui.strings.get('shareCluster'),
+            icon: const SolarIcon('menu_dots'),
+            onSelected: (action) => _runAction(context, action),
+            itemBuilder: (context) => [
+              _actionMenuItem(
+                ui,
+                'copyCluster',
+                'copy',
+                enabled: subscription.canShare,
+              ),
+              _actionMenuItem(
+                ui,
+                'shareCluster',
+                'share',
+                enabled: subscription.canShare,
+              ),
+              _actionMenuItem(
+                ui,
+                'showClusterQr',
+                'qr',
+                enabled: subscription.canShare,
+              ),
+              if (subscription.canRefresh)
+                _actionMenuItem(ui, 'refresh', 'refresh'),
+              _actionMenuItem(ui, 'remove', 'trash_bin_trash'),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _runAction(BuildContext context, String action) async {
+    switch (action) {
+      case 'copyCluster':
+        await ui.run(
+          () => ui.api.copySubscriptionLink(subscription.id),
+          success: ui.strings.get('copied'),
+        );
+        break;
+      case 'shareCluster':
+        await ui.run(() => ui.api.shareSubscription(subscription.id));
+        break;
+      case 'showClusterQr':
+        await _showQrDialog(
+          context,
+          ui,
+          title: subscription.name,
+          image: ui.api.getSubscriptionQr(subscription.id),
+          copy: () => ui.api.copySubscriptionLink(subscription.id),
+          copyLabel: ui.strings.get('copyCluster'),
+          hint: ui.strings.get('qrClusterHint'),
+        );
+        break;
+      case 'refresh':
+        await _previewRefresh(context);
+        break;
+      case 'remove':
+        await _confirmRemove(context);
+        break;
+    }
   }
 
   Future<void> _previewRefresh(BuildContext context) async {
@@ -525,17 +616,17 @@ class _SubscriptionRow extends StatelessWidget {
   Future<void> _confirmRemove(BuildContext context) async {
     final remove = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(ui.strings.get('remove')),
         content: Text(ui.strings.get('confirmRemove')),
         actions: [
           TextButton.icon(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             icon: const SolarIcon('close'),
             label: Text(ui.strings.get('cancel')),
           ),
           FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             icon: const SolarIcon('trash_bin_trash', color: Colors.white),
             label: Text(ui.strings.get('remove')),
           ),
@@ -549,15 +640,21 @@ class _SubscriptionRow extends StatelessWidget {
 }
 
 class _ServerRow extends StatelessWidget {
-  const _ServerRow({required this.ui, required this.node});
+  const _ServerRow({
+    required this.ui,
+    required this.node,
+    required this.subscriptionId,
+  });
 
   final EmberUi ui;
   final EmberNode node;
+  final String subscriptionId;
 
   @override
   Widget build(BuildContext context) {
     final state = ui.state;
     final selected = state.selectedId == node.id;
+    final isFavourite = state.favorites.contains(node.id);
     final result = state.results[node.id];
     final site = state.siteResults[node.id];
     final colors = Theme.of(context).colorScheme;
@@ -576,7 +673,8 @@ class _ServerRow extends StatelessWidget {
       onTap: () => ui.run(() => ui.api.selectServer(node.id)),
       borderRadius: BorderRadius.circular(16),
       child: EmberCard(
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+        selected: selected,
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
         child: Row(
           children: [
             EmberFlagBadge(node.flagCode, size: 32),
@@ -623,89 +721,157 @@ class _ServerRow extends StatelessWidget {
                   ),
                 ),
               ),
-            if (selected && node.canShare)
-              IconButton(
-                tooltip: ui.strings.get('showQr'),
-                onPressed: () => _showQr(context),
-                icon: const SolarIcon('qr'),
+            if (isFavourite)
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: SolarIcon('star', size: 18, color: colors.primary),
               ),
-            IconButton(
-              tooltip: ui.strings.get('favourite'),
-              onPressed: () => ui.run(() => ui.api.toggleFavorite(node.id)),
-              icon: SolarIcon(
-                'star',
-                color: state.favorites.contains(node.id)
-                    ? colors.primary
-                    : colors.onSurfaceVariant,
-              ),
+            PopupMenuButton<String>(
+              tooltip: ui.strings.get('shareServer'),
+              icon: const SolarIcon('menu_dots'),
+              onSelected: (action) => _runAction(context, action),
+              itemBuilder: (context) => [
+                _actionMenuItem(ui, 'copyLink', 'copy', enabled: node.canShare),
+                _actionMenuItem(
+                  ui,
+                  'shareServer',
+                  'share',
+                  enabled: node.canShare,
+                ),
+                _actionMenuItem(ui, 'showQr', 'qr', enabled: node.canShare),
+                _actionMenuItem(
+                  ui,
+                  isFavourite ? 'removeFavourite' : 'favourite',
+                  'star',
+                ),
+                _actionMenuItem(ui, 'removeServer', 'trash_bin_trash'),
+              ],
             ),
-            if (selected)
-              SolarIcon('check_circle', color: colors.primary)
-            else
-              const SizedBox(width: 22),
-            const SizedBox(width: 8),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _showQr(BuildContext context) async {
-    final future = ui.api.getQr(node.id);
-    await showDialog<void>(
+  Future<void> _runAction(BuildContext context, String action) async {
+    switch (action) {
+      case 'copyLink':
+        await ui.run(
+          () => ui.api.copyServerLink(node.id),
+          success: ui.strings.get('copied'),
+        );
+        break;
+      case 'shareServer':
+        await ui.run(() => ui.api.shareServer(node.id));
+        break;
+      case 'showQr':
+        await _showQrDialog(
+          context,
+          ui,
+          title: node.title,
+          image: ui.api.getQr(node.id),
+          copy: () => ui.api.copyServerLink(node.id),
+          copyLabel: ui.strings.get('copyLink'),
+          hint: ui.strings.get('qrHint'),
+        );
+        break;
+      case 'favourite':
+      case 'removeFavourite':
+        await ui.run(() => ui.api.toggleFavorite(node.id));
+        break;
+      case 'removeServer':
+        await _confirmRemoveServer(context);
+        break;
+    }
+  }
+
+  Future<void> _confirmRemoveServer(BuildContext context) async {
+    final remove = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: FutureBuilder<Uint8List?>(
-            future: future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const SizedBox(
-                  width: 260,
-                  height: 260,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError || snapshot.data == null) {
-                return Text(ui.strings.get('qrTooLong'));
-              }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.memory(
-                    snapshot.data!,
-                    width: 260,
-                    height: 260,
-                    gaplessPlayback: true,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(ui.strings.get('qrHint'), textAlign: TextAlign.center),
-                ],
-              );
-            },
-          ),
-        ),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ui.strings.get('removeServer')),
+        content: Text(ui.strings.get('confirmRemoveServer')),
         actions: [
-          if (node.canShare)
-            TextButton.icon(
-              onPressed: () => ui.run(
-                () => ui.api.copyServerLink(node.id),
-                success: ui.strings.get('copied'),
-              ),
-              icon: const SolarIcon('copy'),
-              label: Text(ui.strings.get('copyLink')),
-            ),
           TextButton.icon(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext, false),
             icon: const SolarIcon('close'),
-            label: Text(ui.strings.get('close')),
+            label: Text(ui.strings.get('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const SolarIcon('trash_bin_trash', color: Colors.white),
+            label: Text(ui.strings.get('removeServer')),
           ),
         ],
       ),
     );
+    if (remove == true) {
+      await ui.run(
+        () => ui.api.removeNode(node.id, subscriptionId),
+        success: ui.strings.get('serverRemoved'),
+      );
+    }
   }
+}
+
+Future<void> _showQrDialog(
+  BuildContext context,
+  EmberUi ui, {
+  required String title,
+  required Future<Uint8List?> image,
+  required Future<void> Function() copy,
+  required String copyLabel,
+  required String hint,
+}) async {
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: FutureBuilder<Uint8List?>(
+          future: image,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                width: 260,
+                height: 260,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError || snapshot.data == null) {
+              return Text(ui.strings.get('qrTooLong'));
+            }
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.memory(
+                  snapshot.data!,
+                  width: 260,
+                  height: 260,
+                  gaplessPlayback: true,
+                ),
+                const SizedBox(height: 12),
+                Text(hint, textAlign: TextAlign.center),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: () => ui.run(copy, success: ui.strings.get('copied')),
+          icon: const SolarIcon('copy'),
+          label: Text(copyLabel),
+        ),
+        TextButton.icon(
+          onPressed: () => Navigator.pop(context),
+          icon: const SolarIcon('close'),
+          label: Text(ui.strings.get('close')),
+        ),
+      ],
+    ),
+  );
 }
 
 String _formatBytes(int bytes) {

@@ -22,7 +22,7 @@ private const val PING_URL = "http://cp.cloudflare.com/generate_204"
 private const val SPEED_URL = "https://speed.cloudflare.com/__down?bytes=30000000"
 private const val SPEED_SECONDS = 4
 private const val PING_PARALLEL = 16
-private const val SPEED_TOP = 12
+private const val SPEED_TOP = 3
 
 internal data class PingMeasure(val medianMs: Int?, val jitterMs: Int?, val successRate: Double)
 

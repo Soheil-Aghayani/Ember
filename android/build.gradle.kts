@@ -39,21 +39,29 @@ val forEmulator = project.hasProperty("emulator")
 val tvPreview = project.hasProperty("tvPreview")
 val useFlutterUi = !project.hasProperty("composeUi")
 val emulatorLibsDir = layout.buildDirectory.dir("emulator-libs").get().asFile
+val xrayCoreVersion = "26.11.9"
+val xrayEmulatorZipSha256 = "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"
+val xrayAndroidZipSha256 = "edcefc25b9b3195b11e18624c8269a969d6aabc39c6298a9a5ab29de15d46f3b"
 val fetchXrayEmulator = tasks.register("fetchXrayEmulator") {
     val target = File(emulatorLibsDir, "x86_64/libxray.so")
-    outputs.file(target)
-    onlyIf { forEmulator && !target.exists() }
+    val marker = layout.buildDirectory.file("xray-android/emulator-xray-version.txt").get().asFile
+    val markerValue = "$xrayCoreVersion:$xrayEmulatorZipSha256"
+    outputs.files(target, marker)
+    inputs.property("xrayAsset", markerValue)
+    onlyIf { forEmulator && (!target.exists() || !marker.exists() || marker.readText().trim() != markerValue) }
     doLast {
         val zip = layout.buildDirectory.file("xray-android/Xray-linux-64.zip").get().asFile.apply { parentFile.mkdirs() }
-        URI("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip").toURL().openStream()
+        URI("https://github.com/XTLS/Xray-core/releases/download/v$xrayCoreVersion/Xray-linux-64.zip").toURL().openStream()
             .use { input -> zip.outputStream().use { input.copyTo(it) } }
         val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
-        check(actual == "e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214") { "Checksum mismatch for the Xray download: $actual" }
+        check(actual == xrayEmulatorZipSha256) { "Checksum mismatch for the Xray download: $actual" }
         copy {
             from(zipTree(zip)) { include("xray") }
             into(File(emulatorLibsDir, "x86_64"))
             rename("xray", "libxray.so")
         }
+        marker.parentFile.mkdirs()
+        marker.writeText(markerValue)
     }
 }
 if (forEmulator) tasks.named("preBuild").configure { dependsOn(fetchXrayEmulator) }
@@ -61,20 +69,25 @@ if (forEmulator) tasks.named("preBuild").configure { dependsOn(fetchXrayEmulator
 val xrayAndroidDir = file("src/main/jniLibs/arm64-v8a")
 val fetchXrayAndroid = tasks.register("fetchXrayAndroid") {
     val target = File(xrayAndroidDir, "libxray.so")
-    outputs.file(target)
-    onlyIf { !target.exists() }
+    val marker = layout.buildDirectory.file("xray-android/android-arm64-xray-version.txt").get().asFile
+    val markerValue = "$xrayCoreVersion:$xrayAndroidZipSha256"
+    outputs.files(target, marker)
+    inputs.property("xrayAsset", markerValue)
+    onlyIf { !target.exists() || !marker.exists() || marker.readText().trim() != markerValue }
     doLast {
         val zip = layout.buildDirectory.file("xray-android/Xray-android-arm64-v8a.zip").get().asFile.apply { parentFile.mkdirs() }
-        URI("https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-android-arm64-v8a.zip").toURL().openStream()
+        URI("https://github.com/XTLS/Xray-core/releases/download/v$xrayCoreVersion/Xray-android-arm64-v8a.zip").toURL().openStream()
             .use { input -> zip.outputStream().use { input.copyTo(it) } }
         val actual = MessageDigest.getInstance("SHA-256").digest(zip.readBytes()).joinToString("") { "%02x".format(it) }
-        check(actual == "ee7878bb47ce28ff5b068e2d173ba1a9fab20ca1aec94191644919ec08ba5f1d") { "Checksum mismatch for the Xray download: $actual" }
+        check(actual == xrayAndroidZipSha256) { "Checksum mismatch for the Xray download: $actual" }
         xrayAndroidDir.mkdirs()
         copy {
             from(zipTree(zip)) { include("xray") }
             into(xrayAndroidDir)
             rename("xray", "libxray.so")
         }
+        marker.parentFile.mkdirs()
+        marker.writeText(markerValue)
     }
 }
 tasks.named("preBuild").configure { dependsOn(fetchXrayAndroid) }
@@ -102,10 +115,12 @@ android {
     defaultConfig {
         applicationId = "com.soheil.ember"
         manifestPlaceholders["launcherActivity"] = if (useFlutterUi) ".MainActivity" else ".ComposeMainActivity"
+        manifestPlaceholders["flutterUiEnabled"] = useFlutterUi.toString()
+        manifestPlaceholders["launcherAliasEnabled"] = (!useFlutterUi).toString()
         minSdk = 26
         targetSdk = 35
-        versionCode = 175
-        versionName = "2.7.5"
+        versionCode = 176
+        versionName = "2.7.6"
 
         externalNativeBuild {
             ndkBuild {
