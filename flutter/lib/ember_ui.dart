@@ -311,12 +311,14 @@ class EmberNavigationIcon extends StatelessWidget {
     required this.name,
     required this.appearance,
     this.size = 22,
+    this.kitKatSize,
     this.color,
   });
 
   final String name;
   final String appearance;
   final double size;
+  final double? kitKatSize;
   final Color? color;
 
   static const _kitKatNames = <String, String>{
@@ -334,8 +336,8 @@ class EmberNavigationIcon extends StatelessWidget {
     if (appearance == 'kitkat' && kitKatName != null) {
       return SvgPicture.asset(
         'assets/art/kitkat-icons/$kitKatName.svg',
-        width: size + 6,
-        height: size + 6,
+        width: kitKatSize ?? size + 6,
+        height: kitKatSize ?? size + 6,
         fit: BoxFit.contain,
       );
     }

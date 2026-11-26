@@ -672,6 +672,7 @@ class _PhoneNavigationItem extends StatelessWidget {
                       name: icon,
                       appearance: appearance,
                       size: 21,
+                      kitKatSize: 36,
                       color: iconColor ?? foreground,
                     ),
                   ),
@@ -870,6 +871,7 @@ class _TvRailState extends State<_TvRail> {
                 name: _TvRail._icons[index],
                 appearance: widget.appearance,
                 size: 24,
+                kitKatSize: 30,
                 color: widget.selectedIndex == index
                     ? colors.primary
                     : colors.onSurface,

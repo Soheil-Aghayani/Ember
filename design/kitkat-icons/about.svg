@@ -1,53 +1,64 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Ember KitKat About icon</title>
   <desc id="desc">Editable vector reconstruction of the About icon, with chocolate, wafer, and red wrapper details.</desc>
   <defs>
-<linearGradient id="chocolate" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#A85A35"/>
-  <stop offset=".28" stop-color="#7D3F29"/>
-  <stop offset=".72" stop-color="#572A20"/>
-  <stop offset="1" stop-color="#3E201B"/>
-</linearGradient>
-<linearGradient id="chocolate-face" x1="0" y1="0" x2="1" y2="1">
-  <stop offset="0" stop-color="#8B4A31"/>
-  <stop offset=".48" stop-color="#673322"/>
-  <stop offset="1" stop-color="#47251E"/>
-</linearGradient>
-<linearGradient id="wafer" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#FFF1C9"/>
-  <stop offset=".55" stop-color="#F7D995"/>
-  <stop offset="1" stop-color="#E9B861"/>
-</linearGradient>
-<linearGradient id="red-wrapper" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#FF343C"/>
-  <stop offset=".45" stop-color="#E8172C"/>
-  <stop offset="1" stop-color="#B70824"/>
-</linearGradient>
-<linearGradient id="red-ribbon" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#FF5960"/>
-  <stop offset=".5" stop-color="#EF1E32"/>
-  <stop offset="1" stop-color="#B90A25"/>
-</linearGradient>
-<linearGradient id="cream-shine" x1="0" y1="0" x2="1" y2="1">
-  <stop offset="0" stop-color="#FFF9E8"/>
-  <stop offset="1" stop-color="#F4DDAF"/>
-</linearGradient>
-<pattern id="waffle" width="18" height="18" patternUnits="userSpaceOnUse">
-  <rect width="18" height="18" fill="url(#wafer)"/>
-  <path d="M-5 5 L5 -5 M0 18 L18 0 M13 23 L23 13 M-5 13 L5 23 M0 0 L18 18 M13 -5 L23 5"
-        fill="none" stroke="#D99C4B" stroke-width="2" opacity=".55"/>
-  <path d="M-5 6 L6 -5 M0 18 L18 0" fill="none" stroke="#FFF5D9" stroke-width="1" opacity=".72"/>
-</pattern>
-</defs>
-  
+    <linearGradient id="chocolate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A85A35" />
+      <stop offset=".28" stop-color="#7D3F29" />
+      <stop offset=".72" stop-color="#572A20" />
+      <stop offset="1" stop-color="#3E201B" />
+    </linearGradient>
+    <linearGradient id="chocolate-face" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8B4A31" />
+      <stop offset=".48" stop-color="#673322" />
+      <stop offset="1" stop-color="#47251E" />
+    </linearGradient>
+    <linearGradient id="wafer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF1C9" />
+      <stop offset=".55" stop-color="#F7D995" />
+      <stop offset="1" stop-color="#E9B861" />
+    </linearGradient>
+    <linearGradient id="red-wrapper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF343C" />
+      <stop offset=".45" stop-color="#E8172C" />
+      <stop offset="1" stop-color="#B70824" />
+    </linearGradient>
+    <linearGradient id="red-ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF5960" />
+      <stop offset=".5" stop-color="#EF1E32" />
+      <stop offset="1" stop-color="#B90A25" />
+    </linearGradient>
+    <linearGradient id="cream-shine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF9E8" />
+      <stop offset="1" stop-color="#F4DDAF" />
+    </linearGradient>
+    <pattern id="waffle" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="48" fill="url(#wafer)" />
+      <path d="M-12 12 L12 -12 M0 48 L48 0 M36 60 L60 36 M-12 36 L12 60 M0 0 L48 48 M36 -12 L60 12" fill="none" stroke="#D99C4B" stroke-width="4.2" opacity=".56" />
+      <path d="M-12 14 L14 -12 M2 48 L48 2" fill="none" stroke="#FFF8E8" stroke-width="2.2" opacity=".82" />
+    </pattern>
+    <linearGradient id="glass-glaze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".62" />
+      <stop offset=".18" stop-color="#FFFFFF" stop-opacity=".24" />
+      <stop offset=".42" stop-color="#D8F2F0" stop-opacity=".08" />
+      <stop offset=".68" stop-color="#FFFFFF" stop-opacity=".03" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".20" />
+    </linearGradient>
+    <linearGradient id="glass-rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".98" />
+      <stop offset=".45" stop-color="#E9F7F5" stop-opacity=".62" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".88" />
+    </linearGradient>
+  </defs>
   <g id="about" data-name="About">
-<ellipse cx="256" cy="444" rx="177" ry="18" fill="#6B3526" opacity=".12"/>
-<circle cx="256" cy="253" r="181" fill="url(#chocolate)" stroke="#4A251E" stroke-width="12"/>
-<path d="M141 147 A157 157 0 0 1 350 124" fill="none" stroke="#C78354" stroke-width="8" stroke-linecap="round" opacity=".78"/>
-<circle cx="256" cy="253" r="145" fill="url(#waffle)" stroke="#4E281F" stroke-width="10"/>
-<path d="M242 230 Q242 219 256 219 Q270 219 270 230 V339 Q270 351 284 351 H291 V375 H220 V351 H228 Q242 351 242 339 Z" fill="url(#chocolate-face)"/>
-<circle cx="256" cy="186" r="23" fill="url(#chocolate-face)"/>
-<path d="M249 229 Q256 226 263 229" fill="none" stroke="#C78354" stroke-width="4" stroke-linecap="round" opacity=".8"/>
-</g>
+    <ellipse cx="256" cy="444" rx="177" ry="18" fill="#6B3526" opacity=".12" />
+    <circle cx="256" cy="253" r="181" fill="url(#chocolate)" stroke="#4A251E" stroke-width="12" />
+    <circle cx="256" cy="253" r="181" fill="url(#glass-glaze)" stroke="url(#glass-rim)" stroke-width="4" opacity=".22" pointer-events="none" stroke-linejoin="round" />
+    <path d="M141 147 A157 157 0 0 1 350 124" fill="none" stroke="url(#glass-rim)" stroke-width="10" stroke-linecap="round" opacity=".96" />
+    <circle cx="256" cy="253" r="145" fill="url(#waffle)" stroke="#4E281F" stroke-width="10" />
+    <path d="M242 230 Q242 219 256 219 Q270 219 270 230 V339 Q270 351 284 351 H291 V375 H220 V351 H228 Q242 351 242 339 Z" fill="url(#chocolate-face)" />
+    <circle cx="256" cy="186" r="23" fill="url(#chocolate-face)" />
+    <path d="M249 229 Q256 226 263 229" fill="none" stroke="#C78354" stroke-width="4" stroke-linecap="round" opacity=".8" />
+  </g>
 </svg>
