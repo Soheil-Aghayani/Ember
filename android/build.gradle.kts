@@ -119,8 +119,8 @@ android {
         manifestPlaceholders["launcherAliasEnabled"] = (!useFlutterUi).toString()
         minSdk = 26
         targetSdk = 35
-        versionCode = 176
-        versionName = "2.7.6"
+        versionCode = 177
+        versionName = "2.7.7"
 
         externalNativeBuild {
             ndkBuild {

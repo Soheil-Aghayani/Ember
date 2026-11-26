@@ -36,6 +36,8 @@ On 2026-11-25, the Flutter TV preview was rebuilt from the current release sourc
 
 On 2026-11-26, the signed 2.7.6 release build completed. The phone emulator stopped responding while installing its debug APK, so the updated page transition was not visually checked. No VPN was configured or started. The existing TV preview checks above describe the prior UI and do not verify the 2.7.6 transition; physical BRAVIA BF1 behavior remains pending.
 
+On 2026-11-27, the signed 2.7.7 release build completed and its signature was verified. Network diagnostics now display an active progress state and ignore repeated taps while a check is running. This UI change was not visually checked on an emulator or a physical phone/TV; VPN and physical-device behavior remain pending.
+
 The same day, the signed release APK was installed on the TV-named AVD. Its feature list does not include `android.software.leanback` (`ro.build.characteristics` reports `emulator`), so the shared APK correctly selected the phone layout there. The forced debug TV preview verifies the TV layout and D-pad controls, but this AVD cannot verify release-time Leanback detection or launcher behavior.
 
 - [x] Assemble the normal debug APK and debug-only TV preview APK.

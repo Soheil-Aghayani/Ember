@@ -4,11 +4,21 @@ import 'package:flutter/services.dart';
 import 'ember_api.dart';
 import 'ember_ui.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.ui, required this.onOpenHome});
 
   final EmberUi ui;
   final VoidCallback onOpenHome;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  EmberUi get ui => widget.ui;
+  VoidCallback get onOpenHome => widget.onOpenHome;
+
+  bool _diagnosticsRunning = false;
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +235,10 @@ class SettingsScreen extends StatelessWidget {
         EmberActionTile(
           icon: 'info_circle',
           title: copy.get('diagnosticsTitle'),
-          subtitle: copy.get('diagnosticsHelp'),
+          subtitle: copy.get(
+            _diagnosticsRunning ? 'diagnosticsRunning' : 'diagnosticsHelp',
+          ),
+          loading: _diagnosticsRunning,
           onPressed: () => _runDiagnostics(context),
         ),
       ],
@@ -460,66 +473,72 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _runDiagnostics(BuildContext context) async {
-    final result = await ui.run(() => ui.api.runDiagnostics());
-    if (result == null || !context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(ui.strings.get('diagnosticsTitle')),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(ui.strings.get('diagnosticsPrivacy')),
-                if (result.directIp != null) ...[
+    if (_diagnosticsRunning) return;
+    setState(() => _diagnosticsRunning = true);
+    try {
+      final result = await ui.run(() => ui.api.runDiagnostics());
+      if (result == null || !mounted || !context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(ui.strings.get('diagnosticsTitle')),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(ui.strings.get('diagnosticsPrivacy')),
+                  if (result.directIp != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      ui.strings.get('outsideIp'),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    SelectableText(result.directIp!),
+                  ],
+                  if (result.tunnelIp != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      ui.strings.get('tunnelIp'),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    SelectableText(result.tunnelIp!),
+                  ],
+                  if (result.directIp == null && result.tunnelIp == null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '${ui.strings.get('outsideIp')}: ${ui.strings.get('ipUnavailable')}',
+                    ),
+                  ],
                   const SizedBox(height: 12),
-                  Text(
-                    ui.strings.get('outsideIp'),
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  SelectableText(result.directIp!),
+                  SelectableText(result.report),
                 ],
-                if (result.tunnelIp != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    ui.strings.get('tunnelIp'),
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  SelectableText(result.tunnelIp!),
-                ],
-                if (result.directIp == null && result.tunnelIp == null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    '${ui.strings.get('outsideIp')}: ${ui.strings.get('ipUnavailable')}',
-                  ),
-                ],
-                const SizedBox(height: 12),
-                SelectableText(result.report),
-              ],
+              ),
             ),
           ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: result.report));
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                ui.tell(ui.strings.get('copied'));
+              },
+              icon: const SolarIcon('copy'),
+              label: Text(ui.strings.get('copy')),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.pop(dialogContext),
+              icon: const SolarIcon('close'),
+              label: Text(ui.strings.get('close')),
+            ),
+          ],
         ),
-        actions: [
-          TextButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: result.report));
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-              ui.tell(ui.strings.get('copied'));
-            },
-            icon: const SolarIcon('copy'),
-            label: Text(ui.strings.get('copy')),
-          ),
-          TextButton.icon(
-            onPressed: () => Navigator.pop(dialogContext),
-            icon: const SolarIcon('close'),
-            label: Text(ui.strings.get('close')),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _diagnosticsRunning = false);
+    }
   }
 }
 

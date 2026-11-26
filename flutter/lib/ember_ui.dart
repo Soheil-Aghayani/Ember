@@ -448,16 +448,18 @@ class EmberActionTile extends StatelessWidget {
     required this.title,
     required this.onPressed,
     this.subtitle,
+    this.loading = false,
   });
 
   final String icon;
   final String title;
   final String? subtitle;
   final VoidCallback onPressed;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) => InkWell(
-    onTap: onPressed,
+    onTap: loading ? null : onPressed,
     borderRadius: BorderRadius.circular(18),
     child: EmberCard(
       padding: const EdgeInsets.all(16),
@@ -483,12 +485,21 @@ class EmberActionTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          SolarIcon(
-            Directionality.of(context) == TextDirection.rtl
-                ? 'alt_arrow_left'
-                : 'alt_arrow_right',
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          if (loading)
+            SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            )
+          else
+            SolarIcon(
+              Directionality.of(context) == TextDirection.rtl
+                  ? 'alt_arrow_left'
+                  : 'alt_arrow_right',
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
         ],
       ),
     ),
