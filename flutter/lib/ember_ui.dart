@@ -305,6 +305,44 @@ class SolarIcon extends StatelessWidget {
   );
 }
 
+class EmberNavigationIcon extends StatelessWidget {
+  const EmberNavigationIcon({
+    super.key,
+    required this.name,
+    required this.appearance,
+    this.size = 22,
+    this.color,
+  });
+
+  final String name;
+  final String appearance;
+  final double size;
+  final Color? color;
+
+  static const _kitKatNames = <String, String>{
+    'home': 'home',
+    'server_2': 'servers',
+    'settings': 'settings',
+    'file_text': 'logs',
+    'star_fall': 'whats-new',
+    'info_circle': 'about',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final kitKatName = _kitKatNames[name];
+    if (appearance == 'kitkat' && kitKatName != null) {
+      return SvgPicture.asset(
+        'assets/art/kitkat-icons/$kitKatName.svg',
+        width: size + 6,
+        height: size + 6,
+        fit: BoxFit.contain,
+      );
+    }
+    return SolarIcon(name, size: size, color: color);
+  }
+}
+
 class EmberCard extends StatelessWidget {
   const EmberCard({
     super.key,

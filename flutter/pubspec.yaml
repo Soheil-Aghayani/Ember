@@ -20,6 +20,7 @@ flutter:
   assets:
     - assets/brand/ember-logo.png
     - assets/art/
+    - assets/art/kitkat-icons/
     - assets/flags/
     - assets/icons/solar/
     - assets/fonts/Inter-LICENSE.txt

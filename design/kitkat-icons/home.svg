@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Ember KitKat Home icon</title>
+  <desc id="desc">Editable vector reconstruction of the Home icon, with chocolate, wafer, and red wrapper details.</desc>
+  <defs>
+<linearGradient id="chocolate" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#A85A35"/>
+  <stop offset=".28" stop-color="#7D3F29"/>
+  <stop offset=".72" stop-color="#572A20"/>
+  <stop offset="1" stop-color="#3E201B"/>
+</linearGradient>
+<linearGradient id="chocolate-face" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#8B4A31"/>
+  <stop offset=".48" stop-color="#673322"/>
+  <stop offset="1" stop-color="#47251E"/>
+</linearGradient>
+<linearGradient id="wafer" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#FFF1C9"/>
+  <stop offset=".55" stop-color="#F7D995"/>
+  <stop offset="1" stop-color="#E9B861"/>
+</linearGradient>
+<linearGradient id="red-wrapper" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#FF343C"/>
+  <stop offset=".45" stop-color="#E8172C"/>
+  <stop offset="1" stop-color="#B70824"/>
+</linearGradient>
+<linearGradient id="red-ribbon" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#FF5960"/>
+  <stop offset=".5" stop-color="#EF1E32"/>
+  <stop offset="1" stop-color="#B90A25"/>
+</linearGradient>
+<linearGradient id="cream-shine" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0" stop-color="#FFF9E8"/>
+  <stop offset="1" stop-color="#F4DDAF"/>
+</linearGradient>
+<pattern id="waffle" width="18" height="18" patternUnits="userSpaceOnUse">
+  <rect width="18" height="18" fill="url(#wafer)"/>
+  <path d="M-5 5 L5 -5 M0 18 L18 0 M13 23 L23 13 M-5 13 L5 23 M0 0 L18 18 M13 -5 L23 5"
+        fill="none" stroke="#D99C4B" stroke-width="2" opacity=".55"/>
+  <path d="M-5 6 L6 -5 M0 18 L18 0" fill="none" stroke="#FFF5D9" stroke-width="1" opacity=".72"/>
+</pattern>
+</defs>
+  
+  <g id="home" data-name="Home">
+<ellipse cx="256" cy="442" rx="170" ry="18" fill="#6B3526" opacity=".12"/>
+<g id="wrapper-tab">
+  <path d="M340 43 Q340 28 355 28 H411 L430 43 V183 L413 198 H350 Q340 198 340 187 Z" fill="url(#red-wrapper)" stroke="#A60E22" stroke-width="5"/>
+  <path d="M350 57 Q375 70 418 48" fill="none" stroke="#FFF2D9" stroke-width="12" opacity=".96"/>
+  <path d="M355 36 Q370 32 395 36" fill="none" stroke="#FF8885" stroke-width="5" stroke-linecap="round"/>
+</g>
+<path d="M104 218 L256 88 L408 218 V424 Q408 443 389 443 H123 Q104 443 104 424 Z" fill="url(#waffle)" stroke="#542A20" stroke-width="14" stroke-linejoin="round"/>
+<path d="M58 230 L229 83 Q256 60 283 83 L454 230 Q469 243 457 259 Q444 275 428 261 L256 113 L84 261 Q68 275 54 259 Q42 243 58 230 Z" fill="url(#chocolate)" stroke="#4A251E" stroke-width="8" stroke-linejoin="round"/>
+<path d="M76 235 L236 98 Q256 82 276 98 L436 235" fill="none" stroke="#D28A5A" stroke-width="8" stroke-linecap="round" opacity=".72"/>
+<path d="M202 443 V333 Q202 302 233 302 H279 Q310 302 310 333 V443 Z" fill="url(#chocolate-face)" stroke="#4A251E" stroke-width="8" stroke-linejoin="round"/>
+<path d="M217 333 V323 Q217 315 227 315" fill="none" stroke="#C78354" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+<circle cx="285" cy="378" r="10" fill="#FFE7A8" stroke="#D59B4D" stroke-width="3"/>
+</g>
+</svg>

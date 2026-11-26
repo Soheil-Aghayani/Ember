@@ -14,6 +14,9 @@ Claude's warmth (cream paper, ink text, generous whitespace) with Firefox's oran
 - **Brand:** no Firefox logo, no look-alike fox mark. Ember's mark is an original ember/flame.
 - **Reference only:** the Sketch symbol libraries and HIG are references, not assets we copy.
 
+## Original theme artwork
+- KitKat-inspired icon reconstructions are in `design/kitkat-icons/` as editable SVGs, with a grouped master sheet and individual icons. Flutter uses the standalone vectors from `flutter/assets/art/kitkat-icons/` when that theme is selected.
+
 ## Third-party assets
 - Country flags in `desktop/src/main/resources/flags/` are from the circle-flags set (MIT licence, github.com/HatScripts/circle-flags).
 - Icons come from the Solar icon set by 480 Design (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/). Ember uses converted copies in `android/src/main/res/drawable/ic_solar_*` and `desktop/src/main/resources/icons/`, and SVG copies in `flutter/assets/icons/solar/`.

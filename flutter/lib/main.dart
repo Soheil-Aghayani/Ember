@@ -385,6 +385,7 @@ class _EmberShellState extends State<_EmberShell> {
                       children: [
                         _TvRail(
                           selectedIndex: tvSelected,
+                          appearance: ui.appearance,
                           label: (key) => copy.get(key),
                           onSelect: (index) => _select(_tvPages[index]),
                         ),
@@ -409,6 +410,7 @@ class _EmberShellState extends State<_EmberShell> {
             ? null
             : _PhoneNavigationBar(
                 selectedIndex: phoneNavigationIndex,
+                appearance: ui.appearance,
                 icons: _phoneIcons,
                 labels: _phoneLabels.map(copy.get).toList(growable: false),
                 onSelected: (index) => _select(_phonePages[index]),
@@ -423,12 +425,14 @@ class _EmberShellState extends State<_EmberShell> {
 class _PhoneNavigationBar extends StatefulWidget {
   const _PhoneNavigationBar({
     required this.selectedIndex,
+    required this.appearance,
     required this.icons,
     required this.labels,
     required this.onSelected,
   });
 
   final int selectedIndex;
+  final String appearance;
   final List<String> icons;
   final List<String> labels;
   final ValueChanged<int> onSelected;
@@ -603,6 +607,7 @@ class _PhoneNavigationBarState extends State<_PhoneNavigationBar>
                               child: _PhoneNavigationItem(
                                 icon: widget.icons[index],
                                 label: widget.labels[index],
+                                appearance: widget.appearance,
                                 selected: index == widget.selectedIndex,
                                 onTap: () => widget.onSelected(index),
                               ),
@@ -625,12 +630,14 @@ class _PhoneNavigationItem extends StatelessWidget {
   const _PhoneNavigationItem({
     required this.icon,
     required this.label,
+    required this.appearance,
     required this.selected,
     required this.onTap,
   });
 
   final String icon;
   final String label;
+  final String appearance;
   final bool selected;
   final VoidCallback onTap;
 
@@ -661,8 +668,9 @@ class _PhoneNavigationItem extends StatelessWidget {
                     tween: ColorTween(end: foreground),
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
-                    builder: (context, iconColor, _) => SolarIcon(
-                      icon,
+                    builder: (context, iconColor, _) => EmberNavigationIcon(
+                      name: icon,
+                      appearance: appearance,
                       size: 21,
                       color: iconColor ?? foreground,
                     ),
@@ -760,11 +768,13 @@ class _PageStackState extends State<_PageStack>
 class _TvRail extends StatefulWidget {
   const _TvRail({
     required this.selectedIndex,
+    required this.appearance,
     required this.label,
     required this.onSelect,
   });
 
   final int selectedIndex;
+  final String appearance;
   final String Function(String key) label;
   final ValueChanged<int> onSelect;
 
@@ -856,8 +866,10 @@ class _TvRailState extends State<_TvRail> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
-              SolarIcon(
-                _TvRail._icons[index],
+              EmberNavigationIcon(
+                name: _TvRail._icons[index],
+                appearance: widget.appearance,
+                size: 24,
                 color: widget.selectedIndex == index
                     ? colors.primary
                     : colors.onSurface,
