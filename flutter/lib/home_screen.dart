@@ -73,11 +73,19 @@ class _HomeScreenState extends State<HomeScreen>
     final state = ui.state;
     final copy = ui.strings;
     final node = state.connectedNode ?? state.selectedNode;
-    final status = state.connected
-        ? copy.get('connected')
+    final kitkat = ui.appearance == 'kitkat';
+    final statusKey = kitkat
+        ? state.connected
+              ? 'kitkatConnected'
+              : state.connecting
+              ? 'kitkatConnecting'
+              : 'kitkatDisconnected'
+        : state.connected
+        ? 'connected'
         : state.connecting
-        ? copy.get('connecting')
-        : copy.get('disconnected');
+        ? 'connecting'
+        : 'disconnected';
+    final status = copy.get(statusKey);
     final detail = state.connected
         ? copy.get('sessionStats', {
             'time': _duration(state.connectedAt) ?? '00:00:00',
@@ -253,6 +261,15 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _orb(BuildContext context, EmberState state, double size) {
     final connected = state.connected;
     final connecting = state.connecting;
+    final palette = EmberPalettes.resolve(
+      widget.ui.appearance,
+      Theme.of(context).brightness,
+    );
+    final orbColors = connected
+        ? palette.orbOn
+        : connecting
+        ? EmberPalettes.connectingOrb
+        : palette.orbOff;
     return RepaintBoundary(
       child: SizedBox(
         width: size,
@@ -265,9 +282,7 @@ class _HomeScreenState extends State<HomeScreen>
               child: CustomPaint(
                 painter: _OrbitPainter(
                   animation: _orbit,
-                  orbitColor: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : EmberColors.mintOrb,
+                  orbitColor: palette.orbitColor,
                   connected: connected,
                 ),
               ),
@@ -309,32 +324,7 @@ class _HomeScreenState extends State<HomeScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: connected
-                          ? const [
-                              Color(0xFF0B4F6C),
-                              Color(0xFF0F7A7A),
-                              Color(0xFF1FB08A),
-                              Color(0xFF4FD6A0),
-                              Color(0xFF9AF0B8),
-                              Color(0xFFE0FFC8),
-                            ]
-                          : connecting
-                          ? const [
-                              Color(0xFFB1BECD),
-                              Color(0xFF9AAEBE),
-                              Color(0xFF849DAE),
-                              Color(0xFF7D969F),
-                              Color(0xFF9BB6AB),
-                              Color(0xFFD4DCC8),
-                            ]
-                          : const [
-                              Color(0xFFB4BCD6),
-                              Color(0xFF929BBC),
-                              Color(0xFF767FA4),
-                              Color(0xFF6A7298),
-                              Color(0xFF8C82A6),
-                              Color(0xFFD0A294),
-                            ],
+                      colors: orbColors,
                       stops: const [0, .22, .42, .60, .78, 1],
                     ),
                     border: Border.all(
@@ -351,9 +341,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       BoxShadow(
                         color:
-                            (connected
-                                    ? EmberColors.mintOrb
-                                    : const Color(0xFF8C82A6))
+                            (connected ? palette.orbOn[3] : palette.orbOff[4])
                                 .withValues(alpha: .19),
                         blurRadius: 28,
                         spreadRadius: 1,

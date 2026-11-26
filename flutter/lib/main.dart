@@ -41,8 +41,11 @@ class _EmberAppState extends State<EmberApp> {
 
   Future<void> _loadAppearance() async {
     try {
-      final appearance = await _api.getAppearance();
-      if (mounted && const {'system', 'mint', 'dark'}.contains(appearance)) {
+      final savedAppearance = await _api.getAppearance();
+      final appearance = savedAppearance == 'dark'
+          ? 'dark_choco'
+          : savedAppearance;
+      if (mounted && EmberUi.appearanceOptions.contains(appearance)) {
         setState(() => _appearance = appearance);
       }
     } catch (_) {
@@ -51,7 +54,7 @@ class _EmberAppState extends State<EmberApp> {
   }
 
   Future<void> _setAppearance(String appearance) async {
-    if (!const {'system', 'mint', 'dark'}.contains(appearance) ||
+    if (!EmberUi.appearanceOptions.contains(appearance) ||
         appearance == _appearance) {
       return;
     }
@@ -150,17 +153,23 @@ class _EmberAppState extends State<EmberApp> {
   @override
   Widget build(BuildContext context) {
     final isTv = _state?.isTv ?? false;
-    final themeMode = switch (_appearance) {
-      'mint' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+    final themeMode = _appearance == 'system'
+        ? ThemeMode.system
+        : _appearance == 'dark_choco'
+        ? ThemeMode.dark
+        : ThemeMode.light;
+    final lightAppearance =
+        _appearance == 'system' || _appearance == 'dark_choco'
+        ? 'strawberry'
+        : _appearance;
     return MaterialApp(
       title: 'Ember',
       debugShowCheckedModeBanner: false,
-      theme: _theme(Brightness.light, isTv: isTv),
-      darkTheme: _theme(Brightness.dark, isTv: isTv),
+      theme: _theme(Brightness.light, appearance: lightAppearance, isTv: isTv),
+      darkTheme: _theme(Brightness.dark, appearance: 'dark_choco', isTv: isTv),
       themeMode: themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 350),
+      themeAnimationCurve: Curves.easeInOutCubic,
       scaffoldMessengerKey: _messengerKey,
       home: _state == null
           ? const _LaunchScreen()
@@ -200,51 +209,20 @@ class _EmberAppState extends State<EmberApp> {
       (state.language == 'system' &&
           ui.PlatformDispatcher.instance.locale.languageCode == 'fa');
 
-  ThemeData _theme(Brightness brightness, {required bool isTv}) {
-    const light = ColorScheme.light(
-      primary: EmberColors.mintPrimary,
-      onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFD7EEE5),
-      onPrimaryContainer: Color(0xFF0A4E3D),
-      secondary: EmberColors.mintOrb,
-      onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: EmberColors.mintSurfaceVariant,
-      onSecondaryContainer: Color(0xFF0A6B52),
-      tertiary: Color(0xFF1E7A3C),
-      error: Color(0xFFBA1A1A),
-      surface: Color(0xFFFFFFFF),
-      onSurface: Color(0xFF231712),
-      onSurfaceVariant: Color(0xFF51443C),
-      outline: Color(0xFF7E978A),
-      outlineVariant: EmberColors.mintOutline,
-    );
-    const dark = ColorScheme.dark(
-      primary: Color(0xFFFF8D5C),
-      onPrimary: Color(0xFF1A1714),
-      primaryContainer: Color(0xFF3A2218),
-      onPrimaryContainer: Color(0xFFFFD9C7),
-      secondary: Color(0xFFB79CFF),
-      onSecondary: Color(0xFF2A1566),
-      secondaryContainer: Color(0xFF2C2540),
-      onSecondaryContainer: Color(0xFFE6DCFF),
-      tertiary: Color(0xFF5FD17F),
-      error: Color(0xFFFFB4AB),
-      surface: Color(0xFF24201C),
-      onSurface: Color(0xFFF3EEE6),
-      onSurfaceVariant: Color(0xFFCDC5BA),
-      outline: Color(0xFF80786C),
-      outlineVariant: Color(0xFF3A342D),
-    );
-    final scheme = brightness == Brightness.dark ? dark : light;
+  ThemeData _theme(
+    Brightness brightness, {
+    required String appearance,
+    required bool isTv,
+  }) {
+    final palette = EmberPalettes.resolve(appearance, brightness);
+    final scheme = palette.scheme;
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       focusColor: isTv ? EmberFocus.overlay(scheme.primary, isTv: true) : null,
       fontFamily: 'Inter',
-      scaffoldBackgroundColor: brightness == Brightness.dark
-          ? const Color(0xFF1A1714)
-          : EmberColors.mintBackground,
+      scaffoldBackgroundColor: palette.background,
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           fontSize: 32,
@@ -399,7 +377,7 @@ class _EmberShellState extends State<_EmberShell> {
       child: Scaffold(
         body: Stack(
           children: [
-            const Positioned.fill(child: EmberBackdrop()),
+            Positioned.fill(child: EmberBackdrop(appearance: ui.appearance)),
             SafeArea(
               child: ui.state.isTv
                   ? Row(

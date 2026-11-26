@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="ivory" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF9F1" />
+      <stop offset="0.58" stop-color="#FFF5EA" />
+      <stop offset="1" stop-color="#F4E7DA" />
+    </linearGradient>
+    <linearGradient id="kitkat-red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D92738" />
+      <stop offset="0.55" stop-color="#BA0018" />
+      <stop offset="1" stop-color="#8F0014" />
+    </linearGradient>
+    <linearGradient id="chocolate" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#75402D" />
+      <stop offset="1" stop-color="#351C1B" />
+    </linearGradient>
+    <radialGradient id="open-space" cx="48%" cy="44%" r="66%">
+      <stop offset="0" stop-color="#FFFDF9" stop-opacity="0.72" />
+      <stop offset="0.58" stop-color="#FFFDF9" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#FFFDF9" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#ivory)" />
+
+  <!-- A kinetic red wrapper sweep frames the open center of the app. -->
+  <path d="M995 -80 C1174 10 1350 44 1612 -10 L1612 266 C1458 319 1326 275 1212 212 C1100 150 1028 74 995 -80Z" fill="url(#kitkat-red)" fill-opacity="0.96" />
+  <path d="M1134 -42 C1305 83 1436 116 1604 90" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-opacity="0.95" />
+  <path d="M1155 22 C1320 128 1458 154 1605 136" fill="none" stroke="#F3D4B8" stroke-width="8" stroke-linecap="round" stroke-opacity="0.9" />
+
+  <!-- Chocolate and crisp wafer layers sit in the lower corner as a quiet product cue. -->
+  <path d="M1000 1200 C1152 1070 1190 926 1324 868 C1452 813 1528 878 1600 800 L1600 1200Z" fill="url(#chocolate)" fill-opacity="0.96" />
+  <path d="M1080 1205 C1210 1090 1255 989 1384 940 C1479 904 1542 930 1604 872" fill="none" stroke="#E6B46F" stroke-width="25" stroke-linecap="round" />
+  <path d="M1120 1208 C1260 1095 1308 1011 1410 978 C1490 951 1555 968 1604 925" fill="none" stroke="#F9E1BB" stroke-width="13" stroke-linecap="round" />
+  <path d="M1170 1210 C1300 1100 1350 1040 1440 1018 C1505 1002 1554 1014 1608 984" fill="none" stroke="#A86840" stroke-width="14" stroke-linecap="round" />
+
+  <!-- Bright wafer-gold marks add the playful 2024 packaging energy. -->
+  <path d="M1320 424 C1430 374 1514 380 1610 422" fill="none" stroke="#E8B16A" stroke-width="18" stroke-linecap="round" stroke-opacity="0.62" />
+  <path d="M1390 480 C1476 448 1537 458 1608 496" fill="none" stroke="#BA0018" stroke-width="12" stroke-linecap="round" stroke-opacity="0.28" />
+  <circle cx="1450" cy="568" r="13" fill="#BA0018" fill-opacity="0.48" />
+  <circle cx="1532" cy="632" r="8" fill="#A86840" fill-opacity="0.72" />
+  <circle cx="1252" cy="610" r="7" fill="#E8B16A" fill-opacity="0.92" />
+  <circle cx="1490" cy="752" r="18" fill="#BA0018" fill-opacity="0.45" />
+  <circle cx="1170" cy="1010" r="10" fill="#F9E1BB" fill-opacity="0.88" />
+
+  <rect width="1600" height="1200" fill="url(#open-space)" />
+</svg>

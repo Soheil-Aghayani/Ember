@@ -298,10 +298,17 @@ class MainActivity : FlutterFragmentActivity() {
     private fun handleCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getState" -> result.success(snapshot())
-            "getAppearance" -> result.success(uiPreferences.getString("appearance", "mint") ?: "mint")
+            "getAppearance" -> {
+                val savedAppearance = uiPreferences.getString("appearance", "mint") ?: "mint"
+                val appearance = if (savedAppearance == "dark") "dark_choco" else savedAppearance
+                if (appearance != savedAppearance) {
+                    uiPreferences.edit().putString("appearance", appearance).apply()
+                }
+                result.success(appearance)
+            }
             "setAppearance" -> {
                 val appearance = call.requiredString("appearance", result) ?: return
-                if (appearance !in setOf("system", "mint", "dark")) result.error("invalid_appearance", "Choose a supported appearance.", null)
+                if (appearance !in setOf("system", "strawberry", "dark_choco", "mint", "kitkat")) result.error("invalid_appearance", "Choose a supported appearance.", null)
                 else {
                     uiPreferences.edit().putString("appearance", appearance).apply()
                     result.success(null)

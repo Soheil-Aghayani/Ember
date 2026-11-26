@@ -38,24 +38,62 @@ class SettingsScreen extends StatelessWidget {
         const SizedBox(height: 14),
         _sectionTitle(context, copy.get('appearance')),
         EmberCard(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: RadioGroup<String>(
-            groupValue: ui.appearance,
-            onChanged: (value) {
-              if (value != null) ui.onAppearanceChanged(value);
-            },
-            child: Column(
-              children: [
-                for (final appearance in ['mint', 'system', 'dark'])
-                  RadioListTile<String>(
-                    value: appearance,
-                    title: Text(copy.get(appearance)),
-                    subtitle: appearance == 'mint'
-                        ? Text(copy.get('appearanceHelp'))
-                        : null,
-                    controlAffinity: ListTileControlAffinity.leading,
+          padding: EdgeInsets.zero,
+          child: PopupMenuButton<String>(
+            tooltip: copy.get('appearance'),
+            onSelected: ui.onAppearanceChanged,
+            itemBuilder: (context) => [
+              for (final appearance in EmberUi.appearanceOptions)
+                PopupMenuItem(
+                  value: appearance,
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(copy.appearanceLabel(appearance))),
+                      if (appearance == ui.appearance) ...[
+                        const SizedBox(width: 10),
+                        SolarIcon(
+                          'check_circle',
+                          size: 19,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ],
                   ),
-              ],
+                ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          copy.appearanceLabel(ui.appearance),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          copy.get('appearanceHelp'),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SolarIcon(
+                    'alt_arrow_down',
+                    size: 21,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
